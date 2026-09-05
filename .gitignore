@@ -29,3 +29,7 @@ apps/**/.flutter-plugins-dependencies
 # OS generated
 .DS_Store
 Thumbs.db
+
+# Releases
+releases/
+*.apk
