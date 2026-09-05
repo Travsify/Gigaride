@@ -138,6 +138,14 @@
         </div>
       </button>
 
+      <button onclick="switchTab('failure_radar')" id="tabBtn_failure_radar" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-rose-400 hover:text-white hover:bg-rose-950/40 border border-rose-500/30 shadow-sm">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-shield-halved w-4 text-center text-sm text-rose-400"></i>
+          <span>Failure Radar & Moats</span>
+        </div>
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-black tracking-wider">DEFENSE</span>
+      </button>
+
       <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
         <div class="flex items-center space-x-3">
           <i class="fa-solid fa-id-card w-4 text-center text-sm"></i>
@@ -342,14 +350,20 @@
         </div>
       </div>
 
-      <div class="flex items-center space-x-3">
-        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-          <i class="fa-solid fa-server text-teal-400 text-xs"></i>
-          <span class="text-slate-300">Hostinger VPS: <strong class="text-emerald-400 font-mono">69.62.127.50</strong></span>
-        </div>
+      <div class="flex items-center space-x-2 sm:space-x-2.5">
+        <button onclick="switchTab('failure_radar')" class="text-xs bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1.5 shadow-sm">
+          <i class="fa-solid fa-shield-halved text-rose-400"></i>
+          <span class="hidden md:inline">Failure Radar</span>
+        </button>
+
+        <button onclick="openSystemPurgeModal()" class="text-xs bg-rose-600 hover:bg-rose-500 border border-rose-500 text-white px-3 py-1.5 rounded-lg font-black tracking-wide transition flex items-center space-x-1.5 shadow-md shadow-rose-900/50">
+          <i class="fa-solid fa-fire text-amber-300"></i>
+          <span>Purge All Test Data</span>
+        </button>
+
         <button onclick="refreshAll()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 shadow-sm">
           <i class="fa-solid fa-rotate"></i>
-          <span class="hidden sm:inline">Refresh Data</span>
+          <span class="hidden sm:inline">Refresh</span>
         </button>
       </div>
     </header>
@@ -375,6 +389,34 @@
 
     <!-- ==================== TAB 1: OVERVIEW ==================== -->
     <div id="tab_overview" class="tab-content space-y-8">
+      <!-- Prominent System Overhaul & Failure Radar Banner on Overview -->
+      <div class="bg-gradient-to-r from-slate-900 via-rose-950/30 to-slate-900 border border-rose-500/40 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 text-2xl shrink-0 shadow-lg shadow-rose-950">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-white">System Integrity & Anti-Fraud Defense Radar</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-black border border-emerald-500/30">10 / 10 MOATS ACTIVE</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 max-w-2xl">
+              Zero trip commission active. All test/mock data, fake drivers, and simulated bids can be completely wiped to pristine production with one click.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
+          <button onclick="switchTab('failure_radar')" class="flex-1 md:flex-none text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-magnifying-glass-chart text-teal-400"></i>
+            <span>View 10 Failure Defenses</span>
+          </button>
+          <button onclick="openSystemPurgeModal()" class="flex-1 md:flex-none text-xs bg-rose-600 hover:bg-rose-500 border border-rose-500 text-white px-4 py-2.5 rounded-xl font-black transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-900/40">
+            <i class="fa-solid fa-fire text-amber-300"></i>
+            <span>System Overhaul & Purge</span>
+          </button>
+        </div>
+      </div>
+
       <!-- KPI Metric Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         
@@ -2705,16 +2747,29 @@
       }
     }
 
-    // Ensure Auth Guard
+    // Ensure Auth Guard with Live Token Verification
     async function ensureAdminAuth() {
-      if (adminToken && currentAdminUser) {
+      if (!adminToken || !currentAdminUser) {
+        document.getElementById('adminLoginGate').classList.remove('hidden');
+        return false;
+      }
+      try {
+        const verifyRes = await fetch(`${API_BASE}/api/admin/analytics`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (verifyRes.status === 401 || verifyRes.status === 403) {
+          handleAdminLogout('Your administrative session has expired. Please sign in again.');
+          return false;
+        }
         document.getElementById('adminLoginGate').classList.add('hidden');
         updateAdminProfileUi(currentAdminUser);
         applyRbacUiMasking(currentAdminUser.admin_role || 'SUPER_ADMIN');
         return true;
-      } else {
-        document.getElementById('adminLoginGate').classList.remove('hidden');
-        return false;
+      } catch (err) {
+        document.getElementById('adminLoginGate').classList.add('hidden');
+        updateAdminProfileUi(currentAdminUser);
+        applyRbacUiMasking(currentAdminUser.admin_role || 'SUPER_ADMIN');
+        return true;
       }
     }
 
@@ -2821,17 +2876,21 @@
         const res = await fetch(`${API_BASE}/api/admin/analytics`, {
           headers: { 'Authorization': `Bearer ${adminToken}` }
         });
+        if (res.status === 401 || res.status === 403) {
+          handleAdminLogout('Session expired. Please sign in to reload operational data.');
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           const d = data.data;
-          document.getElementById('statDrivers').textContent = d.totalDrivers;
-          document.getElementById('statPendingKyc').textContent = d.pendingKyc;
-          document.getElementById('statPassengers').textContent = d.totalPassengers;
-          document.getElementById('statRides').textContent = d.totalRidesCompleted;
-          document.getElementById('statRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn).toLocaleString();
-          document.getElementById('statMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn).toLocaleString();
-          document.getElementById('financeMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn).toLocaleString();
-          document.getElementById('financeTotalRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn).toLocaleString();
+          document.getElementById('statDrivers').textContent = (d.totalDrivers ?? 0).toLocaleString();
+          document.getElementById('statPendingKyc').textContent = (d.pendingKyc ?? 0).toLocaleString();
+          document.getElementById('statPassengers').textContent = (d.totalPassengers ?? 0).toLocaleString();
+          document.getElementById('statRides').textContent = (d.totalRidesCompleted ?? 0).toLocaleString();
+          document.getElementById('statRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn || 0).toLocaleString();
+          document.getElementById('statMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn || 0).toLocaleString();
+          document.getElementById('financeMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn || 0).toLocaleString();
+          document.getElementById('financeTotalRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn || 0).toLocaleString();
 
           // Update pending KYC badge in vertical sidebar
           const navKycBadge = document.getElementById('navPendingKycBadge');
