@@ -565,3 +565,238 @@ adminRouter.post(
     }
   }
 );
+
+// 29. Passenger Governance: Update Account Status
+const passengerStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'BANNED']),
+});
+adminRouter.post(
+  '/passengers/:id/status',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { status } = passengerStatusSchema.parse(req.body);
+      const passengerId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.setPassengerStatus(adminUser, passengerId, status, ip);
+      res.json({ success: true, message: `Passenger status updated to ${status}.`, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 30. Passenger Governance: Manual Goodwill Wallet Credit
+const passengerCreditSchema = z.object({
+  amountNgn: z.number().positive(),
+  reason: z.string().min(3),
+});
+adminRouter.post(
+  '/passengers/:id/credit-wallet',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { amountNgn, reason } = passengerCreditSchema.parse(req.body);
+      const passengerId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.creditPassengerWallet(adminUser, passengerId, amountNgn, reason, ip);
+      res.json({ success: true, message: `Successfully credited ₦${amountNgn.toLocaleString()} to passenger wallet.`, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 31. Ride Explorer & Telemetry: List Historical Rides
+adminRouter.get('/rides', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const status = req.query.status ? String(req.query.status) : undefined;
+    const search = req.query.search ? String(req.query.search) : undefined;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+
+    const rides = await adminService.getAllRides({ status, search, limit });
+    res.json({ success: true, data: rides });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 32. Ride Explorer: Fetch GPS Breadcrumbs for Route Replay
+adminRouter.get('/rides/:id/breadcrumbs', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const rideId = String(req.params.id);
+    const breadcrumbs = await adminService.getRideBreadcrumbs(rideId);
+    res.json({ success: true, data: breadcrumbs });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 33. Ride Explorer: Emergency Admin Trip Cancellation
+const cancelRideSchema = z.object({
+  reason: z.string().min(3),
+});
+adminRouter.post(
+  '/rides/:id/cancel',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reason } = cancelRideSchema.parse(req.body);
+      const rideId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.cancelRideByAdmin(adminUser, rideId, reason, ip);
+      res.json({ success: true, message: 'Ride has been cancelled by administrator.', data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 34. Staff & RBAC: List Staff Members
+adminRouter.get(
+  '/staff',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const staff = await adminService.getStaffUsers();
+      res.json({ success: true, data: staff });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 35. Staff & RBAC: Create / Invite New Staff
+const createStaffSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  phone: z.string().min(7),
+  password: z.string().min(6),
+  admin_role: z.enum(['SUPER_ADMIN', 'FINANCE_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+});
+adminRouter.post(
+  '/staff',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = createStaffSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.createStaffUser(adminUser, payload, ip);
+      res.status(201).json({ success: true, message: 'Staff user created successfully.', data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 36. Staff & RBAC: Update Staff Role
+const updateStaffRoleSchema = z.object({
+  admin_role: z.enum(['SUPER_ADMIN', 'FINANCE_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+});
+adminRouter.put(
+  '/staff/:id/role',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { admin_role } = updateStaffRoleSchema.parse(req.body);
+      const staffId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.updateStaffRole(adminUser, staffId, admin_role, ip);
+      res.json({ success: true, message: 'Staff role updated.', data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 37. Staff & RBAC: Suspend / Reinstate Staff Member
+const updateStaffStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED']),
+});
+adminRouter.post(
+  '/staff/:id/status',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { status } = updateStaffStatusSchema.parse(req.body);
+      const staffId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.setStaffStatus(adminUser, staffId, status, ip);
+      res.json({ success: true, message: `Staff status updated to ${status}.`, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 38. Compliance Radar: Dispatch 1-Click Renewal Reminder
+const complianceReminderSchema = z.object({
+  docType: z.string().optional(),
+});
+adminRouter.post(
+  '/compliance/:id/remind',
+  requireAdminRole(['SUPER_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { docType } = complianceReminderSchema.parse(req.body || {});
+      const driverId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.sendComplianceReminder(adminUser, driverId, docType, ip);
+      res.json({ success: true, message: `Reminder successfully sent to ${result.driverName}.`, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 39. Fleet Broadcast & Announcements Engine
+const broadcastSchema = z.object({
+  title: z.string().min(3),
+  message: z.string().min(5),
+  target: z.enum(['ALL', 'DRIVERS', 'PASSENGERS']),
+  severity: z.enum(['INFO', 'WARNING', 'CRITICAL']),
+});
+adminRouter.post(
+  '/broadcast',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const alert = broadcastSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.broadcastFleetAlert(adminUser, alert, ip);
+      res.json({ success: true, message: `Fleet alert dispatched to ${alert.target}.`, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 40. FinTech Float & Reconciliation Desk
+adminRouter.get(
+  '/finance/reconciliation',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const report = await adminService.getFinancialReconciliation();
+      res.json({ success: true, data: report });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);

@@ -70,6 +70,35 @@
         <span id="navPendingKycBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">0</span>
       </button>
 
+      <button onclick="switchTab('passengers')" id="tabBtn_passengers" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-users w-4 text-center text-sm"></i>
+          <span>Passenger Directory</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('rides')" id="tabBtn_rides" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-route w-4 text-center text-sm"></i>
+          <span>Rides & Telemetry</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('compliance')" id="tabBtn_compliance" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-clipboard-check w-4 text-center text-sm text-amber-400"></i>
+          <span>Compliance Radar</span>
+        </div>
+        <span id="complianceAlertBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">!</span>
+      </button>
+
+      <button onclick="switchTab('broadcast')" id="tabBtn_broadcast" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-bullhorn w-4 text-center text-sm text-teal-400"></i>
+          <span>Fleet Broadcasts</span>
+        </div>
+      </button>
+
       <button onclick="switchTab('plans')" id="tabBtn_plans" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
         <div class="flex items-center space-x-3">
           <i class="fa-solid fa-layer-group w-4 text-center text-sm"></i>
@@ -107,7 +136,14 @@
       <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
         <div class="flex items-center space-x-3">
           <i class="fa-solid fa-receipt w-4 text-center text-sm"></i>
-          <span>Finance & MOT</span>
+          <span>Finance & Reconcile</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('staff')" id="tabBtn_staff" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-user-gear w-4 text-center text-sm text-indigo-400"></i>
+          <span>Admin Staff & RBAC</span>
         </div>
       </button>
 
@@ -360,6 +396,261 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: PASSENGER DIRECTORY & GOVERNANCE ==================== -->
+    <div id="tab_passengers" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-users text-teal-400"></i>
+              <span>Passenger Directory & Governance Desk</span>
+            </h2>
+            <p class="text-xs text-slate-400">Manage Nigerian riders, verify Korapay virtual accounts, audit wallet float balances, grant goodwill credits, or enforce suspensions.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input type="text" id="passengerSearchInput" oninput="filterPassengers()" placeholder="Search rider name, phone, email..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none w-64" />
+            <button onclick="loadPassengers()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Passenger Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400 font-semibold uppercase">Total Registered Riders</p>
+            <p id="passengerCountKpi" class="text-2xl font-bold text-white mt-1">0</p>
+          </div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400 font-semibold uppercase">Total Passenger Wallet Float</p>
+            <p id="passengerFloatKpi" class="text-2xl font-bold text-teal-400 mt-1">₦0</p>
+          </div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400 font-semibold uppercase">Completed Trips by Riders</p>
+            <p id="passengerTripsKpi" class="text-2xl font-bold text-emerald-400 mt-1">0</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                <th class="py-3 px-4">Passenger Info</th>
+                <th class="py-3 px-4">Dedicated Virtual Account</th>
+                <th class="py-3 px-4">Wallet Balance</th>
+                <th class="py-3 px-4">Trips Completed</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="passengersTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 text-xs">Loading passenger directory...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: HISTORICAL RIDES & TELEMETRY ==================== -->
+    <div id="tab_rides" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-route text-teal-400"></i>
+              <span>Historical Ride Explorer & Telemetry</span>
+            </h2>
+            <p class="text-xs text-slate-400">Examine all requested, active, and completed journeys with fare breakdown, fuel estimates, and GPS route breadcrumbs.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="rideStatusFilter" onchange="loadRides()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none">
+              <option value="ALL">All Statuses</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="IN_TRANSIT">In Transit</option>
+              <option value="ARRIVED">Driver Arrived</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="NEGOTIATING">Negotiating</option>
+              <option value="REQUESTED">Requested</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+            <input type="text" id="rideSearchInput" oninput="debounceLoadRides()" placeholder="Search trip ID, address, rider, driver..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none w-60" />
+            <button onclick="loadRides()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                <th class="py-3 px-4">Trip ID & Date</th>
+                <th class="py-3 px-4">Rider</th>
+                <th class="py-3 px-4">Driver & Vehicle</th>
+                <th class="py-3 px-4">Route (Pickup → Dropoff)</th>
+                <th class="py-3 px-4">Distance & Fare</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ridesTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Loading rides...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: COMPLIANCE RADAR ==================== -->
+    <div id="tab_compliance" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-clipboard-check text-amber-400"></i>
+              <span>Proactive Document Compliance Radar</span>
+            </h2>
+            <p class="text-xs text-slate-400">Surveillance of FRSC Driver's Licenses, LASDRI cards, Insurance, and Roadworthiness certificates across all drivers.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <select id="complianceDaysSelect" onchange="loadComplianceRadar()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none">
+              <option value="7">Urgent: Expiring within 7 Days</option>
+              <option value="15">Warning: Expiring within 15 Days</option>
+              <option value="30" selected>Upcoming: Expiring within 30 Days</option>
+              <option value="60">Expiring within 60 Days</option>
+            </select>
+            <button onclick="loadComplianceRadar()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Compliance Urgency KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+          <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+            <p class="text-xs text-red-400 font-bold uppercase tracking-wider">Expired Documents</p>
+            <p id="complianceExpiredCount" class="text-2xl font-black text-red-400 mt-1">0</p>
+          </div>
+          <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+            <p class="text-xs text-amber-400 font-bold uppercase tracking-wider">≤ 7 Days Critical</p>
+            <p id="compliance7dCount" class="text-2xl font-black text-amber-400 mt-1">0</p>
+          </div>
+          <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+            <p class="text-xs text-yellow-400 font-bold uppercase tracking-wider">8 - 15 Days Warning</p>
+            <p id="compliance15dCount" class="text-2xl font-black text-yellow-400 mt-1">0</p>
+          </div>
+          <div class="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4">
+            <p class="text-xs text-teal-400 font-bold uppercase tracking-wider">16 - 30 Days Upcoming</p>
+            <p id="compliance30dCount" class="text-2xl font-black text-teal-400 mt-1">0</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                <th class="py-3 px-4">Driver Name & Contact</th>
+                <th class="py-3 px-4">Vehicle Plate</th>
+                <th class="py-3 px-4">Expiring Regulatory Item</th>
+                <th class="py-3 px-4">Expiration Date</th>
+                <th class="py-3 px-4">Days Remaining</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="complianceTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 text-xs">Scanning compliance records...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: FLEET BROADCASTS ==================== -->
+    <div id="tab_broadcast" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Broadcast Composer -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg lg:col-span-1 space-y-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-bullhorn text-teal-400"></i>
+              <span>Compose Broadcast Alert</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Push instant operational advisories to driver and passenger mobile apps via WebSockets and SMS.</p>
+          </div>
+
+          <form onsubmit="dispatchFleetBroadcast(event)" class="space-y-4 text-xs">
+            <div>
+              <label class="block text-slate-300 font-bold mb-1">Target Audience</label>
+              <select id="broadcastTarget" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500">
+                <option value="ALL">Entire Fleet (Drivers & Passengers)</option>
+                <option value="DRIVERS" selected>All Active Drivers Only</option>
+                <option value="PASSENGERS">All Passengers Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-bold mb-1">Severity / Urgency Level</label>
+              <select id="broadcastSeverity" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500">
+                <option value="INFO">Information (Routine)</option>
+                <option value="WARNING" selected>Warning (Traffic / Fuel Advisory)</option>
+                <option value="CRITICAL">Critical (Road Closure / Emergency)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-bold mb-1">Alert Headline</label>
+              <input type="text" id="broadcastTitle" required placeholder="e.g. Fuel Price Adjustment / Lekki Traffic" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500" />
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-bold mb-1">Message Body</label>
+              <textarea id="broadcastMessage" required rows="4" placeholder="Enter detailed dispatch instructions or advisory..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"></textarea>
+            </div>
+
+            <button type="submit" id="broadcastSubmitBtn" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2.5 rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20">
+              <i class="fa-solid fa-paper-plane"></i> Dispatch Instant Broadcast
+            </button>
+          </form>
+        </div>
+
+        <!-- Broadcast Feed & Operational Templates -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg lg:col-span-2 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-tower-broadcast text-teal-400"></i>
+              <span>Live Broadcast Transmission Log</span>
+            </h3>
+            <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">Real-Time Socket Stream</span>
+          </div>
+
+          <!-- Quick Template Chips -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-2">Quick Advisory Presets:</p>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="applyBroadcastPreset('fuel')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] px-2.5 py-1 rounded font-medium border border-slate-700">⛽ PMS Price Surge</button>
+              <button type="button" onclick="applyBroadcastPreset('traffic')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] px-2.5 py-1 rounded font-medium border border-slate-700">🚗 Lekki-Epe Gridlock</button>
+              <button type="button" onclick="applyBroadcastPreset('rain')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] px-2.5 py-1 rounded font-medium border border-slate-700">🌧️ Heavy Rains & Flash Floods</button>
+              <button type="button" onclick="applyBroadcastPreset('promo')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] px-2.5 py-1 rounded font-medium border border-slate-700">🎁 Weekend Driver Incentive</button>
+            </div>
+          </div>
+
+          <div id="broadcastHistoryContainer" class="space-y-3">
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center text-slate-500 text-xs">
+              Dispatched alerts will appear here in chronological order.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ==================== TAB 3: LIVE FLEET & RIDES ==================== -->
     <div id="tab_fleet" class="tab-content hidden space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -428,6 +719,61 @@
 
     <!-- ==================== TAB 5: FINANCE & MOT LEVY ==================== -->
     <div id="tab_finance" class="tab-content hidden space-y-6">
+      
+      <!-- FinTech Float & Reconciliation Header & KPIs -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-scale-balanced text-teal-400"></i>
+              <span>FinTech Float & Solvency Reconciliation Desk</span>
+            </h2>
+            <p class="text-xs text-slate-400">Real-time aggregate reconciliation across Korapay DVA escrow floats, driver subscription revenue, and LASG road levy liabilities.</p>
+          </div>
+          <button onclick="loadReconciliation()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-rotate"></i> Re-Calculate Float
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-slate-950 border border-teal-500/30 rounded-xl p-4">
+            <div class="flex justify-between items-start">
+              <p class="text-[11px] font-bold uppercase text-slate-400">Passenger Wallet Float</p>
+              <span class="text-[10px] bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded font-bold">Korapay Escrow</span>
+            </div>
+            <p id="reconPassengerFloat" class="text-2xl font-black text-teal-400 mt-2">₦0</p>
+            <p class="text-[10px] text-slate-500 mt-1">Available in passenger balances</p>
+          </div>
+
+          <div class="bg-slate-950 border border-blue-500/30 rounded-xl p-4">
+            <div class="flex justify-between items-start">
+              <p class="text-[11px] font-bold uppercase text-slate-400">Driver Wallet Float</p>
+              <span class="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold">Driver NUBAN</span>
+            </div>
+            <p id="reconDriverFloat" class="text-2xl font-black text-blue-400 mt-2">₦0</p>
+            <p class="text-[10px] text-slate-500 mt-1">Held in driver virtual accounts</p>
+          </div>
+
+          <div class="bg-slate-950 border border-emerald-500/30 rounded-xl p-4">
+            <div class="flex justify-between items-start">
+              <p class="text-[11px] font-bold uppercase text-slate-400">Subscription Retainage</p>
+              <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">100% Giga Revenue</span>
+            </div>
+            <p id="reconSubRevenue" class="text-2xl font-black text-emerald-400 mt-2">₦0</p>
+            <p class="text-[10px] text-slate-500 mt-1">Total recognized plan earnings</p>
+          </div>
+
+          <div class="bg-slate-950 border border-amber-500/30 rounded-xl p-4">
+            <div class="flex justify-between items-start">
+              <p class="text-[11px] font-bold uppercase text-slate-400">Lagos MOT Tax Accrual</p>
+              <span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">LASG Liability</span>
+            </div>
+            <p id="reconMotLevy" class="text-2xl font-black text-amber-400 mt-2">₦0</p>
+            <p class="text-[10px] text-slate-500 mt-1">₦50 per completed ride escrowed</p>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         <!-- Lagos State Ministry of Transport Compliance Card -->
@@ -492,6 +838,43 @@
             <tbody id="transactionsTableBody" class="divide-y divide-slate-800 text-slate-300">
               <tr>
                 <td colspan="6" class="py-6 text-center text-slate-500">No payment transactions found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: ADMIN STAFF & RBAC ==================== -->
+    <div id="tab_staff" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-user-gear text-indigo-400"></i>
+              <span>Admin Staff Team & Role-Based Access Control (RBAC)</span>
+            </h2>
+            <p class="text-xs text-slate-400">Provision operations personnel, assign granular security privileges (Super Admin, Finance Admin, KYC Officer, Support Agent), and govern staff status.</p>
+          </div>
+          <button onclick="openInviteStaffModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-lg shadow-indigo-500/20">
+            <i class="fa-solid fa-user-plus"></i> Invite Staff Member
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                <th class="py-3 px-4">Staff Name & Contact</th>
+                <th class="py-3 px-4">Assigned RBAC Role</th>
+                <th class="py-3 px-4">Account Status</th>
+                <th class="py-3 px-4">Created Date</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staffTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
+              <tr>
+                <td colspan="5" class="py-8 text-center text-slate-500 text-xs">Loading staff team...</td>
               </tr>
             </tbody>
           </table>
@@ -1156,6 +1539,82 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 7: PASSENGER GOODWILL CREDIT ==================== -->
+  <div id="passengerCreditModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-gift text-teal-400"></i> Passenger Goodwill Wallet Credit
+        </h3>
+        <button onclick="closeModal('passengerCreditModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="passengerCreditForm" onsubmit="submitPassengerCredit(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="passengerCreditId" />
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Rider Name:</label>
+          <p id="passengerCreditName" class="text-white font-bold"></p>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Credit Amount (₦ NGN):</label>
+          <input type="number" id="passengerCreditAmount" min="100" step="50" value="1000" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-teal-400 font-bold text-sm" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Operational Audit Reason (Mandatory):</label>
+          <textarea id="passengerCreditReason" required rows="2" placeholder="e.g. Compensation for driver AC failure or direct customer goodwill refund" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('passengerCreditModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-teal-600 hover:bg-teal-500 font-bold text-white">Credit Giga Wallet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 8: INVITE ADMIN STAFF ==================== -->
+  <div id="inviteStaffModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-plus text-indigo-400"></i> Invite New Operations Staff Member
+        </h3>
+        <button onclick="closeModal('inviteStaffModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="inviteStaffForm" onsubmit="submitInviteStaff(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Full Legal Name</label>
+          <input type="text" id="staffFullName" required placeholder="e.g. Babatunde Fashola" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Staff Email Address</label>
+          <input type="email" id="staffEmail" required placeholder="name@gigaride.ng" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Phone Number (Nigeria)</label>
+          <input type="tel" id="staffPhone" required placeholder="08012345678" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Temporary Initial Password</label>
+          <input type="password" id="staffPassword" required minlength="6" placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Assigned Security Role (RBAC)</label>
+          <select id="staffAdminRole" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+            <option value="SUPPORT_AGENT">Customer Support Agent (Disputes & Passenger Care)</option>
+            <option value="KYC_OFFICER">KYC & Compliance Officer (Driver Documents & Verification)</option>
+            <option value="FINANCE_ADMIN">Finance Administrator (Reconciliation & Wallet Adjustments)</option>
+            <option value="SUPER_ADMIN">Super Administrator (Unrestricted Full Access)</option>
+          </select>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('inviteStaffModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 font-bold text-white">Create Staff Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_BASE = 'http://localhost:4000';
     let adminToken = '';
@@ -1195,11 +1654,16 @@
     const tabHeadings = {
       overview: { name: 'Overview', desc: 'System Operations & Fleet Pulse' },
       drivers: { name: 'Drivers & KYC', desc: 'Driver Verification & Regulatory Compliance' },
+      passengers: { name: 'Passenger Directory', desc: 'Rider Wallets, Korapay Virtual NUBANs, Float Escrows & Goodwill Credits' },
+      rides: { name: 'Historical Rides & Telemetry', desc: 'Trip Telemetry, Complete Fare Economics & High-Res GPS Route Tracing' },
+      compliance: { name: 'Compliance Radar', desc: 'Proactive 30/15/7-Day FRSC & LASDRI Regulatory License Tracking' },
+      broadcast: { name: 'Fleet Broadcasts', desc: 'Instant Dispatch Alerts for Fuel Surges & Lagos Traffic Advisories' },
       plans: { name: 'Plan Builder', desc: 'Subscription Tier Management (Zero Commission)' },
       disputes: { name: 'Dispute Desk', desc: 'Driver-Rider Arbitration & Strike Desk' },
       fleet: { name: 'Live Fleet Radar', desc: 'Real-Time Geo Radar & GPS Route Playback' },
       sos: { name: 'SOS Incidents', desc: 'Emergency Incident Response Room' },
-      finance: { name: 'Finance & MOT', desc: 'Subscriptions & LASG Ministry of Transportation Levies' },
+      finance: { name: 'Finance & Reconcile', desc: 'Subscriptions, FinTech Float Escrow & LASG Road Levies' },
+      staff: { name: 'Admin Staff & RBAC', desc: 'Operations Personnel Roles, Access Privileges & Account Governance' },
       integrations: { name: 'FinTech & RegTech Integrations', desc: 'Prembly, Paystack, Korapay, Resend, Twilio & Auto Top-Up Engine' },
       settings: { name: 'Fuel Levers', desc: 'Dynamic PMS Pricing & Base Fare Knobs' },
       audit: { name: 'Audit Logs', desc: 'Immutable Administrator Action Trail' }
@@ -1245,11 +1709,16 @@
       }
 
       if (tabId === 'drivers') loadDrivers(currentFilter);
+      if (tabId === 'passengers') loadPassengers();
+      if (tabId === 'rides') loadRides();
+      if (tabId === 'compliance') loadComplianceRadar();
+      if (tabId === 'broadcast') loadBroadcastHistory();
       if (tabId === 'plans') loadPlans();
       if (tabId === 'disputes') loadDisputes('ALL');
       if (tabId === 'fleet') loadFleetAndRides();
       if (tabId === 'sos') loadSos();
-      if (tabId === 'finance') loadFinance();
+      if (tabId === 'finance') { loadFinance(); loadReconciliation(); }
+      if (tabId === 'staff') loadStaff();
       if (tabId === 'integrations') loadIntegrationSettings();
       if (tabId === 'settings') loadSettings();
       if (tabId === 'audit') loadAuditLogs();
@@ -2278,6 +2747,636 @@
       }
     }
 
+    // ==================== PASSENGER DIRECTORY & GOVERNANCE ====================
+    let rawPassengers = [];
+
+    async function loadPassengers() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/passengers`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          rawPassengers = data.data || [];
+          renderPassengersTable(rawPassengers);
+
+          // Update KPI metrics
+          document.getElementById('passengerCountKpi').textContent = rawPassengers.length;
+          const totalFloat = rawPassengers.reduce((sum, p) => sum + (p.virtualAccount ? (p.virtualAccount.balance_ngn || 0) : 0), 0);
+          document.getElementById('passengerFloatKpi').textContent = '₦' + totalFloat.toLocaleString();
+          const totalTrips = rawPassengers.reduce((sum, p) => sum + (p.totalRides || 0), 0);
+          document.getElementById('passengerTripsKpi').textContent = totalTrips.toLocaleString();
+        }
+      } catch (err) {
+        console.error('Error loading passengers:', err);
+      }
+    }
+
+    function filterPassengers() {
+      const q = (document.getElementById('passengerSearchInput').value || '').toLowerCase();
+      const filtered = rawPassengers.filter(p =>
+        (p.full_name && p.full_name.toLowerCase().includes(q)) ||
+        (p.phone_number && p.phone_number.includes(q)) ||
+        (p.email && p.email.toLowerCase().includes(q)) ||
+        (p.virtualAccount && p.virtualAccount.account_number.includes(q))
+      );
+      renderPassengersTable(filtered);
+    }
+
+    function renderPassengersTable(list) {
+      const tbody = document.getElementById('passengersTableBody');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-500 text-xs">No registered passengers found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      list.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        const va = p.virtualAccount;
+        const balance = va ? va.balance_ngn : 0;
+        const status = p.account_status || 'ACTIVE';
+        const isSuspended = status === 'SUSPENDED' || status === 'BANNED';
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">
+            <div class="font-bold text-white text-sm">${p.full_name}</div>
+            <div class="text-xs text-slate-400 font-mono">${p.phone_number} • ${p.email}</div>
+          </td>
+          <td class="py-3 px-4">
+            ${va ? `
+              <div class="font-mono font-bold text-teal-300 text-xs">${va.account_number}</div>
+              <div class="text-[11px] text-slate-400">${va.bank_name}</div>
+            ` : `
+              <span class="text-xs text-slate-500 italic">Not Provisioned</span>
+            `}
+          </td>
+          <td class="py-3 px-4">
+            <span class="font-mono font-bold ${balance > 0 ? 'text-emerald-400' : 'text-slate-400'}">₦${Number(balance).toLocaleString()}</span>
+          </td>
+          <td class="py-3 px-4 font-bold text-white text-xs">
+            ${p.totalRides || 0} rides
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isSuspended ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+              ${status}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+            <button onclick="openPassengerCreditModal('${p.id}', '${p.full_name}')" class="bg-teal-600/20 hover:bg-teal-600 hover:text-white text-teal-300 text-xs px-2.5 py-1 rounded font-bold border border-teal-500/30 transition">
+              + Credit Wallet
+            </button>
+            <button onclick="togglePassengerStatus('${p.id}', '${status}')" class="${isSuspended ? 'bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300' : 'bg-red-600/20 hover:bg-red-600 text-red-300'} text-xs px-2.5 py-1 rounded font-bold border ${isSuspended ? 'border-emerald-500/30' : 'border-red-500/30'} transition">
+              ${isSuspended ? 'Reinstate' : 'Suspend'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openPassengerCreditModal(passengerId, name) {
+      document.getElementById('passengerCreditId').value = passengerId;
+      document.getElementById('passengerCreditName').textContent = name;
+      document.getElementById('passengerCreditAmount').value = 1000;
+      document.getElementById('passengerCreditReason').value = '';
+      document.getElementById('passengerCreditModal').classList.remove('hidden');
+    }
+
+    async function submitPassengerCredit(e) {
+      e.preventDefault();
+      const passengerId = document.getElementById('passengerCreditId').value;
+      const amountNgn = parseFloat(document.getElementById('passengerCreditAmount').value);
+      const reason = document.getElementById('passengerCreditReason').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/passengers/${passengerId}/credit-wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ amountNgn, reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('passengerCreditModal');
+          alert(`Successfully credited ₦${amountNgn.toLocaleString()} to passenger wallet.`);
+          loadPassengers();
+          loadReconciliation();
+        } else {
+          alert(data.message || 'Failed to credit passenger wallet.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function togglePassengerStatus(passengerId, currentStatus) {
+      const nextStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      if (!confirm(`Are you sure you want to change this rider's status to ${nextStatus}?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/passengers/${passengerId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPassengers();
+        } else {
+          alert(data.message || 'Status update failed.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== HISTORICAL RIDE EXPLORER & TELEMETRY ====================
+    let rideDebounceTimer;
+    function debounceLoadRides() {
+      clearTimeout(rideDebounceTimer);
+      rideDebounceTimer = setTimeout(loadRides, 300);
+    }
+
+    async function loadRides() {
+      const status = document.getElementById('rideStatusFilter').value;
+      const search = document.getElementById('rideSearchInput').value;
+
+      try {
+        const url = `${API_BASE}/api/admin/rides?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&limit=100`;
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderRidesTable(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading rides:', err);
+      }
+    }
+
+    function renderRidesTable(rides) {
+      const tbody = document.getElementById('ridesTableBody');
+      if (rides.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-500 text-xs">No rides found matching search criteria.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      rides.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        const fare = r.agreed_fare_ngn || r.suggested_fare_ngn || 0;
+        const fuelEst = Math.round(((r.distance_km || 0) / 10) * 1050); // ~10km/L Lagos average
+        const isDone = r.status === 'COMPLETED';
+        const isCancelled = r.status === 'CANCELLED';
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">
+            <div class="font-mono font-bold text-white text-xs">${r.id.slice(0, 8)}...</div>
+            <div class="text-[11px] text-slate-400">${new Date(r.created_at).toLocaleString()}</div>
+          </td>
+          <td class="py-3 px-4">
+            <div class="font-bold text-white text-xs">${r.rider ? r.rider.full_name : 'Passenger'}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${r.rider ? r.rider.phone_number : ''}</div>
+          </td>
+          <td class="py-3 px-4">
+            ${r.driver ? `
+              <div class="font-bold text-white text-xs">${r.driver.full_name}</div>
+              <div class="text-[11px] text-amber-400 font-mono">${r.driverProfile ? r.driverProfile.license_plate : ''}</div>
+            ` : `
+              <span class="text-slate-500 italic text-xs">Unassigned</span>
+            `}
+          </td>
+          <td class="py-3 px-4 text-xs max-w-xs truncate">
+            <div class="text-white"><i class="fa-solid fa-circle-dot text-teal-400 mr-1 text-[10px]"></i> ${r.pickup_address}</div>
+            <div class="text-slate-400"><i class="fa-solid fa-location-dot text-red-400 mr-1 text-[10px]"></i> ${r.dropoff_address}</div>
+          </td>
+          <td class="py-3 px-4 font-mono text-xs">
+            <div class="font-bold text-emerald-400">₦${fare.toLocaleString()} (${(r.distance_km || 0).toFixed(1)} km)</div>
+            <div class="text-[10px] text-slate-400">PMS Est: ~₦${fuelEst.toLocaleString()} | MOT: ₦50</div>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+              isDone ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+              isCancelled ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+              'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            }">
+              ${r.status}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+            <button onclick="openBreadcrumbsModal('${r.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded font-bold border border-slate-700 transition">
+              <i class="fa-solid fa-route text-teal-400 mr-1"></i> Trace
+            </button>
+            ${!isDone && !isCancelled ? `
+              <button onclick="cancelRideByAdmin('${r.id}')" class="bg-red-600/20 hover:bg-red-600 text-red-300 text-xs px-2 py-1 rounded font-bold border border-red-500/30 transition">
+                Cancel
+              </button>
+            ` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function cancelRideByAdmin(rideId) {
+      const reason = prompt('Enter mandatory operational reason for emergency cancellation:');
+      if (!reason || reason.trim().length < 3) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/rides/${rideId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Ride successfully cancelled.');
+          loadRides();
+        } else {
+          alert(data.message || 'Cancellation failed.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== PROACTIVE COMPLIANCE RADAR ====================
+    async function loadComplianceRadar() {
+      const days = document.getElementById('complianceDaysSelect').value || 30;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/compliance/expiring?days=${days}`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          const list = data.data || [];
+          renderComplianceTable(list);
+
+          // Categorize urgency
+          let expired = 0, critical = 0, warning = 0, upcoming = 0;
+          list.forEach(item => {
+            const d = item.daysUntilExpiry;
+            if (d < 0) expired++;
+            else if (d <= 7) critical++;
+            else if (d <= 15) warning++;
+            else upcoming++;
+          });
+
+          document.getElementById('complianceExpiredCount').textContent = expired;
+          document.getElementById('compliance7dCount').textContent = critical;
+          document.getElementById('compliance15dCount').textContent = warning;
+          document.getElementById('compliance30dCount').textContent = upcoming;
+
+          const badge = document.getElementById('complianceAlertBadge');
+          if (badge) {
+            if (expired + critical > 0) {
+              badge.textContent = expired + critical;
+              badge.classList.remove('hidden');
+            } else {
+              badge.classList.add('hidden');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error loading compliance radar:', err);
+      }
+    }
+
+    function renderComplianceTable(list) {
+      const tbody = document.getElementById('complianceTableBody');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-emerald-400 text-xs">All drivers currently meet 100% regulatory compliance within this time window.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      list.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        const d = item.daysUntilExpiry;
+        let urgencyBadge = '';
+        if (d < 0) {
+          urgencyBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-red-600/30 text-red-300 border border-red-500/50">EXPIRED (${Math.abs(d)}d ago)</span>`;
+        } else if (d <= 7) {
+          urgencyBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/30 text-amber-300 border border-amber-500/50">${d} days left (Critical)</span>`;
+        } else if (d <= 15) {
+          urgencyBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">${d} days left (Warning)</span>`;
+        } else {
+          urgencyBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-500/20 text-teal-300 border border-teal-500/30">${d} days left</span>`;
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">
+            <div class="font-bold text-white text-xs">${item.driver_name}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${item.phone_number}</div>
+          </td>
+          <td class="py-3 px-4 font-mono font-bold text-amber-400 text-xs">
+            ${item.license_plate}
+          </td>
+          <td class="py-3 px-4 text-xs font-semibold text-white">
+            ${item.document_type}
+          </td>
+          <td class="py-3 px-4 font-mono text-xs text-slate-300">
+            ${item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}
+          </td>
+          <td class="py-3 px-4">
+            ${urgencyBadge}
+          </td>
+          <td class="py-3 px-4 text-right">
+            <button onclick="sendComplianceReminder('${item.driver_id}', '${item.document_type}')" class="bg-amber-500/20 hover:bg-amber-500 hover:text-black text-amber-400 text-xs px-3 py-1 rounded font-bold border border-amber-500/30 transition flex items-center gap-1 ml-auto">
+              <i class="fa-solid fa-paper-plane"></i> Send 1-Click Reminder
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function sendComplianceReminder(driverId, docType) {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/compliance/${driverId}/remind`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ docType })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Official SMS & Email renewal alert dispatched successfully to ${data.data.driverName}!`);
+        } else {
+          alert(data.message || 'Failed to dispatch reminder.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== FLEET BROADCAST ENGINE ====================
+    let broadcastLogs = [];
+
+    const broadcastPresets = {
+      fuel: {
+        title: 'PMS Petrol Price Adjustment Advisory',
+        message: 'Notice to all fleet drivers: Dynamic PMS pump pricing has been adjusted to reflect Lagos depot costs. Suggested trip fares and driver bidding floors have been recalibrated automatically.',
+        severity: 'WARNING',
+        target: 'DRIVERS'
+      },
+      traffic: {
+        title: 'Lekki-Epe Expressway Heavy Gridlock',
+        message: 'Severe congestion reported around Ajah / Victoria Island corridor. Drivers are advised to utilize alternate coastal routes and communicate realistic ETAs to riders.',
+        severity: 'INFO',
+        target: 'ALL'
+      },
+      rain: {
+        title: 'Flash Flood & Safety Advisory',
+        message: 'Heavy downpour across Lagos Mainland and Island. Exercise extreme caution, activate headlights, reduce transit speeds, and avoid submerged underpasses.',
+        severity: 'CRITICAL',
+        target: 'ALL'
+      },
+      promo: {
+        title: 'Zero-Commission Weekend Rush',
+        message: 'Earn 100% of all passenger fares this weekend. Top up your subscription pack today and take unlimited trips without paying a single kobo in platform commissions!',
+        severity: 'INFO',
+        target: 'DRIVERS'
+      }
+    };
+
+    function applyBroadcastPreset(key) {
+      const p = broadcastPresets[key];
+      if (!p) return;
+      document.getElementById('broadcastTitle').value = p.title;
+      document.getElementById('broadcastMessage').value = p.message;
+      document.getElementById('broadcastSeverity').value = p.severity;
+      document.getElementById('broadcastTarget').value = p.target;
+    }
+
+    async function dispatchFleetBroadcast(e) {
+      e.preventDefault();
+      const title = document.getElementById('broadcastTitle').value;
+      const message = document.getElementById('broadcastMessage').value;
+      const severity = document.getElementById('broadcastSeverity').value;
+      const target = document.getElementById('broadcastTarget').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/broadcast`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ title, message, severity, target })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Fleet broadcast dispatched in real-time to ${target}!`);
+          broadcastLogs.unshift({
+            title,
+            message,
+            severity,
+            target,
+            timestamp: new Date().toISOString()
+          });
+          loadBroadcastHistory();
+          document.getElementById('broadcastTitle').value = '';
+          document.getElementById('broadcastMessage').value = '';
+        } else {
+          alert(data.message || 'Broadcast dispatch failed.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function loadBroadcastHistory() {
+      const container = document.getElementById('broadcastHistoryContainer');
+      if (broadcastLogs.length === 0) {
+        container.innerHTML = '<div class="bg-slate-950 border border-slate-800 rounded-xl p-6 text-center text-slate-500 text-xs">No broadcasts transmitted during this admin session yet.</div>';
+        return;
+      }
+      container.innerHTML = broadcastLogs.map(b => {
+        const borderCol = b.severity === 'CRITICAL' ? 'border-red-500/40 bg-red-950/20' : b.severity === 'WARNING' ? 'border-amber-500/40 bg-amber-950/20' : 'border-teal-500/30 bg-slate-950';
+        const textCol = b.severity === 'CRITICAL' ? 'text-red-400' : b.severity === 'WARNING' ? 'text-amber-400' : 'text-teal-400';
+        return `
+          <div class="border ${borderCol} rounded-xl p-4 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-black uppercase tracking-wider ${textCol}">[${b.severity}] ${b.title}</span>
+              </div>
+              <div class="flex items-center space-x-2 text-[10px]">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold uppercase">To: ${b.target}</span>
+                <span class="text-slate-500 font-mono">${new Date(b.timestamp).toLocaleTimeString()}</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300">${b.message}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== FINTECH FLOAT & SOLVENCY RECONCILIATION ====================
+    async function loadReconciliation() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/finance/reconciliation`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          const d = data.data;
+          document.getElementById('reconPassengerFloat').textContent = '₦' + Number(d.totalPassengerFloatNgn || 0).toLocaleString();
+          document.getElementById('reconDriverFloat').textContent = '₦' + Number(d.totalDriverFloatNgn || 0).toLocaleString();
+          document.getElementById('reconSubRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn || 0).toLocaleString();
+          document.getElementById('reconMotLevy').textContent = '₦' + Number(d.totalMotLeviesNgn || 0).toLocaleString();
+        }
+      } catch (err) {
+        console.error('Error loading reconciliation report:', err);
+      }
+    }
+
+    // ==================== ADMIN STAFF TEAM & RBAC DESK ====================
+    async function loadStaff() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/staff`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderStaffTable(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading staff:', err);
+      }
+    }
+
+    function renderStaffTable(staffList) {
+      const tbody = document.getElementById('staffTableBody');
+      if (staffList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-500 text-xs">No staff accounts found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      staffList.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        const role = s.admin_role || 'SUPPORT_AGENT';
+        const status = s.account_status || 'ACTIVE';
+        const isSuspended = status === 'SUSPENDED';
+
+        let roleBadge = '';
+        if (role === 'SUPER_ADMIN') {
+          roleBadge = '<span class="px-2.5 py-1 rounded text-xs font-black bg-purple-500/20 text-purple-300 border border-purple-500/40">SUPER ADMIN</span>';
+        } else if (role === 'FINANCE_ADMIN') {
+          roleBadge = '<span class="px-2.5 py-1 rounded text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">FINANCE ADMIN</span>';
+        } else if (role === 'KYC_OFFICER') {
+          roleBadge = '<span class="px-2.5 py-1 rounded text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">KYC OFFICER</span>';
+        } else {
+          roleBadge = '<span class="px-2.5 py-1 rounded text-xs font-black bg-blue-500/20 text-blue-300 border border-blue-500/40">SUPPORT AGENT</span>';
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">
+            <div class="font-bold text-white text-sm">${s.full_name}</div>
+            <div class="text-xs text-slate-400 font-mono">${s.email} • ${s.phone_number}</div>
+          </td>
+          <td class="py-3 px-4">
+            ${roleBadge}
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isSuspended ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+              ${status}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-xs font-mono text-slate-400">
+            ${new Date(s.created_at).toLocaleDateString()}
+          </td>
+          <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+            <select onchange="changeStaffRole('${s.id}', this.value)" class="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none focus:border-indigo-500">
+              <option value="SUPPORT_AGENT" ${role === 'SUPPORT_AGENT' ? 'selected' : ''}>Support Agent</option>
+              <option value="KYC_OFFICER" ${role === 'KYC_OFFICER' ? 'selected' : ''}>KYC Officer</option>
+              <option value="FINANCE_ADMIN" ${role === 'FINANCE_ADMIN' ? 'selected' : ''}>Finance Admin</option>
+              <option value="SUPER_ADMIN" ${role === 'SUPER_ADMIN' ? 'selected' : ''}>Super Admin</option>
+            </select>
+            <button onclick="toggleStaffStatus('${s.id}', '${status}')" class="${isSuspended ? 'bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300' : 'bg-red-600/20 hover:bg-red-600 text-red-300'} text-xs px-2.5 py-1 rounded font-bold border ${isSuspended ? 'border-emerald-500/30' : 'border-red-500/30'} transition">
+              ${isSuspended ? 'Reinstate' : 'Suspend'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openInviteStaffModal() {
+      document.getElementById('staffFullName').value = '';
+      document.getElementById('staffEmail').value = '';
+      document.getElementById('staffPhone').value = '';
+      document.getElementById('staffPassword').value = '';
+      document.getElementById('staffAdminRole').value = 'SUPPORT_AGENT';
+      document.getElementById('inviteStaffModal').classList.remove('hidden');
+    }
+
+    async function submitInviteStaff(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('staffFullName').value,
+        email: document.getElementById('staffEmail').value,
+        phone: document.getElementById('staffPhone').value,
+        password: document.getElementById('staffPassword').value,
+        admin_role: document.getElementById('staffAdminRole').value,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/staff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('inviteStaffModal');
+          alert('Staff member account created successfully!');
+          loadStaff();
+        } else {
+          alert(data.message || 'Staff creation failed.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function changeStaffRole(staffId, admin_role) {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/staff/${staffId}/role`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ admin_role })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadStaff();
+        } else {
+          alert(data.message || 'Failed to update role.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function toggleStaffStatus(staffId, currentStatus) {
+      const nextStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      if (!confirm(`Are you sure you want to change staff status to ${nextStatus}?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/staff/${staffId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadStaff();
+        } else {
+          alert(data.message || 'Failed to update staff status.');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
     }
@@ -2286,6 +3385,7 @@
     ensureAdminAuth().then(() => {
       fetchAnalytics();
       loadDrivers('ALL');
+      loadReconciliation();
     });
 
     // Auto refresh every 6 seconds

@@ -634,8 +634,140 @@ async function runE2ETest() {
     );
     console.log('   ✓ Admin 1-Click Lockout Override:', unlockRes.data.message);
 
+    // 34. Passenger Directory & Goodwill Float Governance
+    console.log('\n34. Testing Passenger Directory & Goodwill Float Governance...');
+    const passengersRes = await axios.get(`${BASE_URL}/api/admin/passengers`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Retrieved ${passengersRes.data.data.length} registered passengers.`);
+    const targetPassenger = passengersRes.data.data.find((p: any) => p.id === passengerId) || passengersRes.data.data[0];
+
+    // Suspend passenger
+    const suspendRiderRes = await axios.post(
+      `${BASE_URL}/api/admin/passengers/${targetPassenger.id}/status`,
+      { status: 'SUSPENDED' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Rider Status Update: ${suspendRiderRes.data.data.account_status}`);
+
+    // Credit goodwill funds to passenger
+    const creditWalletRes = await axios.post(
+      `${BASE_URL}/api/admin/passengers/${targetPassenger.id}/credit-wallet`,
+      { amountNgn: 2500, reason: 'Goodwill gesture for AC malfunction' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Passenger Wallet Credited: ₦${creditWalletRes.data.data.creditedNgn} (New Balance: ₦${creditWalletRes.data.data.newBalance})`);
+
+    // Reinstate passenger
+    await axios.post(
+      `${BASE_URL}/api/admin/passengers/${targetPassenger.id}/status`,
+      { status: 'ACTIVE' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log('   ✓ Passenger account reinstated to ACTIVE.');
+
+    // 35. Historical Ride Explorer & Admin Cancellation
+    console.log('\n35. Testing Historical Ride Explorer & Telemetry...');
+    const historicalRidesRes = await axios.get(`${BASE_URL}/api/admin/rides?status=ALL`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Total historical rides retrieved: ${historicalRidesRes.data.data.length}`);
+
+    // Create a dummy ride to test emergency admin trip cancellation
+    const testCancelRide = await db.createRide({
+      id: `ride_cancel_test_${Date.now()}`,
+      rider_id: passengerId,
+      pickup_lat: 6.5244,
+      pickup_lng: 3.3792,
+      pickup_address: 'Yaba Tech, Lagos',
+      dropoff_lat: 6.6018,
+      dropoff_lng: 3.3515,
+      dropoff_address: 'Ikeja City Mall, Lagos',
+      suggested_fare_ngn: 4500,
+      rider_offer_ngn: 4500,
+      distance_km: 12.0,
+      status: 'REQUESTED',
+      created_at: new Date().toISOString(),
+    });
+    const adminCancelRes = await axios.post(
+      `${BASE_URL}/api/admin/rides/${testCancelRide.id}/cancel`,
+      { reason: 'Security alert along route corridor' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Emergency Admin Trip Cancellation: ${adminCancelRes.data.message}`);
+
+    // 36. Proactive Compliance Radar & 1-Click Reminder
+    console.log('\n36. Testing Proactive Document Compliance Radar...');
+    const complianceListRes = await axios.get(`${BASE_URL}/api/admin/compliance/expiring?days=30`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Drivers flagged on compliance radar: ${complianceListRes.data.data.length}`);
+    const remindRes = await axios.post(
+      `${BASE_URL}/api/admin/compliance/${driverId}/remind`,
+      { docType: 'LASDRI Driver Card' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ 1-Click Reminder Dispatched: ${remindRes.data.message}`);
+
+    // 37. Fleet Broadcast & Announcements Engine
+    console.log('\n37. Testing Fleet Broadcast & Announcements Engine...');
+    const broadcastRes = await axios.post(
+      `${BASE_URL}/api/admin/broadcast`,
+      {
+        title: 'Depot Fuel PMS Adjustment Notice',
+        message: 'Lagos petrol prices adjusted to ₦1,050/L. All suggested fares auto-recalculated.',
+        target: 'ALL',
+        severity: 'WARNING',
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Fleet Broadcast Dispatched: ${broadcastRes.data.message}`);
+
+    // 38. Admin Staff Team & Role-Based Access Control (RBAC)
+    console.log('\n38. Testing Admin Staff Team & RBAC Management...');
+    const newStaffRes = await axios.post(
+      `${BASE_URL}/api/admin/staff`,
+      {
+        name: 'Oluwaseun Adeyemi',
+        email: `staff_${Date.now()}@gigaride.ng`,
+        phone: `080${Math.floor(10000000 + Math.random() * 90000000)}`,
+        password: 'secureStaffPassword2026',
+        admin_role: 'SUPPORT_AGENT',
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Staff Created: ${newStaffRes.data.data.full_name} (${newStaffRes.data.data.admin_role})`);
+
+    const staffId = newStaffRes.data.data.id;
+    // Upgrade role to KYC_OFFICER
+    const roleUpdateRes = await axios.put(
+      `${BASE_URL}/api/admin/staff/${staffId}/role`,
+      { admin_role: 'KYC_OFFICER' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Staff Role Promoted: ${roleUpdateRes.data.data.admin_role}`);
+
+    // Suspend staff member
+    const staffStatusRes = await axios.post(
+      `${BASE_URL}/api/admin/staff/${staffId}/status`,
+      { status: 'SUSPENDED' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Staff Status Updated: ${staffStatusRes.data.data.account_status}`);
+
+    // 39. FinTech Float & Solvency Reconciliation Desk
+    console.log('\n39. Testing FinTech Float & Solvency Reconciliation Desk...');
+    const reconRes = await axios.get(`${BASE_URL}/api/admin/finance/reconciliation`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const r = reconRes.data.data;
+    console.log(`   ✓ Total Passenger Wallet Float: ₦${r.totalPassengerFloatNgn.toLocaleString()}`);
+    console.log(`   ✓ Total Driver Wallet Float:    ₦${r.totalDriverFloatNgn.toLocaleString()}`);
+    console.log(`   ✓ Subscription Retainage:       ₦${r.totalSubscriptionRevenueNgn.toLocaleString()}`);
+    console.log(`   ✓ Lagos MOT Tax Accrual:        ₦${r.totalMotLeviesNgn.toLocaleString()}`);
+
     console.log('\n================================================================');
-    console.log(' ✅ ALL 33 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
+    console.log(' ✅ ALL 39 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
     console.log('================================================================');
 
     driverSocket.disconnect();

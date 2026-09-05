@@ -13,7 +13,21 @@ interface AuthenticatedSocket extends Socket {
   };
 }
 
+let globalIo: SocketIOServer | null = null;
+
+export function broadcastFleetAlert(target: 'ALL' | 'DRIVERS' | 'PASSENGERS', alertData: any) {
+  if (!globalIo) return;
+  if (target === 'DRIVERS') {
+    globalIo.to('drivers_pool').emit('fleet:broadcast', alertData);
+  } else if (target === 'PASSENGERS') {
+    globalIo.to('passengers_pool').emit('fleet:broadcast', alertData);
+  } else {
+    globalIo.emit('fleet:broadcast', alertData);
+  }
+}
+
 export function setupBiddingGateway(io: SocketIOServer) {
+  globalIo = io;
   // Authentication middleware for Socket.io
   io.use((socket: AuthenticatedSocket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers['authorization']?.replace('Bearer ', '');

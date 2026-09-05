@@ -1,5 +1,10 @@
-import { db, PlatformSettingsRow, SubscriptionPlanRow, AdminAuditLogRow, DisputeRow } from '../../database';
+import { db, PlatformSettingsRow, SubscriptionPlanRow, AdminAuditLogRow, DisputeRow, AdminRole, UserRow } from '../../database';
 import { geoSessionManager } from '../../common/redis';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { broadcastFleetAlert } from '../bidding/bidding.gateway';
+import { resendService } from '../notifications/resend.service';
+import { twilioService } from '../notifications/twilio.service';
 
 export class AdminService {
   public async getAnalytics() {
@@ -471,6 +476,286 @@ export class AdminService {
 
   public async getPassengers() {
     return db.getPassengers();
+  }
+
+  public async setPassengerStatus(
+    adminUser: { id: string; email: string },
+    passengerId: string,
+    status: 'ACTIVE' | 'SUSPENDED' | 'BANNED',
+    ipAddress?: string
+  ) {
+    const updated = await db.setUserStatus(passengerId, status);
+    if (!updated) throw new Error('Passenger not found.');
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: `PASSENGER_STATUS_${status}`,
+      resource_type: 'PASSENGER_PROFILE',
+      resource_id: passengerId,
+      details: { status },
+      ip_address: ipAddress,
+    });
+
+    return updated;
+  }
+
+  public async creditPassengerWallet(
+    adminUser: { id: string; email: string },
+    passengerId: string,
+    amountNgn: number,
+    reason: string,
+    ipAddress?: string
+  ) {
+    if (amountNgn <= 0) throw new Error('Credit amount must be greater than 0.');
+    if (!reason || reason.trim().length < 3) throw new Error('Operational reason is required for goodwill wallet credit.');
+
+    const passenger = await db.findUserById(passengerId);
+    if (!passenger) throw new Error('Passenger not found.');
+
+    let va = await db.getVirtualAccountByUserId(passengerId);
+    if (!va) {
+      va = await db.createOrUpdateVirtualAccount({
+        id: `va_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        user_id: passengerId,
+        account_reference: `ref_va_${Date.now()}`,
+        account_number: `100${Math.floor(1000000 + Math.random() * 9000000)}`,
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: passenger.full_name,
+        provider: 'korapay',
+        balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const updatedVa = await db.creditVirtualAccountBalance(passengerId, amountNgn);
+
+    await db.createTransaction({
+      id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      reference: `ADMIN_CREDIT_${Date.now()}`,
+      user_id: passengerId,
+      amount_kobo: Math.round(amountNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'SUBSCRIPTION_PURCHASE',
+      channel: 'ADMIN_GOODWILL',
+      meta_data: { reason, admin_id: adminUser.id, admin_email: adminUser.email },
+      created_at: new Date().toISOString(),
+    });
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'PASSENGER_WALLET_CREDITED',
+      resource_type: 'PASSENGER_WALLET',
+      resource_id: passengerId,
+      details: { amountNgn, reason, newBalance: updatedVa?.balance_ngn },
+      ip_address: ipAddress,
+    });
+
+    return { passengerId, creditedNgn: amountNgn, newBalance: updatedVa?.balance_ngn };
+  }
+
+  public async getAllRides(filter?: { status?: string; search?: string; limit?: number }) {
+    return db.getAllRides(filter);
+  }
+
+  public async cancelRideByAdmin(
+    adminUser: { id: string; email: string },
+    rideId: string,
+    reason: string,
+    ipAddress?: string
+  ) {
+    const updated = await db.updateRideStatus(rideId, 'CANCELLED');
+    if (!updated) throw new Error('Ride not found.');
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'RIDE_CANCELLED_BY_ADMIN',
+      resource_type: 'RIDE',
+      resource_id: rideId,
+      details: { reason },
+      ip_address: ipAddress,
+    });
+
+    return updated;
+  }
+
+  public async getStaffUsers() {
+    return db.getStaffUsers();
+  }
+
+  public async createStaffUser(
+    adminUser: { id: string; email: string },
+    payload: { name: string; email: string; phone: string; password: string; admin_role: AdminRole },
+    ipAddress?: string
+  ) {
+    const existingEmail = await db.findUserByEmail(payload.email);
+    if (existingEmail) throw new Error('A user with this email address already exists.');
+
+    const existingPhone = await db.findUserByPhone(payload.phone);
+    if (existingPhone) throw new Error('A user with this phone number already exists.');
+
+    const passwordHash = await bcrypt.hash(payload.password, 10);
+    const staffId = uuidv4();
+    const newUser: UserRow = {
+      id: staffId,
+      role: 'ADMIN',
+      admin_role: payload.admin_role,
+      full_name: payload.name,
+      email: payload.email,
+      phone_number: payload.phone,
+      password_hash: passwordHash,
+      account_status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+    };
+
+    await db.createUser(newUser);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'STAFF_USER_CREATED',
+      resource_type: 'STAFF_USER',
+      resource_id: staffId,
+      details: { email: payload.email, admin_role: payload.admin_role },
+      ip_address: ipAddress,
+    });
+
+    return {
+      id: newUser.id,
+      full_name: newUser.full_name,
+      email: newUser.email,
+      phone_number: newUser.phone_number,
+      admin_role: newUser.admin_role,
+      account_status: newUser.account_status,
+      created_at: newUser.created_at,
+    };
+  }
+
+  public async updateStaffRole(
+    adminUser: { id: string; email: string },
+    staffId: string,
+    adminRole: AdminRole,
+    ipAddress?: string
+  ) {
+    const updated = await db.updateStaffRole(staffId, adminRole);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'STAFF_ROLE_UPDATED',
+      resource_type: 'STAFF_USER',
+      resource_id: staffId,
+      details: { newRole: adminRole },
+      ip_address: ipAddress,
+    });
+
+    return updated;
+  }
+
+  public async setStaffStatus(
+    adminUser: { id: string; email: string },
+    staffId: string,
+    status: 'ACTIVE' | 'SUSPENDED',
+    ipAddress?: string
+  ) {
+    const updated = await db.setUserStatus(staffId, status);
+    if (!updated) throw new Error('Staff user not found.');
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: `STAFF_STATUS_${status}`,
+      resource_type: 'STAFF_USER',
+      resource_id: staffId,
+      details: { status },
+      ip_address: ipAddress,
+    });
+
+    return updated;
+  }
+
+  public async sendComplianceReminder(
+    adminUser: { id: string; email: string },
+    driverId: string,
+    docType: string = 'Driver License / LASDRI',
+    ipAddress?: string
+  ) {
+    const profile = await db.getDriverProfile(driverId);
+    if (!profile) throw new Error('Driver profile not found.');
+    const user = await db.findUserById(driverId);
+    if (!user) throw new Error('Driver user record not found.');
+
+    // 1. Send SMS reminder
+    await twilioService.sendSms(
+      user.phone_number,
+      `Hello ${user.full_name}, reminder from Giga Ride Compliance Desk: Your ${docType} is approaching expiration. Please renew immediately to avoid dispatch suspension.`
+    );
+
+    // 2. Send Email reminder
+    if (user.email) {
+      await resendService.sendEmail({
+        to: user.email,
+        subject: `URGENT: Giga Ride Document Renewal Notice (${docType})`,
+        html: `
+          <div style="font-family: Arial, sans-serif; background: #0F172A; color: #F8FAFC; padding: 24px; border-radius: 16px;">
+            <h2 style="color: #F59E0B;">⚠️ Giga Ride Compliance Notice: Document Renewal Required</h2>
+            <p>Dear ${user.full_name},</p>
+            <p>Our regulatory monitoring system detected that your <strong>${docType}</strong> is due for expiration or has expired.</p>
+            <p>Under Lagos State Ministry of Transportation (LASG) guidelines, active commercial drivers must maintain valid LASDRI and FRSC credentials to remain on the dispatch grid.</p>
+            <div style="background: #1E293B; border-left: 4px solid #F59E0B; padding: 14px; margin: 16px 0; border-radius: 8px;">
+              Please upload your renewed documentation through the Giga Driver App or visit a designated Giga Support Hub.
+            </div>
+            <p style="color: #94A3B8; font-size: 12px;">Giga Ride Regulatory Compliance Operations Desk</p>
+          </div>
+        `,
+      });
+    }
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'COMPLIANCE_REMINDER_DISPATCHED',
+      resource_type: 'DRIVER_PROFILE',
+      resource_id: driverId,
+      details: { docType, phone: user.phone_number, email: user.email },
+      ip_address: ipAddress,
+    });
+
+    return { success: true, driverId, driverName: user.full_name, docType };
+  }
+
+  public async broadcastFleetAlert(
+    adminUser: { id: string; email: string },
+    alert: { title: string; message: string; target: 'ALL' | 'DRIVERS' | 'PASSENGERS'; severity: 'INFO' | 'WARNING' | 'CRITICAL' },
+    ipAddress?: string
+  ) {
+    const alertPayload = {
+      ...alert,
+      timestamp: new Date().toISOString(),
+      dispatchedBy: adminUser.email,
+    };
+
+    broadcastFleetAlert(alert.target, alertPayload);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'FLEET_BROADCAST_SENT',
+      resource_type: 'PLATFORM_BROADCAST',
+      resource_id: `broadcast_${Date.now()}`,
+      details: alertPayload,
+      ip_address: ipAddress,
+    });
+
+    return { success: true, alert: alertPayload };
+  }
+
+  public async getFinancialReconciliation() {
+    return db.getFinancialReconciliation();
   }
 
   public async getTransactions() {

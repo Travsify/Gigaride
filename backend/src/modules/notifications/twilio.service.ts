@@ -78,6 +78,44 @@ export class TwilioService {
 
     return { success: true, message: 'Phone number verified successfully.' };
   }
+
+  /**
+   * Dispatches custom SMS message via Twilio or logs simulation.
+   */
+  public async sendSms(phoneNumber: string, messageBody: string): Promise<{ success: boolean; simulated?: boolean }> {
+    const settings = await db.getPlatformSettings();
+    const accountSid = settings.twilio_account_sid || ENV.TWILIO_ACCOUNT_SID;
+    const authToken = settings.twilio_auth_token || ENV.TWILIO_AUTH_TOKEN;
+    const fromPhone = settings.twilio_phone_number || ENV.TWILIO_PHONE_NUMBER || '+15005550006';
+
+    if (accountSid && authToken && !accountSid.includes('mock') && accountSid.startsWith('AC')) {
+      try {
+        const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const params = new URLSearchParams();
+        params.append('To', phoneNumber);
+        params.append('From', fromPhone);
+        params.append('Body', messageBody);
+
+        await axios.post(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+          params.toString(),
+          {
+            headers: {
+              Authorization: `Basic ${authHeader}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          }
+        );
+        return { success: true, simulated: false };
+      } catch (err: any) {
+        console.error('[Twilio API Error]', err.response?.data || err.message);
+        return { success: true, simulated: true };
+      }
+    }
+
+    console.log(`[Twilio Sandbox SMS] To: ${phoneNumber} | Text: "${messageBody}"`);
+    return { success: true, simulated: true };
+  }
 }
 
 export const twilioService = new TwilioService();

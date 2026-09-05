@@ -3,15 +3,18 @@ import path from 'path';
 import { Pool } from 'pg';
 import { ENV } from '../config/env';
 
+export type AdminRole = 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
+
 export interface UserRow {
   id: string;
   role: 'PASSENGER' | 'DRIVER' | 'ADMIN';
-  admin_role?: 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
+  admin_role?: AdminRole;
   full_name: string;
   phone_number: string;
   email: string;
   password_hash: string;
   is_phone_verified?: boolean;
+  account_status?: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   created_at: string;
 }
 
@@ -444,13 +447,116 @@ export class DatabaseService {
     return this.store.users.find((u) => u.id === id);
   }
 
-  public async getPassengers(): Promise<(UserRow & { totalRides: number })[]> {
+  public async getPassengers(): Promise<(UserRow & { totalRides: number; virtualAccount: VirtualBankAccountRow | null })[]> {
     return this.store.users
       .filter((u) => u.role === 'PASSENGER')
       .map((u) => {
         const totalRides = this.store.rides.filter((r) => r.rider_id === u.id && r.status === 'COMPLETED').length;
-        return { ...u, totalRides };
+        const virtualAccount = this.store.virtual_bank_accounts.find((v) => v.user_id === u.id) || null;
+        return {
+          ...u,
+          account_status: u.account_status || 'ACTIVE',
+          totalRides,
+          virtualAccount,
+        };
       });
+  }
+
+  public async setUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED' | 'BANNED'): Promise<UserRow | undefined> {
+    const user = this.store.users.find((u) => u.id === userId);
+    if (user) {
+      user.account_status = status;
+      this.saveStore();
+      return user;
+    }
+    return undefined;
+  }
+
+  public async getStaffUsers() {
+    return this.store.users
+      .filter((u) => u.role === 'ADMIN')
+      .map((u) => ({
+        id: u.id,
+        email: u.email,
+        full_name: u.full_name,
+        phone_number: u.phone_number,
+        admin_role: (u.admin_role || 'SUPPORT_AGENT') as AdminRole,
+        account_status: u.account_status || 'ACTIVE',
+        created_at: u.created_at,
+      }));
+  }
+
+  public async updateStaffRole(staffId: string, adminRole: AdminRole) {
+    const user = this.store.users.find((u) => u.id === staffId && u.role === 'ADMIN');
+    if (!user) throw new Error('Staff user not found.');
+    user.admin_role = adminRole;
+    this.saveStore();
+    return user;
+  }
+
+  public async getAllRides(filter?: { status?: string; search?: string; limit?: number }) {
+    let list = [...this.store.rides].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (filter?.status && filter.status !== 'ALL') {
+      list = list.filter((r) => r.status === filter.status);
+    }
+    if (filter?.search) {
+      const q = filter.search.toLowerCase();
+      list = list.filter((r) => {
+        const rider = this.store.users.find((u) => u.id === r.rider_id);
+        const driver = r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : undefined;
+        return (
+          r.id.toLowerCase().includes(q) ||
+          r.pickup_address.toLowerCase().includes(q) ||
+          r.dropoff_address.toLowerCase().includes(q) ||
+          (rider && rider.full_name.toLowerCase().includes(q)) ||
+          (driver && driver.full_name.toLowerCase().includes(q))
+        );
+      });
+    }
+    const limit = filter?.limit || 100;
+    return list.slice(0, limit).map((r) => {
+      const rider = this.store.users.find((u) => u.id === r.rider_id);
+      const driver = r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : undefined;
+      const driverProfile = r.driver_id ? this.store.driver_profiles.find((p) => p.driver_id === r.driver_id) : undefined;
+      return {
+        ...r,
+        rider: rider ? { id: rider.id, full_name: rider.full_name, phone_number: rider.phone_number } : null,
+        driver: driver ? { id: driver.id, full_name: driver.full_name, phone_number: driver.phone_number } : null,
+        driverProfile: driverProfile ? { license_plate: driverProfile.license_plate, vehicle_make: driverProfile.vehicle_make, vehicle_model: driverProfile.vehicle_model } : null,
+      };
+    });
+  }
+
+  public async getFinancialReconciliation() {
+    const passengerVbas = this.store.virtual_bank_accounts.filter((v) => {
+      const u = this.store.users.find((user) => user.id === v.user_id);
+      return u && u.role === 'PASSENGER';
+    });
+    const driverVbas = this.store.virtual_bank_accounts.filter((v) => {
+      const u = this.store.users.find((user) => user.id === v.user_id);
+      return u && u.role === 'DRIVER';
+    });
+
+    const totalPassengerFloatNgn = passengerVbas.reduce((sum, v) => sum + (v.balance_ngn || 0), 0);
+    const totalDriverFloatNgn = driverVbas.reduce((sum, v) => sum + (v.balance_ngn || 0), 0);
+
+    const motLevyUnit = this.store.platform_settings.lagos_mot_levy_ngn || 50;
+    const completedTrips = this.store.rides.filter((r) => r.status === 'COMPLETED');
+    const totalMotLeviesNgn = completedTrips.length * motLevyUnit;
+    const totalAgreedFaresNgn = completedTrips.reduce((sum, r) => sum + (r.agreed_fare_ngn || r.suggested_fare_ngn || 0), 0);
+
+    const successfulPayments = this.store.payment_transactions.filter((t) => t.status === 'SUCCESS');
+    const totalSubscriptionRevenueNgn = successfulPayments.reduce((sum, t) => sum + (t.amount_kobo / 100), 0);
+
+    return {
+      totalPassengerFloatNgn,
+      totalDriverFloatNgn,
+      totalSubscriptionRevenueNgn,
+      totalMotLeviesNgn,
+      totalAgreedFaresNgn,
+      completedTripsCount: completedTrips.length,
+      totalTransactionsCount: successfulPayments.length,
+    };
   }
 
   // --- Driver Profile Repository ---
