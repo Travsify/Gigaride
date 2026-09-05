@@ -1,12 +1,203 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'home_screen.dart';
 
-class RideTrackingScreen extends StatelessWidget {
+class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({super.key});
+
+  @override
+  State<RideTrackingScreen> createState() => _RideTrackingScreenState();
+}
+
+class _RideTrackingScreenState extends State<RideTrackingScreen> {
+  bool _walletPaymentSuccess = false;
+  bool _isSettlingWallet = false;
+  bool _sosDispatched = false;
+
+  void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver) {
+    final phone = driver?['driverPhone'] ?? driver?['phone'] ?? '+234 800 000 0000';
+    final name = driver?['driverName'] ?? 'Driver';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppConstants.primaryColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.phone_in_talk_rounded, color: AppConstants.accentColor, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text('Assigned Giga Driver', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.phone_android_rounded, color: AppConstants.textMuted, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        phone,
+                        style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: AppConstants.accentColor, size: 20),
+                      tooltip: 'Copy Number',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: phone));
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Copied $phone to clipboard. Dial from phone.'),
+                            backgroundColor: AppConstants.primaryColor,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                  icon: const Icon(Icons.call, color: Colors.white),
+                  label: const Text('Copy & Dial Driver', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: phone));
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Copied $phone. Opening phone app...'),
+                        backgroundColor: AppConstants.primaryColor,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _triggerEmergencySosDialog(BuildContext context, PassengerProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppConstants.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: AppConstants.dangerColor, size: 28),
+            SizedBox(width: 10),
+            Text('Activate SOS Dispatch?', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'This will immediately transmit your real-time GPS coordinates, vehicle license plate, and driver identity to Giga Security Operations and Lagos Emergency Response.\n\nOnly use this in real emergency situations.',
+          style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppConstants.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.dangerColor),
+            onPressed: () {
+              Navigator.pop(ctx);
+              provider.triggerEmergencySos();
+              setState(() {
+                _sosDispatched = true;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('🚨 DISPATCH NOTIFIED: Giga Security Ops and local emergency units alerted!'),
+                  backgroundColor: AppConstants.dangerColor,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 6),
+                ),
+              );
+            },
+            child: const Text('ACTIVATE SOS NOW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleWalletPayment(PassengerProvider provider) async {
+    setState(() => _isSettlingWallet = true);
+    try {
+      await provider.payWithLivingWallet();
+      setState(() {
+        _walletPaymentSuccess = true;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Fare successfully settled from your Living Wallet! Driver received 100%.'),
+            backgroundColor: AppConstants.successColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppConstants.dangerColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSettlingWallet = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,17 +215,18 @@ class RideTrackingScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle, size: 84, color: AppConstants.successColor),
-                const SizedBox(height: 20),
+                const Icon(Icons.check_circle, size: 80, color: AppConstants.successColor),
+                const SizedBox(height: 16),
                 const Text('You Have Arrived!', style: TextStyle(color: AppConstants.textLight, fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text('Hope you enjoyed your ride.', style: TextStyle(color: AppConstants.textMuted, fontSize: 14)),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: AppConstants.cardBg,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _walletPaymentSuccess ? AppConstants.successColor : Colors.white12),
                   ),
                   child: Column(
                     children: [
@@ -45,20 +237,59 @@ class RideTrackingScreen extends StatelessWidget {
                         style: const TextStyle(color: AppConstants.accentColor, fontSize: 32, fontWeight: FontWeight.bold),
                       ),
                       const Divider(color: Colors.white12, height: 24),
-                      const Text(
-                        'Pay driver via Cash or Instant Bank Transfer. (Zero commission platform - driver keeps 100%).',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                      ),
+                      if (_walletPaymentSuccess) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
+                            SizedBox(width: 8),
+                            Text('Paid via Giga Living Wallet', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Driver received 100% directly into their payout wallet.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                      ] else ...[
+                        const Text(
+                          'Settle with driver directly via cash/transfer or pay instantly with your Living Wallet.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+
+                // Pay With Living Wallet Button (if not already settled)
+                if (!_walletPaymentSuccess) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.accentColor,
+                        foregroundColor: Colors.black,
+                      ),
+                      icon: _isSettlingWallet
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                          : const Icon(Icons.account_balance_wallet_rounded, size: 20),
+                      label: Text(
+                        _isSettlingWallet ? 'Processing Wallet Transfer...' : 'Pay with Living Wallet',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      onPressed: _isSettlingWallet ? null : () => _handleWalletPayment(provider),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
+                  height: 50,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _walletPaymentSuccess ? AppConstants.primaryColor : AppConstants.surfaceBg,
+                    ),
                     onPressed: () {
                       provider.resetTrip();
                       Navigator.pushAndRemoveUntil(
@@ -67,7 +298,10 @@ class RideTrackingScreen extends StatelessWidget {
                         (r) => false,
                       );
                     },
-                    child: const Text('Book Another Ride', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _walletPaymentSuccess ? 'Book Another Ride' : 'Paid Driver Cash / Transfer Done',
+                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -90,6 +324,32 @@ class RideTrackingScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // SOS Alert Banner if activated
+              if (_sosDispatched) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppConstants.dangerColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppConstants.dangerColor),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.shield_rounded, color: AppConstants.dangerColor, size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'EMERGENCY SOS ACTIVE: Security dispatch monitoring this vehicle in real-time.',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Status Header
               Container(
                 width: double.infinity,
@@ -215,7 +475,7 @@ class RideTrackingScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {},
+                      onPressed: () => _callDriverSheet(context, driver),
                       label: const Text('Call Driver', style: TextStyle(color: AppConstants.textLight)),
                     ),
                   ),
@@ -228,14 +488,7 @@ class RideTrackingScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('SOS Emergency Link Shared. Emergency contacts alerted.'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      },
+                      onPressed: () => _triggerEmergencySosDialog(context, provider),
                       label: const Text('Emergency SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),

@@ -63,6 +63,21 @@ class SocketService {
     });
   }
 
+  // Trigger Emergency SOS on Real-Time Gateway (alerts Admin console + LASEMA desk)
+  void triggerSos({
+    required String rideId,
+    required double latitude,
+    required double longitude,
+    String? notes,
+  }) {
+    socket?.emit('ride:sos_trigger', {
+      'rideId': rideId,
+      'latitude': latitude,
+      'longitude': longitude,
+      'notes': notes ?? 'Passenger triggered in-transit SOS',
+    });
+  }
+
   void disconnect() {
     socket?.disconnect();
     socket?.dispose();

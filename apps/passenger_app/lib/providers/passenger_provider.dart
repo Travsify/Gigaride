@@ -159,6 +159,68 @@ class PassengerProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Trigger Emergency SOS alert
+  void triggerEmergencySos({double? lat, double? lng, String? notes}) {
+    if (currentRide == null) return;
+    socket.triggerSos(
+      rideId: currentRide!['id'],
+      latitude: lat ?? 6.5244,
+      longitude: lng ?? 3.3792,
+      notes: notes ?? 'Emergency SOS triggered by passenger in mobile app',
+    );
+  }
+
+  // Pay for ride using Giga Living Wallet
+  Future<Map<String, dynamic>> payWithLivingWallet() async {
+    if (currentRide == null) throw Exception('No active ride to settle');
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.payRideWithWallet(currentRide!['id']);
+      finalFarePaid = res['fareNgn'];
+      return res;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Schedule advance airport or interstate trip
+  Future<Map<String, dynamic>> scheduleAdvanceTrip({
+    required double pickupLat,
+    required double pickupLng,
+    required String pickupAddress,
+    required double dropoffLat,
+    required double dropoffLng,
+    required String dropoffAddress,
+    required String scheduledFor,
+    required int riderOfferNgn,
+    String? flightNumber,
+    bool isAirport = false,
+    bool isInterstate = false,
+  }) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.scheduleRide(
+        pickupLat: pickupLat,
+        pickupLng: pickupLng,
+        pickupAddress: pickupAddress,
+        dropoffLat: dropoffLat,
+        dropoffLng: dropoffLng,
+        dropoffAddress: dropoffAddress,
+        scheduledFor: scheduledFor,
+        riderOfferNgn: riderOfferNgn,
+        flightNumber: flightNumber,
+        isAirport: isAirport,
+        isInterstate: isInterstate,
+      );
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await api.clearAuth();
     socket.disconnect();

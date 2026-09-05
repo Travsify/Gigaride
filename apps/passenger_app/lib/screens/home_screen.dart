@@ -21,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _pickupCtrl = TextEditingController(text: 'Current Location');
   final _dropoffCtrl = TextEditingController();
   final _offerCtrl = TextEditingController();
+  final _flightCtrl = TextEditingController();
 
   // Active coordinates (default center: Lagos Mainland / Island corridor)
   final double _pickupLat = 6.5244;
@@ -28,7 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double _dropoffLat = 6.4281;
   double _dropoffLng = 3.4219;
 
-  String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE', 'PASS'
+  String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
+  DateTime? _scheduledDateTime;
 
   final List<Map<String, dynamic>> _quickDestinations = [
     {
@@ -66,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _pickupCtrl.dispose();
     _dropoffCtrl.dispose();
     _offerCtrl.dispose();
+    _flightCtrl.dispose();
     super.dispose();
   }
 
@@ -76,6 +79,57 @@ class _HomeScreenState extends State<HomeScreen> {
       _dropoffLng = dest['lng'];
     });
     _calculateFareEstimate();
+  }
+
+  Future<void> _pickScheduleDateTime() async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDateTime ?? now.add(const Duration(hours: 3)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 30)),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppConstants.primaryColor,
+            onPrimary: Colors.white,
+            surface: AppConstants.cardBg,
+            onSurface: AppConstants.textLight,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_scheduledDateTime ?? now.add(const Duration(hours: 3))),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppConstants.primaryColor,
+            onPrimary: Colors.white,
+            surface: AppConstants.cardBg,
+            onSurface: AppConstants.textLight,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (pickedTime != null && mounted) {
+      setState(() {
+        _scheduledDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+      });
+    }
   }
 
   void _calculateFareEstimate() {
@@ -123,6 +177,99 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    // Advance Booking Handling (Airport / Interstate)
+    if (_selectedCategory == 'AIRPORT' || _selectedCategory == 'INTERSTATE') {
+      final scheduleTarget = _scheduledDateTime ?? DateTime.now().add(
+        Duration(hours: _selectedCategory == 'AIRPORT' ? 3 : 6),
+      );
+
+      try {
+        final res = await provider.scheduleAdvanceTrip(
+          pickupLat: _pickupLat,
+          pickupLng: _pickupLng,
+          pickupAddress: _pickupCtrl.text.trim(),
+          dropoffLat: _dropoffLat,
+          dropoffLng: _dropoffLng,
+          dropoffAddress: dropoffText,
+          scheduledFor: scheduleTarget.toIso8601String(),
+          riderOfferNgn: offer > 0 ? offer : (_selectedCategory == 'AIRPORT' ? 8000 : 25000),
+          flightNumber: _flightCtrl.text.trim().isNotEmpty ? _flightCtrl.text.trim() : null,
+          isAirport: _selectedCategory == 'AIRPORT',
+          isInterstate: _selectedCategory == 'INTERSTATE',
+        );
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppConstants.cardBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: const [
+                  Icon(Icons.check_circle, color: AppConstants.successColor, size: 26),
+                  SizedBox(width: 10),
+                  Text('Trip Scheduled!', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your ${_selectedCategory == 'AIRPORT' ? 'Airport VIP Transfer' : 'Interstate Ride'} has been queued in Giga Dispatch.',
+                    style: const TextStyle(color: AppConstants.textMuted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppConstants.surfaceBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pickup: ${DateFormat('EEE, MMM d • h:mm a').format(scheduleTarget)}', style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Target Fare: ${currencyFormat.format(offer > 0 ? offer : (_selectedCategory == 'AIRPORT' ? 8000 : 25000))}', style: const TextStyle(color: AppConstants.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                        if (_flightCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('Flight: ${_flightCtrl.text.trim()}', style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                        ],
+                        if (res['id'] != null) ...[
+                          const SizedBox(height: 4),
+                          Text('Booking Ref: ${res['id'].toString().substring(0, 8).toUpperCase()}', style: const TextStyle(color: AppConstants.textMuted, fontSize: 10)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Assigned drivers will be dispatched 2 hours prior to pickup with zero cancellation penalty.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _dropoffCtrl.clear();
+                      _flightCtrl.clear();
+                    });
+                  },
+                  child: const Text('Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        _showSnack(e.toString().replaceAll('Exception: ', ''));
+      }
+      return;
+    }
+
+    // On-Demand City Ride Handling
     try {
       await provider.submitRideRequest(
         pickupLat: _pickupLat,
@@ -468,6 +615,80 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                               ],
                             ),
+
+                            // Advance Booking Fields (Airport / Interstate)
+                            if (_selectedCategory != 'CITY') ...[
+                              const Divider(color: AppConstants.surfaceBg, height: 20),
+                              GestureDetector(
+                                onTap: _pickScheduleDateTime,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: AppConstants.accentColor.withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.calendar_today_rounded, color: AppConstants.accentColor, size: 12),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Pickup Schedule', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
+                                          Text(
+                                            DateFormat('EEE, MMM d • h:mm a').format(
+                                              _scheduledDateTime ?? DateTime.now().add(Duration(hours: _selectedCategory == 'AIRPORT' ? 3 : 6)),
+                                            ),
+                                            style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppConstants.surfaceBg,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text('Change', style: TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+
+                            if (_selectedCategory == 'AIRPORT') ...[
+                              const Divider(color: AppConstants.surfaceBg, height: 20),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.primaryLight.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.flight_takeoff_rounded, color: AppConstants.primaryLight, size: 13),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _flightCtrl,
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                      decoration: const InputDecoration(
+                                        hintText: 'Flight Number (e.g. BA075) [Optional]',
+                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -631,12 +852,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                         height: 20,
                                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                       )
-                                    : const Row(
+                                    : Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          Text('Find Nearby Drivers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                                          SizedBox(width: 8),
-                                          Icon(Icons.arrow_forward_rounded, size: 16),
+                                          Text(
+                                            _selectedCategory == 'CITY'
+                                                ? 'Find Nearby Drivers'
+                                                : _selectedCategory == 'AIRPORT'
+                                                    ? 'Schedule Airport VIP Transfer'
+                                                    : 'Book Advance Interstate Ride',
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.arrow_forward_rounded, size: 16),
                                         ],
                                       ),
                               ),

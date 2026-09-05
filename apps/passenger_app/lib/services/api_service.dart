@@ -240,4 +240,77 @@ class ApiService {
     }
     return [];
   }
+
+  // Pay for completed ride using Giga Living Wallet
+  Future<Map<String, dynamic>> payRideWithWallet(String rideId) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/$rideId/pay-wallet'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Wallet payment failed');
+  }
+
+  // Pre-schedule Advance Airport or Interstate Ride
+  Future<Map<String, dynamic>> scheduleRide({
+    required double pickupLat,
+    required double pickupLng,
+    required String pickupAddress,
+    required double dropoffLat,
+    required double dropoffLng,
+    required String dropoffAddress,
+    required String scheduledFor,
+    required int riderOfferNgn,
+    String? flightNumber,
+    bool isAirport = false,
+    bool isInterstate = false,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rides/schedule'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'pickupLat': pickupLat,
+        'pickupLng': pickupLng,
+        'pickupAddress': pickupAddress,
+        'dropoffLat': dropoffLat,
+        'dropoffLng': dropoffLng,
+        'dropoffAddress': dropoffAddress,
+        'scheduledFor': scheduledFor,
+        'riderOfferNgn': riderOfferNgn,
+        'flightNumber': flightNumber,
+        'isAirport': isAirport,
+        'isInterstate': isInterstate,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 201 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to schedule ride');
+  }
+
+  // Fetch Passenger Ride History
+  Future<List<dynamic>> getRiderHistory() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rides/history/passenger'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
 }
