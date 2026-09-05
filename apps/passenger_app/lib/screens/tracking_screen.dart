@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'home_screen.dart';
+import 'in_app_call_screen.dart';
+import 'ride_chat_sheet.dart';
 
 class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({super.key});
@@ -20,9 +22,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   int _driverRating = 5;
   int? _selectedTip;
 
-  void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver) {
+  void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver, String rideId) {
     final phone = driver?['driverPhone'] ?? driver?['phone'] ?? '+234 800 000 0000';
     final name = driver?['driverName'] ?? 'Driver';
+    final driverId = driver?['driverId'] ?? 'driver';
+    final vehicle = '${driver?['vehicleModel'] ?? 'Toyota Corolla'} • ${driver?['licensePlate'] ?? ''}';
 
     showModalBottomSheet(
       context: context,
@@ -53,18 +57,72 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(name, style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const Text('Assigned Giga Driver', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                        Text(vehicle, style: const TextStyle(color: AppConstants.textMuted, fontSize: 13)),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // NDPR Privacy Banner
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.shield_outlined, color: Color(0xFF10B981), size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'NDPR Shield: Your personal phone number is never shared with the driver.',
+                        style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Option 1: In-App VoIP Call (Zero phone number leakage)
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.headset_mic_rounded, color: Colors.white),
+                  label: const Text(
+                    'Free In-App Audio Call (VoIP)',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => InAppCallScreen(
+                          rideId: rideId,
+                          driverId: driverId,
+                          driverName: name,
+                          vehicleInfo: vehicle,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Option 2: Direct Cellular GSM Dial
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppConstants.surfaceBg,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white10),
                 ),
                 child: Row(
@@ -72,9 +130,15 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     const Icon(Icons.phone_android_rounded, color: AppConstants.textMuted, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        phone,
-                        style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Driver Verified Line', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                          Text(
+                            phone,
+                            style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ),
                     IconButton(
@@ -86,7 +150,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Copied $phone to clipboard. Dial from phone.'),
+                            content: Text('Copied $phone to clipboard.'),
                             backgroundColor: AppConstants.primaryColor,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -96,30 +160,24 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-                  icon: const Icon(Icons.call, color: Colors.white),
-                  label: const Text('Copy & Dial Driver', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: phone));
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Copied $phone. Opening phone app...'),
-                        backgroundColor: AppConstants.primaryColor,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _openChatSheet(BuildContext context, Map<String, dynamic>? driver, String rideId) {
+    final name = driver?['driverName'] ?? 'Driver';
+    final driverId = driver?['driverId'] ?? 'driver';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => RideChatSheet(
+        rideId: rideId,
+        driverId: driverId,
+        driverName: name,
       ),
     );
   }
@@ -207,6 +265,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
     final driver = provider.selectedDriverBid;
     final status = provider.tripStatus ?? 'ACCEPTED';
+    final rideId = provider.currentRide?['id'] ?? driver?['rideId'] ?? 'active-ride';
 
     if (status == 'COMPLETED') {
       return Scaffold(
@@ -527,32 +586,49 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
               const Spacer(),
 
-              // Safety SOS & Emergency
+              // Safety SOS, Chat & VoIP Call Actions
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.phone, color: AppConstants.textLight),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 18),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppConstants.accentColor.withOpacity(0.6)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => _openChatSheet(context, driver, rideId),
+                      label: const Text('Chat', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.phone_in_talk_rounded, color: AppConstants.textLight, size: 18),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.white24),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () => _callDriverSheet(context, driver),
-                      label: const Text('Call Driver', style: TextStyle(color: AppConstants.textLight)),
+                      onPressed: () => _callDriverSheet(context, driver, rideId),
+                      label: const Text('Call', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.shield_outlined, color: Colors.white),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppConstants.dangerColor,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => _triggerEmergencySosDialog(context, provider),
-                      label: const Text('Emergency SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.dangerColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _triggerEmergencySosDialog(context, provider),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.shield_rounded, color: Colors.white, size: 18),
+                        SizedBox(width: 6),
+                        Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ],
                     ),
                   ),
                 ],

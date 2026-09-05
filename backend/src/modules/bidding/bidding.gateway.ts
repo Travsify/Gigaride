@@ -322,6 +322,75 @@ export function setupBiddingGateway(io: SocketIOServer) {
       }
     });
 
+    // --- In-App Secure Calling (VoIP / Encrypted Signaling) ---
+    // Passenger's personal phone number is NEVER exposed. Calls route via in-app WebSockets.
+    socket.on('call:initiate', async (data: { rideId: string; receiverId: string }) => {
+      try {
+        const caller = await db.findUserById(user.userId);
+        const callerName = user.role === 'DRIVER' ? (caller?.full_name || 'Driver') : (caller?.full_name || 'Passenger');
+
+        console.log(`📞 [In-App Call] Initiated by ${user.role} (${user.userId}) to ${data.receiverId} for ride ${data.rideId}`);
+
+        io.to(`user:${data.receiverId}`).emit('call:incoming', {
+          rideId: data.rideId,
+          callerId: user.userId,
+          callerName,
+          callerRole: user.role,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    socket.on('call:answer', (data: { rideId: string; callerId: string }) => {
+      console.log(`📞 [In-App Call Answered] User ${user.userId} answered call from ${data.callerId}`);
+      io.to(`user:${data.callerId}`).emit('call:connected', {
+        rideId: data.rideId,
+        answeredBy: user.userId,
+      });
+      socket.emit('call:connected', {
+        rideId: data.rideId,
+        answeredBy: user.userId,
+      });
+    });
+
+    socket.on('call:end', (data: { rideId: string; targetId: string; reason?: string }) => {
+      console.log(`📞 [In-App Call Ended] by ${user.userId} for ride ${data.rideId}`);
+      io.to(`user:${data.targetId}`).emit('call:ended', {
+        rideId: data.rideId,
+        endedBy: user.userId,
+        reason: data.reason || 'Call ended',
+      });
+      socket.emit('call:ended', {
+        rideId: data.rideId,
+        endedBy: user.userId,
+        reason: data.reason || 'Call ended',
+      });
+    });
+
+    // --- In-App Gate & Ride Chat (Zero Number Exchange) ---
+    socket.on('ride:chat_send', async (data: { rideId: string; receiverId: string; text: string }) => {
+      try {
+        const sender = await db.findUserById(user.userId);
+        const senderName = user.role === 'DRIVER' ? (sender?.full_name || 'Driver') : (sender?.full_name || 'Passenger');
+        const messagePayload = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          rideId: data.rideId,
+          senderId: user.userId,
+          senderName,
+          senderRole: user.role,
+          text: data.text,
+          timestamp: new Date().toISOString(),
+        };
+
+        io.to(`user:${data.receiverId}`).emit('ride:chat_message', messagePayload);
+        socket.emit('ride:chat_sent', messagePayload);
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
     // --- Disconnect & Cleanup ---
     socket.on('disconnect', async () => {
       if (user.role === 'DRIVER') {

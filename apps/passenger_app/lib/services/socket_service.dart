@@ -49,7 +49,39 @@ class SocketService {
         onRideFinished(Map<String, dynamic>.from(data));
       }
     });
+
+    // In-App Calling & Secure Signaling Listeners
+    socket!.on('call:incoming', (data) {
+      if (data != null && onIncomingCall != null) {
+        onIncomingCall!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:connected', (data) {
+      if (data != null && onCallConnected != null) {
+        onCallConnected!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:ended', (data) {
+      if (data != null && onCallEnded != null) {
+        onCallEnded!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // In-App Chat Listeners
+    socket!.on('ride:chat_message', (data) {
+      if (data != null && onChatMessage != null) {
+        onChatMessage!(Map<String, dynamic>.from(data));
+      }
+    });
   }
+
+  // Call & Chat event callbacks
+  Function(Map<String, dynamic>)? onIncomingCall;
+  Function(Map<String, dynamic>)? onCallConnected;
+  Function(Map<String, dynamic>)? onCallEnded;
+  Function(Map<String, dynamic>)? onChatMessage;
 
   void broadcastRide(String rideId) {
     socket?.emit('ride:request', {'rideId': rideId});
@@ -60,6 +92,38 @@ class SocketService {
       'rideId': rideId,
       'driverId': driverId,
       'agreedFareNgn': agreedFareNgn,
+    });
+  }
+
+  // In-App VoIP Call Actions
+  void initiateCall({required String rideId, required String receiverId}) {
+    socket?.emit('call:initiate', {
+      'rideId': rideId,
+      'receiverId': receiverId,
+    });
+  }
+
+  void answerCall({required String rideId, required String callerId}) {
+    socket?.emit('call:answer', {
+      'rideId': rideId,
+      'callerId': callerId,
+    });
+  }
+
+  void endCall({required String rideId, required String targetId, String? reason}) {
+    socket?.emit('call:end', {
+      'rideId': rideId,
+      'targetId': targetId,
+      'reason': reason ?? 'Call ended',
+    });
+  }
+
+  // In-App Chat Actions
+  void sendChatMessage({required String rideId, required String receiverId, required String text}) {
+    socket?.emit('ride:chat_send', {
+      'rideId': rideId,
+      'receiverId': receiverId,
+      'text': text,
     });
   }
 
