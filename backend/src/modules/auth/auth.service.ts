@@ -121,6 +121,7 @@ export class AuthService {
         id: user.id,
         role: user.role,
         adminRole: user.role === 'ADMIN' ? (user.admin_role || 'SUPER_ADMIN') : undefined,
+        admin_role: user.role === 'ADMIN' ? (user.admin_role || 'SUPER_ADMIN') : undefined,
         fullName: user.full_name,
         phoneNumber: user.phone_number,
         email: user.email,

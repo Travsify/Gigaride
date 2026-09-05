@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
+import bcrypt from 'bcryptjs';
 import { ENV } from '../config/env';
 
 export type AdminRole = 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
@@ -65,6 +66,25 @@ export interface DriverSubscriptionRow {
   remaining_rides: number; // e.g. 50, 0, or down to -2 for grace
   starts_at: string;
   expires_at: string;
+  is_frozen?: boolean;
+  frozen_at?: string;
+  total_frozen_ms?: number;
+  freeze_reason?: string;
+  created_at: string;
+}
+
+export interface RiderSubscriptionRow {
+  id: string;
+  rider_id: string;
+  pass_name: string;
+  discount_percent: number;
+  max_discount_per_ride_ngn: number;
+  rides_remaining: number;
+  corridor?: string;
+  starts_at: string;
+  expires_at: string;
+  price_kobo: number;
+  status: 'ACTIVE' | 'EXHAUSTED' | 'EXPIRED';
   created_at: string;
 }
 
@@ -131,6 +151,11 @@ export interface RideRow {
   agreed_fare_ngn?: number | null;
   distance_km: number;
   status: 'REQUESTED' | 'NEGOTIATING' | 'ACCEPTED' | 'ARRIVED' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
+  scheduled_for?: string;
+  flight_number?: string;
+  is_airport?: boolean;
+  is_interstate?: boolean;
+  driver_pre_assigned?: boolean;
   created_at: string;
   completed_at?: string | null;
 }
@@ -254,7 +279,21 @@ export interface VirtualBankAccountRow {
   account_name: string;
   provider: 'korapay';
   balance_ngn: number;
+  vault_balance_ngn?: number;
   is_active: boolean;
+  created_at: string;
+}
+
+export interface BeneficiaryRow {
+  id: string;
+  user_id: string;
+  account_name: string;
+  account_number: string;
+  bank_name: string;
+  bank_code: string;
+  nickname?: string;
+  last_transacted_at: string;
+  is_pinned?: boolean;
   created_at: string;
 }
 
@@ -344,6 +383,8 @@ export class DatabaseService {
     promo_codes: [] as PromoCodeRow[],
     vehicle_inspections: [] as VehicleInspectionRow[],
     backup_snapshots: [] as BackupSnapshotRow[],
+    rider_subscriptions: [] as RiderSubscriptionRow[],
+    beneficiaries: [] as BeneficiaryRow[],
     platform_settings: {
       petrol_price_ngn: 1050,
       base_flag_fall_ngn: 1500,
@@ -417,8 +458,11 @@ export class DatabaseService {
         if (!this.store.promo_codes) this.store.promo_codes = [];
         if (!this.store.vehicle_inspections) this.store.vehicle_inspections = [];
         if (!this.store.backup_snapshots) this.store.backup_snapshots = [];
+        if (!this.store.rider_subscriptions) this.store.rider_subscriptions = [];
+        if (!this.store.beneficiaries) this.store.beneficiaries = [];
         this.seedDefaultCities();
         this.seedDefaultPromos();
+        this.seedDefaultStaff();
       } catch {
         this.saveStore();
       }
@@ -426,6 +470,7 @@ export class DatabaseService {
       this.seedDefaultPlans();
       this.seedDefaultCities();
       this.seedDefaultPromos();
+      this.seedDefaultStaff();
       this.saveStore();
     }
   }
@@ -583,6 +628,56 @@ export class DatabaseService {
           created_at: new Date().toISOString(),
         },
       ];
+    }
+  }
+
+  private seedDefaultStaff() {
+    const defaultStaff = [
+      {
+        email: 'admin@gigaride.ng',
+        password: 'admin_password_2026',
+        full_name: 'Lead Super Admin',
+        phone_number: '08000000001',
+        admin_role: 'SUPER_ADMIN' as AdminRole,
+      },
+      {
+        email: 'kyc@gigaride.ng',
+        password: 'kyc_password_2026',
+        full_name: 'Lead KYC Officer',
+        phone_number: '08000000002',
+        admin_role: 'KYC_OFFICER' as AdminRole,
+      },
+      {
+        email: 'support@gigaride.ng',
+        password: 'support_password_2026',
+        full_name: 'Senior Support Agent',
+        phone_number: '08000000003',
+        admin_role: 'SUPPORT_AGENT' as AdminRole,
+      },
+      {
+        email: 'finance@gigaride.ng',
+        password: 'finance_password_2026',
+        full_name: 'Finance & Treasury Admin',
+        phone_number: '08000000004',
+        admin_role: 'FINANCE_ADMIN' as AdminRole,
+      },
+    ];
+
+    for (const staff of defaultStaff) {
+      const existing = this.store.users.find((u) => u.email.toLowerCase() === staff.email.toLowerCase());
+      if (!existing) {
+        this.store.users.push({
+          id: `staff_${staff.admin_role.toLowerCase()}`,
+          role: 'ADMIN',
+          admin_role: staff.admin_role,
+          full_name: staff.full_name,
+          email: staff.email,
+          phone_number: staff.phone_number,
+          password_hash: bcrypt.hashSync(staff.password, 10),
+          account_status: 'ACTIVE',
+          created_at: new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -920,8 +1015,36 @@ export class DatabaseService {
   public async getActiveDriverSubscription(driverId: string): Promise<DriverSubscriptionRow | undefined> {
     const now = new Date().toISOString();
     return this.store.driver_subscriptions
-      .filter((s) => s.driver_id === driverId && s.expires_at > now && (s.status === 'ACTIVE' || s.remaining_rides > -ENV.MAX_GRACE_RIDES))
+      .filter((s) => s.driver_id === driverId && (s.is_frozen || s.expires_at > now) && (s.status === 'ACTIVE' || s.remaining_rides > -ENV.MAX_GRACE_RIDES))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+  }
+
+  public async freezeDriverSubscription(driverId: string, reason?: string): Promise<DriverSubscriptionRow> {
+    const activeSub = await this.getActiveDriverSubscription(driverId);
+    if (!activeSub) throw new Error('No active subscription found to freeze.');
+    if (activeSub.is_frozen) throw new Error('Subscription is already frozen.');
+
+    activeSub.is_frozen = true;
+    activeSub.frozen_at = new Date().toISOString();
+    activeSub.freeze_reason = reason || 'Breakdown / Vehicle Maintenance';
+    this.saveStore();
+    return activeSub;
+  }
+
+  public async unfreezeDriverSubscription(driverId: string): Promise<DriverSubscriptionRow> {
+    const sub = this.store.driver_subscriptions
+      .filter((s) => s.driver_id === driverId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    if (!sub || !sub.is_frozen) throw new Error('Subscription is not currently frozen.');
+
+    const elapsedMs = Date.now() - new Date(sub.frozen_at!).getTime();
+    sub.expires_at = new Date(new Date(sub.expires_at).getTime() + elapsedMs).toISOString();
+    sub.total_frozen_ms = (sub.total_frozen_ms || 0) + elapsedMs;
+    sub.is_frozen = false;
+    sub.frozen_at = undefined;
+    sub.freeze_reason = undefined;
+    this.saveStore();
+    return sub;
   }
 
   public async createDriverSubscription(sub: DriverSubscriptionRow): Promise<DriverSubscriptionRow> {
@@ -943,6 +1066,9 @@ export class DatabaseService {
     const activeSub = await this.getActiveDriverSubscription(driverId);
     if (!activeSub) {
       return { remainingRides: 0, status: 'EXHAUSTED', graceUsed: false };
+    }
+    if (activeSub.is_frozen) {
+      throw new Error('Subscription is currently frozen / snoozed. Unfreeze before accepting rides.');
     }
 
     const plan = await this.getPlanById(activeSub.plan_id);
@@ -1397,6 +1523,201 @@ export class DatabaseService {
     return undefined;
   }
 
+  public async swapWalletVault(
+    userId: string,
+    direction: 'MAIN_TO_VAULT' | 'VAULT_TO_MAIN',
+    amountNgn: number
+  ): Promise<VirtualBankAccountRow> {
+    const acc = this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
+    if (!acc) throw new Error('Virtual bank account not found.');
+    if (amountNgn <= 0) throw new Error('Transfer amount must be greater than zero.');
+
+    acc.vault_balance_ngn = acc.vault_balance_ngn || 0;
+
+    if (direction === 'MAIN_TO_VAULT') {
+      if (acc.balance_ngn < amountNgn) throw new Error('Insufficient available balance in Main Ride Wallet.');
+      acc.balance_ngn = Number((acc.balance_ngn - amountNgn).toFixed(2));
+      acc.vault_balance_ngn = Number((acc.vault_balance_ngn + amountNgn).toFixed(2));
+    } else {
+      if (acc.vault_balance_ngn < amountNgn) throw new Error('Insufficient locked funds in Giga Vault.');
+      acc.vault_balance_ngn = Number((acc.vault_balance_ngn - amountNgn).toFixed(2));
+      acc.balance_ngn = Number((acc.balance_ngn + amountNgn).toFixed(2));
+    }
+
+    // Record internal swap in transaction ledger
+    this.store.payment_transactions.unshift({
+      id: `tx_swap_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      reference: `SWAP_${Date.now()}`,
+      user_id: userId,
+      amount_kobo: Math.round(amountNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'SUBSCRIPTION_PURCHASE',
+      channel: 'INTERNAL_SWAP',
+      meta_data: { direction, amountNgn, newMain: acc.balance_ngn, newVault: acc.vault_balance_ngn },
+      created_at: new Date().toISOString(),
+    });
+
+    this.saveStore();
+    return acc;
+  }
+
+  public async withdrawFromWallet(
+    userId: string,
+    amountNgn: number,
+    bankDetails: { bankName: string; accountNumber: string; accountName: string; bankCode: string }
+  ): Promise<{ transaction: PaymentTransactionRow; remainingBalance: number; beneficiary: BeneficiaryRow }> {
+    const acc = this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
+    if (!acc) throw new Error('Virtual bank account not found.');
+    if (amountNgn < 500) throw new Error('Minimum withdrawal amount is ₦500.');
+    if (acc.balance_ngn < amountNgn) throw new Error('Insufficient wallet balance for withdrawal.');
+
+    acc.balance_ngn = Number((acc.balance_ngn - amountNgn).toFixed(2));
+
+    const tx: PaymentTransactionRow = {
+      id: `tx_wdr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      reference: `WDR_${Date.now()}`,
+      user_id: userId,
+      amount_kobo: Math.round(amountNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'SUBSCRIPTION_PURCHASE',
+      channel: 'NIP_TRANSFER',
+      meta_data: { bankDetails, amountNgn, type: 'WALLET_WITHDRAWAL' },
+      created_at: new Date().toISOString(),
+    };
+
+    this.store.payment_transactions.unshift(tx);
+
+    // Auto-remember destination beneficiary with 30-day activity tracking
+    const beneficiary = await this.saveOrUpdateBeneficiary(userId, {
+      account_name: bankDetails.accountName,
+      account_number: bankDetails.accountNumber,
+      bank_name: bankDetails.bankName,
+      bank_code: bankDetails.bankCode,
+    });
+
+    this.saveStore();
+    return { transaction: tx, remainingBalance: acc.balance_ngn, beneficiary };
+  }
+
+  // --- Auto-Remember Beneficiaries (30-Day Living Memory) ---
+  public async saveOrUpdateBeneficiary(
+    userId: string,
+    data: {
+      account_name: string;
+      account_number: string;
+      bank_name: string;
+      bank_code: string;
+      nickname?: string;
+      is_pinned?: boolean;
+    }
+  ): Promise<BeneficiaryRow> {
+    let existing = this.store.beneficiaries.find(
+      (b) => b.user_id === userId && b.account_number === data.account_number && b.bank_code === data.bank_code
+    );
+
+    const now = new Date().toISOString();
+
+    if (existing) {
+      existing.account_name = data.account_name;
+      existing.bank_name = data.bank_name;
+      if (data.nickname) existing.nickname = data.nickname;
+      if (data.is_pinned !== undefined) existing.is_pinned = data.is_pinned;
+      existing.last_transacted_at = now;
+      this.saveStore();
+      return existing;
+    }
+
+    const newBen: BeneficiaryRow = {
+      id: `ben_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      user_id: userId,
+      account_name: data.account_name,
+      account_number: data.account_number,
+      bank_name: data.bank_name,
+      bank_code: data.bank_code,
+      nickname: data.nickname,
+      last_transacted_at: now,
+      is_pinned: data.is_pinned || false,
+      created_at: now,
+    };
+
+    this.store.beneficiaries.unshift(newBen);
+    this.saveStore();
+    return newBen;
+  }
+
+  public async getBeneficiaries(userId: string, search?: string, daysLimit: number = 30): Promise<BeneficiaryRow[]> {
+    const cutoffTime = Date.now() - daysLimit * 24 * 60 * 60 * 1000;
+
+    let list = this.store.beneficiaries.filter((b) => {
+      if (b.user_id !== userId) return false;
+      const isRecent = new Date(b.last_transacted_at).getTime() >= cutoffTime;
+      return b.is_pinned || isRecent;
+    });
+
+    if (search && search.trim().length > 0) {
+      const q = search.toLowerCase().trim();
+      list = list.filter(
+        (b) =>
+          b.account_name.toLowerCase().includes(q) ||
+          b.account_number.includes(q) ||
+          b.bank_name.toLowerCase().includes(q) ||
+          (b.nickname && b.nickname.toLowerCase().includes(q))
+      );
+    }
+
+    return list.sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return new Date(b.last_transacted_at).getTime() - new Date(a.last_transacted_at).getTime();
+    });
+  }
+
+  public async deleteBeneficiary(userId: string, beneficiaryId: string): Promise<boolean> {
+    const idx = this.store.beneficiaries.findIndex((b) => b.id === beneficiaryId && b.user_id === userId);
+    if (idx >= 0) {
+      this.store.beneficiaries.splice(idx, 1);
+      this.saveStore();
+      return true;
+    }
+    return false;
+  }
+
+  public async getLivingWalletDetails(userId: string): Promise<any> {
+    let acc = this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
+    const user = this.store.users.find((u) => u.id === userId);
+    if (!acc && user) {
+      acc = {
+        id: `va_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        user_id: userId,
+        account_reference: `ref_va_${Date.now()}`,
+        account_number: `100${Math.floor(1000000 + Math.random() * 9000000)}`,
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: user.full_name,
+        provider: 'korapay',
+        balance_ngn: 0,
+        vault_balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(acc);
+      this.saveStore();
+    }
+
+    const transactions = this.store.payment_transactions
+      .filter((t) => t.user_id === userId)
+      .slice(0, 50);
+
+    const beneficiaries = await this.getBeneficiaries(userId, undefined, 30);
+
+    return {
+      virtualAccount: acc ? { ...acc, vault_balance_ngn: acc.vault_balance_ngn || 0 } : null,
+      user: user ? { id: user.id, full_name: user.full_name, email: user.email, phone_number: user.phone_number } : null,
+      recentTransactions: transactions,
+      beneficiaries,
+    };
+  }
+
   // --- Phone OTP Verifications (Twilio) ---
   public async savePhoneOtp(phoneNumber: string, otpCode: string, expiryMinutes = 10): Promise<PhoneVerificationRow> {
     const expiresAt = new Date(Date.now() + expiryMinutes * 60000).toISOString();
@@ -1724,6 +2045,120 @@ export class DatabaseService {
 
   public async getBackupSnapshots(): Promise<BackupSnapshotRow[]> {
     return this.store.backup_snapshots;
+  }
+
+  // --- Scheduled Airport & Interstate Rides ---
+  public async createScheduledRide(ride: RideRow): Promise<RideRow> {
+    this.store.rides.push(ride);
+    this.saveStore();
+    return ride;
+  }
+
+  public async getScheduledRides(): Promise<any[]> {
+    const scheduled = this.store.rides.filter((r) => !!r.scheduled_for);
+    return scheduled.map((r) => {
+      const rider = this.store.users.find((u) => u.id === r.rider_id);
+      const driver = r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : undefined;
+      const driverProfile = r.driver_id ? this.store.driver_profiles.find((p) => p.driver_id === r.driver_id) : undefined;
+      return {
+        ...r,
+        rider: rider ? { id: rider.id, full_name: rider.full_name, phone_number: rider.phone_number } : null,
+        driver: driver ? { id: driver.id, full_name: driver.full_name, phone_number: driver.phone_number } : null,
+        driverProfile: driverProfile ? { license_plate: driverProfile.license_plate, vehicle_make: driverProfile.vehicle_make, vehicle_model: driverProfile.vehicle_model } : null,
+      };
+    });
+  }
+
+  public async assignDriverToScheduledRide(rideId: string, driverId: string): Promise<RideRow> {
+    const ride = this.store.rides.find((r) => r.id === rideId);
+    if (!ride) throw new Error('Scheduled ride not found.');
+    ride.driver_id = driverId;
+    ride.driver_pre_assigned = true;
+    ride.status = 'ACCEPTED';
+    this.saveStore();
+    return ride;
+  }
+
+  // --- Passenger Commute Passes (Giga Pass) ---
+  public async createRiderPass(data: Omit<RiderSubscriptionRow, 'id' | 'created_at'>): Promise<RiderSubscriptionRow> {
+    const entry: RiderSubscriptionRow = {
+      id: `pass_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ...data,
+      created_at: new Date().toISOString(),
+    };
+    this.store.rider_subscriptions.unshift(entry);
+    this.saveStore();
+    return entry;
+  }
+
+  public async getActiveRiderPass(riderId: string): Promise<RiderSubscriptionRow | undefined> {
+    const now = new Date().toISOString();
+    return this.store.rider_subscriptions.find(
+      (p) => p.rider_id === riderId && p.status === 'ACTIVE' && p.expires_at > now && p.rides_remaining > 0
+    );
+  }
+
+  public async getAllRiderPasses(): Promise<any[]> {
+    return this.store.rider_subscriptions.map((p) => {
+      const rider = this.store.users.find((u) => u.id === p.rider_id);
+      return { ...p, rider: rider ? { id: rider.id, full_name: rider.full_name, phone_number: rider.phone_number } : null };
+    });
+  }
+
+  // --- Live Demand Heatmaps & GPS Surge Clusters ---
+  public async getDemandHeatmap(): Promise<any[]> {
+    const predefinedHubs = [
+      { zone_id: 'lekki_phase1', zone_name: 'Lekki Phase 1 / Admiralty Way', city: 'Lagos', lat: 6.4474, lng: 3.4723, baseDemand: 18 },
+      { zone_id: 'vi_odeku', zone_name: 'Victoria Island / Adeola Odeku', city: 'Lagos', lat: 6.4281, lng: 3.4219, baseDemand: 22 },
+      { zone_id: 'ikeja_mma2', zone_name: 'Ikeja MMA2 Airport Corridor', city: 'Lagos', lat: 6.5774, lng: 3.3213, baseDemand: 35 },
+      { zone_id: 'ikeja_allen', zone_name: 'Ikeja Central / Allen Avenue', city: 'Lagos', lat: 6.6018, lng: 3.3515, baseDemand: 15 },
+      { zone_id: 'yaba_tech', zone_name: 'Yaba / UNILAG Tech Corridor', city: 'Lagos', lat: 6.5181, lng: 3.3792, baseDemand: 19 },
+      { zone_id: 'surulere_stadium', zone_name: 'Surulere / National Stadium', city: 'Lagos', lat: 6.4969, lng: 3.3615, baseDemand: 12 },
+      { zone_id: 'ajah_sangotedo', zone_name: 'Ajah / Sangotedo Expressway', city: 'Lagos', lat: 6.4698, lng: 3.5852, baseDemand: 14 },
+      { zone_id: 'abuja_airport', zone_name: 'Abuja Nnamdi Azikiwe Airport', city: 'Abuja', lat: 9.0065, lng: 7.2631, baseDemand: 28 },
+      { zone_id: 'abuja_cbd', zone_name: 'Abuja Central Business District', city: 'Abuja', lat: 9.0765, lng: 7.4985, baseDemand: 20 },
+      { zone_id: 'ph_gra', zone_name: 'Port Harcourt GRA Phase 2', city: 'Port Harcourt', lat: 4.8156, lng: 7.0028, baseDemand: 11 },
+    ];
+
+    return predefinedHubs.map((hub) => {
+      const activeNearHub = this.store.rides.filter((r) => {
+        return (
+          ['REQUESTED', 'NEGOTIATING', 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT'].includes(r.status) &&
+          Math.abs(r.pickup_lat - hub.lat) < 0.05 &&
+          Math.abs(r.pickup_lng - hub.lng) < 0.05
+        );
+      }).length;
+
+      const totalDemand = hub.baseDemand + activeNearHub;
+      let surgeMultiplier = 1.0;
+      let demandLevel: 'NORMAL' | 'ELEVATED' | 'CRITICAL_SURGE' = 'NORMAL';
+
+      if (totalDemand >= 30) {
+        surgeMultiplier = 1.5;
+        demandLevel = 'CRITICAL_SURGE';
+      } else if (totalDemand >= 18) {
+        surgeMultiplier = 1.25;
+        demandLevel = 'ELEVATED';
+      }
+
+      const availableDrivers = Math.max(2, Math.round(totalDemand / 3));
+      const avgFareNgn = hub.city === 'Lagos' ? 4500 : (hub.city === 'Abuja' ? 5500 : 3800);
+      const statusText = demandLevel === 'CRITICAL_SURGE' ? 'Severe undersupply • High earnings' : (demandLevel === 'ELEVATED' ? 'High rider requests • Quick pickups' : 'Balanced demand');
+
+      return {
+        zone_id: hub.zone_id,
+        zone_name: hub.zone_name,
+        city: hub.city,
+        lat: hub.lat,
+        lng: hub.lng,
+        request_count: totalDemand,
+        surge_multiplier: surgeMultiplier,
+        demand_level: demandLevel,
+        avg_fare_ngn: Math.round(avgFareNgn * surgeMultiplier),
+        available_drivers: availableDrivers,
+        status_text: statusText,
+      };
+    });
   }
 }
 

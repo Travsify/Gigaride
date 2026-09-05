@@ -1075,6 +1075,81 @@ export class AdminService {
   public async getBackupSnapshots() {
     return db.getBackupSnapshots();
   }
+
+  // ==========================================
+  // MODULE 8: DEMAND HEATMAPS, SCHEDULED TRIPS & PASSENGER COMMUTE PASSES
+  // ==========================================
+  public async getDemandHeatmap() {
+    return db.getDemandHeatmap();
+  }
+
+  public async getScheduledRides() {
+    return db.getScheduledRides();
+  }
+
+  public async assignDriverToScheduledRide(
+    adminUser: { id: string; email: string },
+    rideId: string,
+    driverId: string,
+    ipAddress?: string
+  ) {
+    const updated = await db.assignDriverToScheduledRide(rideId, driverId);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'SCHEDULED_RIDE_DRIVER_ASSIGNED',
+      resource_type: 'RIDE',
+      resource_id: rideId,
+      details: { driverId },
+      ip_address: ipAddress,
+    });
+    return updated;
+  }
+
+  public async createRiderPass(
+    adminUser: { id: string; email: string },
+    payload: {
+      rider_id: string;
+      pass_name: string;
+      discount_percent: number;
+      max_discount_per_ride_ngn: number;
+      rides_remaining: number;
+      corridor?: string;
+      duration_days: number;
+      price_kobo: number;
+    },
+    ipAddress?: string
+  ) {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + (payload.duration_days || 30) * 24 * 60 * 60 * 1000).toISOString();
+    const entry = await db.createRiderPass({
+      rider_id: payload.rider_id,
+      pass_name: payload.pass_name,
+      discount_percent: payload.discount_percent,
+      max_discount_per_ride_ngn: payload.max_discount_per_ride_ngn,
+      rides_remaining: payload.rides_remaining,
+      corridor: payload.corridor || 'All Corridors',
+      starts_at: now.toISOString(),
+      expires_at: expiresAt,
+      price_kobo: payload.price_kobo,
+      status: 'ACTIVE',
+    });
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'RIDER_COMMUTE_PASS_CREATED',
+      resource_type: 'RIDER_PASS',
+      resource_id: entry.id,
+      details: { rider_id: payload.rider_id, pass_name: payload.pass_name },
+      ip_address: ipAddress,
+    });
+    return entry;
+  }
+
+  public async getAllRiderPasses() {
+    return db.getAllRiderPasses();
+  }
 }
 
 export const adminService = new AdminService();

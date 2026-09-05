@@ -62,6 +62,59 @@ export class RideService {
   public async getDriverHistory(driverId: string): Promise<RideRow[]> {
     return db.getDriverHistory(driverId);
   }
+
+  /**
+   * Schedules an advance ride (Airport pickup/dropoff, Interstate, or future trip).
+   */
+  public async scheduleRide(
+    riderId: string,
+    data: {
+      pickupLat: number;
+      pickupLng: number;
+      pickupAddress: string;
+      dropoffLat: number;
+      dropoffLng: number;
+      dropoffAddress: string;
+      scheduledFor: string;
+      riderOfferNgn: number;
+      flightNumber?: string;
+      isAirport?: boolean;
+      isInterstate?: boolean;
+    }
+  ): Promise<RideRow> {
+    const estimate = await calculateSuggestedFareWithDb(
+      data.pickupLat,
+      data.pickupLng,
+      data.dropoffLat,
+      data.dropoffLng
+    );
+
+    const rideId = uuidv4();
+    const ride: RideRow = {
+      id: rideId,
+      rider_id: riderId,
+      driver_id: null,
+      pickup_lat: data.pickupLat,
+      pickup_lng: data.pickupLng,
+      pickup_address: data.pickupAddress,
+      dropoff_lat: data.dropoffLat,
+      dropoff_lng: data.dropoffLng,
+      dropoff_address: data.dropoffAddress,
+      suggested_fare_ngn: estimate.suggestedFareNgn,
+      rider_offer_ngn: data.riderOfferNgn,
+      agreed_fare_ngn: data.riderOfferNgn,
+      distance_km: estimate.distanceKm,
+      status: 'REQUESTED',
+      scheduled_for: data.scheduledFor,
+      flight_number: data.flightNumber,
+      is_airport: Boolean(data.isAirport),
+      is_interstate: Boolean(data.isInterstate),
+      driver_pre_assigned: false,
+      created_at: new Date().toISOString(),
+    };
+
+    return db.createScheduledRide(ride);
+  }
 }
 
 export const rideService = new RideService();

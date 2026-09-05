@@ -36,7 +36,7 @@ export class SubscriptionService {
     const plan = await db.getPlanById(sub.plan_id);
     const isUnlimited = plan?.plan_type === 'UNLIMITED';
     const isGrace = sub.remaining_rides < 0 && sub.remaining_rides >= -ENV.MAX_GRACE_RIDES;
-    const canReceiveRides = isUnlimited || sub.remaining_rides > -ENV.MAX_GRACE_RIDES;
+    const canReceiveRides = !sub.is_frozen && (isUnlimited || sub.remaining_rides > -ENV.MAX_GRACE_RIDES);
 
     return {
       hasActiveSubscription: sub.status === 'ACTIVE',
@@ -51,7 +51,7 @@ export class SubscriptionService {
 
   /**
    * Gatekeeper Check: Checks whether a driver is eligible to receive dispatch broadcast requests.
-   * If driver has 0 rides (or has exceeded grace limit), they are strictly ineligible.
+   * If driver has 0 rides (or has exceeded grace limit), or if subscription is frozen, they are strictly ineligible.
    */
   public async isDriverEligibleForDispatch(driverId: string): Promise<boolean> {
     const profile = await db.getDriverProfile(driverId);
@@ -72,6 +72,9 @@ export class SubscriptionService {
     }
 
     const status = await this.getDriverSubscriptionStatus(driverId);
+    if (status.subscription?.is_frozen) {
+      return false;
+    }
     return status.canReceiveRides;
   }
 
@@ -171,6 +174,36 @@ export class SubscriptionService {
 
     console.log(`[Subscription] Driver ${driverId} successfully activated plan: ${plan.name} (${saved.remaining_rides} rides)`);
     return saved;
+  }
+
+  /**
+   * Driver Subscription Freeze / Breakdown Shield:
+   * Temporarily pauses the active subscription without losing remaining paid time.
+   */
+  public async freezeSubscription(driverId: string, reason?: string): Promise<DriverSubscriptionRow> {
+    const updated = await db.freezeDriverSubscription(driverId, reason);
+    const loc = geoSessionManager.getDriverLocation(driverId);
+    if (loc) {
+      loc.hasActiveSubscription = false;
+      geoSessionManager.updateDriverLocation(loc);
+    }
+    console.log(`[Subscription Shield] Driver ${driverId} froze active subscription. Reason: ${reason || 'Maintenance'}`);
+    return updated;
+  }
+
+  /**
+   * Unfreezes the subscription and extends expires_at by the exact elapsed downtime.
+   */
+  public async unfreezeSubscription(driverId: string): Promise<DriverSubscriptionRow> {
+    const updated = await db.unfreezeDriverSubscription(driverId);
+    const loc = geoSessionManager.getDriverLocation(driverId);
+    if (loc) {
+      loc.hasActiveSubscription = true;
+      loc.remainingRides = updated.remaining_rides;
+      geoSessionManager.updateDriverLocation(loc);
+    }
+    console.log(`[Subscription Shield] Driver ${driverId} unfroze subscription. New expiry: ${updated.expires_at}`);
+    return updated;
   }
 }
 

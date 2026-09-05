@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'offer_room_screen.dart';
+import 'wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -95,6 +96,16 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         title: const Text('Book a Ride', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet, color: AppConstants.accentColor),
+            tooltip: 'Living Wallet',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: AppConstants.textMuted),
             onPressed: () => provider.logout(),

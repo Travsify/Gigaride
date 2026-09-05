@@ -50,6 +50,57 @@ rideRouter.post(
   }
 );
 
+// Schedule Advance Airport or Interstate Ride
+rideRouter.post(
+  '/schedule',
+  requireAuth,
+  requireRole(['PASSENGER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const {
+        pickupLat,
+        pickupLng,
+        pickupAddress,
+        dropoffLat,
+        dropoffLng,
+        dropoffAddress,
+        scheduledFor,
+        riderOfferNgn,
+        flightNumber,
+        isAirport,
+        isInterstate,
+      } = req.body;
+
+      if (!pickupLat || !pickupLng || !pickupAddress || !dropoffLat || !dropoffLng || !dropoffAddress || !scheduledFor || !riderOfferNgn) {
+        res.status(400).json({ success: false, message: 'Missing required scheduled ride booking fields.' });
+        return;
+      }
+
+      const ride = await rideService.scheduleRide(req.user!.userId, {
+        pickupLat: Number(pickupLat),
+        pickupLng: Number(pickupLng),
+        pickupAddress: String(pickupAddress),
+        dropoffLat: Number(dropoffLat),
+        dropoffLng: Number(dropoffLng),
+        dropoffAddress: String(dropoffAddress),
+        scheduledFor: String(scheduledFor),
+        riderOfferNgn: Number(riderOfferNgn),
+        flightNumber: flightNumber ? String(flightNumber) : undefined,
+        isAirport: Boolean(isAirport),
+        isInterstate: Boolean(isInterstate),
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Advance ride successfully scheduled. Drivers notified for dispatch queue.',
+        data: ride,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // Get specific ride details
 rideRouter.get(
   '/:id',

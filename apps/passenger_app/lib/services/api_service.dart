@@ -133,4 +133,111 @@ class ApiService {
     }
     throw Exception(data['message'] ?? 'Failed to create ride request');
   }
+
+  // --- Living Wallet API Suite ---
+  Future<Map<String, dynamic>> getLivingWallet() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/wallet'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to load living wallet');
+  }
+
+  Future<Map<String, dynamic>> addMoney(int amountNgn, {String method = 'BANK_TRANSFER'}) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/add-money'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'amountNgn': amountNgn, 'method': method}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to fund wallet');
+  }
+
+  Future<Map<String, dynamic>> swapWalletVault(String direction, int amountNgn) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/swap'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'direction': direction, 'amountNgn': amountNgn}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to swap funds');
+  }
+
+  Future<Map<String, dynamic>> withdrawFromWallet({
+    required int amountNgn,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String bankCode = '000',
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/withdraw'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'amountNgn': amountNgn,
+        'bankName': bankName,
+        'accountNumber': accountNumber,
+        'accountName': accountName,
+        'bankCode': bankCode,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to withdraw funds');
+  }
+
+  Future<List<dynamic>> getBeneficiaries({String? search, int days = 30}) async {
+    final token = await getToken();
+    String url = '$baseUrl/api/payments/wallet/beneficiaries?days=$days';
+    if (search != null && search.isNotEmpty) {
+      url += '&search=${Uri.encodeComponent(search)}';
+    }
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> getStatement() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/wallet/statement'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
 }

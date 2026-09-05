@@ -29,6 +29,7 @@ export interface AuthResponse {
     id: string;
     role: UserRole;
     adminRole?: AdminRole;
+    admin_role?: AdminRole;
     fullName: string;
     phoneNumber: string;
     email: string;

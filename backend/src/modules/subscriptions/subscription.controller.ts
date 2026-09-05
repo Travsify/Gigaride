@@ -79,3 +79,42 @@ subscriptionRouter.put(
     }
   }
 );
+
+// Driver: Freeze Active Subscription (Breakdown Shield)
+subscriptionRouter.post(
+  '/freeze',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reason } = req.body;
+      const sub = await subscriptionService.freezeSubscription(req.user!.userId, reason);
+      res.status(200).json({
+        success: true,
+        message: 'Subscription successfully frozen. Breakdown shield activated.',
+        data: sub,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// Driver: Unfreeze Subscription & Restore Expiration with Zero Time Lost
+subscriptionRouter.post(
+  '/unfreeze',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const sub = await subscriptionService.unfreezeSubscription(req.user!.userId);
+      res.status(200).json({
+        success: true,
+        message: 'Subscription successfully resumed. Expiration extended with 0 days lost.',
+        data: sub,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);

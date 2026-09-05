@@ -580,6 +580,48 @@ adminRouter.post(
   }
 );
 
+// Passenger Commuter Passes (Giga Pass)
+const createRiderPassSchema = z.object({
+  rider_id: z.string(),
+  pass_name: z.string().min(2),
+  discount_percent: z.number().min(1).max(100),
+  max_discount_per_ride_ngn: z.number().positive(),
+  rides_remaining: z.number().int().positive(),
+  corridor: z.string().optional(),
+  duration_days: z.number().int().positive().optional().default(30),
+  price_kobo: z.number().int().positive(),
+});
+
+adminRouter.get(
+  '/passengers/commute-passes',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_AGENT']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const passes = await adminService.getAllRiderPasses();
+      res.json({ success: true, data: passes });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/passengers/commute-passes',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = createRiderPassSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const pass = await adminService.createRiderPass(adminUser, payload, ip);
+      res.status(201).json({ success: true, message: 'Passenger commute pass issued successfully.', data: pass });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // 29. Passenger Governance: Update Account Status
 const passengerStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED', 'BANNED']),
@@ -638,6 +680,57 @@ adminRouter.get('/rides', async (req: AuthenticatedRequest, res: Response): Prom
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// Live Demand Heatmaps & GPS Surge Clusters
+adminRouter.get(
+  '/rides/demand-heatmap',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const heatmap = await adminService.getDemandHeatmap();
+      res.json({ success: true, data: heatmap });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// Scheduled Airport & Interstate Dispatch Desk
+adminRouter.get(
+  '/rides/scheduled',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const scheduled = await adminService.getScheduledRides();
+      res.json({ success: true, data: scheduled });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// Assign Driver to Scheduled Ride
+adminRouter.post(
+  '/rides/:id/assign-driver',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { driverId } = req.body;
+      if (!driverId) {
+        res.status(400).json({ success: false, message: 'driverId is required' });
+        return;
+      }
+      const rideId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const updated = await adminService.assignDriverToScheduledRide(adminUser, rideId, String(driverId), ip);
+      res.json({ success: true, message: 'Driver successfully assigned to scheduled trip.', data: updated });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
 
 // 32. Ride Explorer: Fetch GPS Breadcrumbs for Route Replay
 adminRouter.get('/rides/:id/breadcrumbs', async (req: AuthenticatedRequest, res: Response): Promise<void> => {

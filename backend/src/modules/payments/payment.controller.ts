@@ -116,3 +116,195 @@ paymentRouter.post(
     }
   }
 );
+
+// ==========================================
+// LIVING WALLET CORE ENDPOINTS
+// ==========================================
+
+// 1. Get Living Wallet Details (Main balance, Vault balance, Virtual NUBAN, 30-day Beneficiaries, Recent ledger)
+paymentRouter.get(
+  '/wallet',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const details = await db.getLivingWalletDetails(req.user!.userId);
+      res.json({ success: true, data: details });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 2. Add Money / Fund Wallet (Card / Instant Bank Transfer)
+paymentRouter.post(
+  '/wallet/add-money',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      if (!amountNgn || amountNgn < 100) {
+        res.status(400).json({ success: false, message: 'Minimum deposit is ₦100.' });
+        return;
+      }
+      const updated = await db.creditVirtualAccountBalance(req.user!.userId, amountNgn);
+      await db.createTransaction({
+        id: `tx_fund_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        reference: `FUND_${Date.now()}`,
+        user_id: req.user!.userId,
+        amount_kobo: Math.round(amountNgn * 100),
+        status: 'SUCCESS',
+        payment_type: 'SUBSCRIPTION_PURCHASE',
+        channel: req.body.channel || 'DIRECT_TRANSFER',
+        meta_data: { type: 'WALLET_TOPUP', method: req.body.method || 'BANK_TRANSFER' },
+        created_at: new Date().toISOString(),
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully credited ₦${amountNgn.toLocaleString()} to Living Wallet.`,
+        data: updated,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 3. Swap: Move funds between Main Ride Balance and SafeLock Vault
+paymentRouter.post(
+  '/wallet/swap',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const direction = req.body.direction;
+      const amount = Number(req.body.amountNgn || req.body.amount_ngn);
+      if (direction !== 'MAIN_TO_VAULT' && direction !== 'VAULT_TO_MAIN') {
+        res.status(400).json({ success: false, message: 'direction must be MAIN_TO_VAULT or VAULT_TO_MAIN' });
+        return;
+      }
+      if (!amount || amount <= 0) {
+        res.status(400).json({ success: false, message: 'Invalid swap amount.' });
+        return;
+      }
+
+      const updated = await db.swapWalletVault(req.user!.userId, direction, amount);
+      const msg = direction === 'MAIN_TO_VAULT'
+        ? `Successfully moved ₦${amount.toLocaleString()} into Giga Vault.`
+        : `Successfully released ₦${amount.toLocaleString()} from Vault to Main Balance.`;
+
+      res.json({ success: true, message: msg, data: updated });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 4. Withdraw: Instant NIP transfer to commercial bank with 30-day auto-beneficiary memory
+paymentRouter.post(
+  '/wallet/withdraw',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      const bankName = req.body.bankName || req.body.bank_name;
+      const accountNumber = req.body.accountNumber || req.body.account_number;
+      const accountName = req.body.accountName || req.body.account_name;
+      const bankCode = req.body.bankCode || req.body.bank_code;
+
+      if (!amountNgn || !bankName || !accountNumber || !accountName) {
+        res.status(400).json({ success: false, message: 'Missing required bank payout details.' });
+        return;
+      }
+
+      const result = await db.withdrawFromWallet(req.user!.userId, amountNgn, {
+        bankName: String(bankName),
+        accountNumber: String(accountNumber),
+        accountName: String(accountName),
+        bankCode: String(bankCode || '000'),
+      });
+
+      res.json({
+        success: true,
+        message: `₦${Number(amountNgn).toLocaleString()} withdrawal dispatched to ${bankName} (${accountNumber}). Beneficiary auto-saved.`,
+        data: result,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 5. Beneficiaries Directory: List / Search 30-Day Auto-Saved Beneficiaries
+paymentRouter.get(
+  '/wallet/beneficiaries',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const search = req.query.search as string | undefined;
+      const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+      const beneficiaries = await db.getBeneficiaries(req.user!.userId, search, days);
+      res.json({ success: true, data: beneficiaries });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 6. Explicitly Save / Pin Beneficiary
+paymentRouter.post(
+  '/wallet/beneficiaries',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { account_name, account_number, bank_name, bank_code, nickname, is_pinned } = req.body;
+      if (!account_name || !account_number || !bank_name) {
+        res.status(400).json({ success: false, message: 'Account name, number, and bank name are required.' });
+        return;
+      }
+
+      const ben = await db.saveOrUpdateBeneficiary(req.user!.userId, {
+        account_name: String(account_name),
+        account_number: String(account_number),
+        bank_name: String(bank_name),
+        bank_code: String(bank_code || '000'),
+        nickname: nickname ? String(nickname) : undefined,
+        is_pinned: Boolean(is_pinned),
+      });
+
+      res.status(201).json({ success: true, message: 'Beneficiary saved successfully.', data: ben });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 7. Delete Saved Beneficiary
+paymentRouter.delete(
+  '/wallet/beneficiaries/:id',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const removed = await db.deleteBeneficiary(req.user!.userId, String(req.params.id));
+      res.json({ success: true, message: removed ? 'Beneficiary removed.' : 'Not found.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 8. Statement: Ledger Feed with Search & Inflow/Outflow Filter
+paymentRouter.get(
+  '/wallet/statement',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const transactions = (await db.getTransactions())
+        .filter((t) => t.user_id === req.user!.userId)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      res.json({ success: true, data: transactions });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
