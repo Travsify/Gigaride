@@ -22,67 +22,165 @@
     }
   </script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col lg:flex-row antialiased selection:bg-teal-500 selection:text-white">
 
-  <!-- Top Navigation -->
-  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <!-- Mobile Backdrop -->
+  <div id="sidebarBackdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden hidden transition-opacity duration-300"></div>
+
+  <!-- Vertical Operations Sidebar -->
+  <aside id="adminSidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static lg:h-screen lg:sticky lg:top-0 shrink-0 select-none">
+    
+    <!-- Top Brand Area -->
+    <div class="p-5 border-b border-slate-800/80 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-xl">
+        <div class="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-xl shadow-inner shadow-teal-500/10">
           <i class="fa-solid fa-car-side"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-            GIGA RIDE <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">SUPER ADMIN</span>
+          <h1 class="text-base font-black text-white tracking-wider flex items-center gap-1.5">
+            GIGA RIDE
+            <span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 font-bold tracking-normal">OPS</span>
           </h1>
-          <p class="text-xs text-slate-400">Zero Commission • Real-Time Dispatch & Compliance</p>
+          <p class="text-[11px] text-slate-400 font-medium">Super Admin Console</p>
         </div>
       </div>
+      <button onclick="toggleMobileSidebar()" class="lg:hidden text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="hidden lg:flex space-x-1">
-        <button onclick="switchTab('overview')" id="tabBtn_overview" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white">Overview</button>
-        <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Drivers & KYC</button>
-        <button onclick="switchTab('plans')" id="tabBtn_plans" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Plan Builder</button>
-        <button onclick="switchTab('disputes')" id="tabBtn_disputes" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Dispute Desk</button>
-        <button onclick="switchTab('fleet')" id="tabBtn_fleet" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Live Fleet</button>
-        <button onclick="switchTab('sos')" id="tabBtn_sos" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white flex items-center gap-1">
-          <span>SOS</span>
-          <span id="sosBadgeHeader" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-        </button>
-        <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Finance & MOT</button>
-        <button onclick="switchTab('settings')" id="tabBtn_settings" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Fuel Levers</button>
-        <button onclick="switchTab('audit')" id="tabBtn_audit" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Audit Logs</button>
-      </nav>
+    <!-- Vertical Navigation Links -->
+    <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1 custom-scrollbar">
+      <div class="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        Fleet & Dispatch
+      </div>
 
-      <div class="flex items-center space-x-3">
-        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span class="text-slate-300">PMS: <strong id="headerFuelPrice" class="text-amber-400">₦1,050/L</strong></span>
+      <button onclick="switchTab('overview')" id="tabBtn_overview" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition bg-teal-600 text-white shadow-lg shadow-teal-900/30">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-chart-pie w-4 text-center text-sm"></i>
+          <span>Overview</span>
         </div>
-        <button onclick="refreshAll()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5">
-          <i class="fa-solid fa-rotate"></i>
-          <span class="hidden sm:inline">Refresh</span>
-        </button>
+      </button>
+
+      <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-id-card w-4 text-center text-sm"></i>
+          <span>Drivers & KYC</span>
+        </div>
+        <span id="navPendingKycBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">0</span>
+      </button>
+
+      <button onclick="switchTab('plans')" id="tabBtn_plans" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-layer-group w-4 text-center text-sm"></i>
+          <span>Plan Builder</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('disputes')" id="tabBtn_disputes" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-handshake-angle w-4 text-center text-sm"></i>
+          <span>Dispute Desk</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('fleet')" id="tabBtn_fleet" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-location-crosshairs w-4 text-center text-sm"></i>
+          <span>Live Fleet Radar</span>
+        </div>
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      </button>
+
+      <button onclick="switchTab('sos')" id="tabBtn_sos" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-triangle-exclamation w-4 text-center text-sm text-red-400"></i>
+          <span>SOS Incidents</span>
+        </div>
+        <span id="sosBadgeHeader" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+      </button>
+
+      <div class="pt-5 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        Finance & Control
+      </div>
+
+      <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-receipt w-4 text-center text-sm"></i>
+          <span>Finance & MOT</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('settings')" id="tabBtn_settings" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-gas-pump w-4 text-center text-sm"></i>
+          <span>Fuel Levers</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('audit')" id="tabBtn_audit" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-shield-halved w-4 text-center text-sm"></i>
+          <span>Audit Logs</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Sidebar Bottom / Fuel Indicator & Admin Badge -->
+    <div class="p-3.5 border-t border-slate-800/80 bg-slate-900/60 space-y-2.5">
+      <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-[11px] text-slate-400">PMS Price</span>
+        </div>
+        <strong id="headerFuelPrice" class="text-xs font-mono text-amber-400 font-bold">₦1,050/L</strong>
+      </div>
+
+      <div class="flex items-center space-x-3 px-2 py-1.5 rounded-xl bg-slate-800/40 border border-slate-800">
+        <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-xs">
+          SA
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-bold text-white truncate">Super Admin</p>
+          <p class="text-[10px] text-slate-400 truncate">admin@gigaride.ng</p>
+        </div>
+        <span class="w-2 h-2 rounded-full bg-emerald-400" title="Online"></span>
       </div>
     </div>
-  </header>
+  </aside>
 
-  <!-- Mobile Tab Bar -->
-  <div class="lg:hidden flex overflow-x-auto bg-slate-900 border-b border-slate-800 px-4 py-2 space-x-2 text-xs">
-    <button onclick="switchTab('overview')" class="px-3 py-1 bg-teal-600 rounded text-white font-bold whitespace-nowrap">Overview</button>
-    <button onclick="switchTab('drivers')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Drivers</button>
-    <button onclick="switchTab('plans')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Plans</button>
-    <button onclick="switchTab('disputes')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Disputes</button>
-    <button onclick="switchTab('fleet')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Fleet</button>
-    <button onclick="switchTab('sos')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">SOS</button>
-    <button onclick="switchTab('finance')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Finance</button>
-    <button onclick="switchTab('settings')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Levers</button>
-    <button onclick="switchTab('audit')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Audits</button>
-  </div>
+  <!-- Right App Container -->
+  <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+    <!-- Top Bar -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-30 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <button onclick="toggleMobileSidebar()" class="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800 border border-slate-700">
+          <i class="fa-solid fa-bars text-base"></i>
+        </button>
+        <div>
+          <div class="flex items-center space-x-2 text-xs text-slate-400">
+            <span>Operations</span>
+            <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+            <span id="breadcrumbCurrentTab" class="text-teal-400 font-bold">Overview</span>
+          </div>
+          <h2 id="viewHeading" class="text-xs sm:text-sm font-bold text-white truncate">System Operations & Pulse</h2>
+        </div>
+      </div>
 
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+          <i class="fa-solid fa-server text-teal-400 text-xs"></i>
+          <span class="text-slate-300">Hostinger VPS: <strong class="text-emerald-400 font-mono">69.62.127.50</strong></span>
+        </div>
+        <button onclick="refreshAll()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 shadow-sm">
+          <i class="fa-solid fa-rotate"></i>
+          <span class="hidden sm:inline">Refresh Data</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
 
     <!-- Active SOS Banner (Conditional) -->
     <div id="sosAlertBanner" class="hidden bg-red-950/90 border border-red-600 rounded-2xl p-5 shadow-2xl animate-pulse flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -542,6 +640,7 @@
     </div>
 
   </main>
+  </div>
 
   <!-- ==================== MODAL 1: DRIVER 360 DOSSIER ==================== -->
   <div id="dossierModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -776,16 +875,53 @@
       }
     }
 
+    const tabHeadings = {
+      overview: { name: 'Overview', desc: 'System Operations & Fleet Pulse' },
+      drivers: { name: 'Drivers & KYC', desc: 'Driver Verification & Regulatory Compliance' },
+      plans: { name: 'Plan Builder', desc: 'Subscription Tier Management (Zero Commission)' },
+      disputes: { name: 'Dispute Desk', desc: 'Driver-Rider Arbitration & Strike Desk' },
+      fleet: { name: 'Live Fleet Radar', desc: 'Real-Time Geo Radar & GPS Route Playback' },
+      sos: { name: 'SOS Incidents', desc: 'Emergency Incident Response Room' },
+      finance: { name: 'Finance & MOT', desc: 'Subscriptions & LASG Ministry of Transportation Levies' },
+      settings: { name: 'Fuel Levers', desc: 'Dynamic PMS Pricing & Base Fare Knobs' },
+      audit: { name: 'Audit Logs', desc: 'Immutable Administrator Action Trail' }
+    };
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('adminSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.toggle('-translate-x-full');
+        backdrop.classList.toggle('hidden');
+      }
+    }
+
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-      document.getElementById(`tab_${tabId}`).classList.remove('hidden');
+      const activeTab = document.getElementById(`tab_${tabId}`);
+      if (activeTab) activeTab.classList.remove('hidden');
 
+      // Update vertical tab styling
       document.querySelectorAll('.tab-btn').forEach(b => {
-        b.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+        b.className = 'tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60';
       });
       const activeBtn = document.getElementById(`tabBtn_${tabId}`);
       if (activeBtn) {
-        activeBtn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white';
+        activeBtn.className = 'tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition bg-teal-600 text-white shadow-lg shadow-teal-900/30';
+      }
+
+      // Update breadcrumb and header title
+      if (tabHeadings[tabId]) {
+        const bc = document.getElementById('breadcrumbCurrentTab');
+        const vh = document.getElementById('viewHeading');
+        if (bc) bc.textContent = tabHeadings[tabId].name;
+        if (vh) vh.textContent = tabHeadings[tabId].desc;
+      }
+
+      // Close mobile sidebar if open
+      const sidebar = document.getElementById('adminSidebar');
+      if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 1024) {
+        toggleMobileSidebar();
       }
 
       if (tabId === 'drivers') loadDrivers(currentFilter);
@@ -826,6 +962,17 @@
           document.getElementById('financeMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn).toLocaleString();
           document.getElementById('financeTotalRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn).toLocaleString();
 
+          // Update pending KYC badge in vertical sidebar
+          const navKycBadge = document.getElementById('navPendingKycBadge');
+          if (navKycBadge) {
+            if (d.pendingKyc > 0) {
+              navKycBadge.textContent = d.pendingKyc;
+              navKycBadge.classList.remove('hidden');
+            } else {
+              navKycBadge.classList.add('hidden');
+            }
+          }
+
           if (d.platformSettings) {
             document.getElementById('headerFuelPrice').textContent = `₦${d.platformSettings.petrol_price_ngn}/L`;
             document.getElementById('cardPetrol').textContent = `₦${d.platformSettings.petrol_price_ngn}/L`;
@@ -834,7 +981,7 @@
             document.getElementById('cardMotTax').textContent = `₦${d.platformSettings.lagos_mot_levy_ngn}/ride`;
           }
 
-          // Handle SOS Banner
+          // Handle SOS Banner & badge
           if (d.openSosCount > 0) {
             document.getElementById('sosAlertBanner').classList.remove('hidden');
             document.getElementById('sosBadgeHeader').classList.remove('hidden');
