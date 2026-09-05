@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  static const String defaultApiUrl = 'http://10.0.2.2:4000';
-  static const String defaultSocketUrl = 'http://10.0.2.2:4000';
+  // Production Hostinger VPS Server
+  static const String defaultApiUrl = 'http://69.62.127.50';
+  static const String defaultSocketUrl = 'http://69.62.127.50';
 
   // Rider Palette: Premium Indigo & Amber
   static const Color primaryColor = Color(0xFF2563EB); // Royal Blue

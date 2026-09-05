@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // Use 10.0.2.2 for Android emulator to reach host machine, or your local machine IP
-  static const String defaultApiUrl = 'http://10.0.2.2:4000';
-  static const String defaultSocketUrl = 'http://10.0.2.2:4000';
+  // Production Hostinger VPS Server
+  static const String defaultApiUrl = 'http://69.62.127.50';
+  static const String defaultSocketUrl = 'http://69.62.127.50';
 
   // Primary brand palette for Nigerian driver experience (High contrast, modern emerald & gold)
   static const Color primaryColor = Color(0xFF0F766E); // Emerald 700
