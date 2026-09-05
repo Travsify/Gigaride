@@ -1235,3 +1235,49 @@ adminRouter.post(
     }
   }
 );
+
+// ==========================================
+// 48. SYSTEM INTEGRITY & FAILURE RADAR
+// ==========================================
+adminRouter.get(
+  '/system/failure-radar',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const radar = await adminService.getFailureRadarMetrics();
+      res.status(200).json({ success: true, data: radar });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 49. PRODUCTION DATA PURGE & OVERHAUL
+// ==========================================
+adminRouter.post(
+  '/system/purge-data',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+      const { confirmationCode } = req.body;
+
+      if (!confirmationCode) {
+        res.status(400).json({ success: false, message: 'Confirmation code is required to execute system purge.' });
+        return;
+      }
+
+      const result = await adminService.purgeSystemData(adminUser, confirmationCode, ip);
+      res.status(200).json({
+        success: true,
+        message: 'System purge completed. All test and mock data wiped. Pristine production state restored.',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+

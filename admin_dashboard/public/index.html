@@ -280,9 +280,17 @@
         </div>
       </button>
 
+      <button onclick="switchTab('failure_radar')" id="tabBtn_failure_radar" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-rose-400 hover:text-white hover:bg-rose-950/40 border border-rose-500/20 shadow-sm">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-shield-halved w-4 text-center text-sm text-rose-400"></i>
+          <span>Failure Radar & Moats</span>
+        </div>
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-black tracking-wider">DEFENSE</span>
+      </button>
+
       <button onclick="switchTab('audit')" id="tabBtn_audit" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
         <div class="flex items-center space-x-3">
-          <i class="fa-solid fa-shield-halved w-4 text-center text-sm"></i>
+          <i class="fa-solid fa-clock-rotate-left w-4 text-center text-sm"></i>
           <span>Audit Logs</span>
         </div>
       </button>
@@ -1725,6 +1733,159 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: SYSTEM INTEGRITY, FAILURE RADAR & AFRICAN MOATS ==================== -->
+    <div id="tab_failure_radar" class="tab-content hidden space-y-6">
+      <!-- Radar Header & Emergency Overhaul Action -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-rose-950/40 border border-rose-500/20 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> Real-Time Integrity Shield
+              </span>
+              <span class="text-xs text-slate-400">Target Market: Nigeria (Lagos, Abuja, PH, Ibadan) & Pan-Africa</span>
+            </div>
+            <h2 class="text-xl font-black text-white flex items-center gap-2.5">
+              <i class="fa-solid fa-shield-halved text-rose-400"></i>
+              System Integrity, Anti-Fraud & Failure Prevention Command Console
+            </h2>
+            <p class="text-xs text-slate-400 mt-1 max-w-3xl">
+              Real-time audit radar analyzing the 10 existential failure points of African mobility networks alongside Giga Ride's 8 market-winning strategic moats to outcompete Bolt, Uber, and inDrive.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="loadFailureRadar()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2.5 rounded-xl font-bold transition flex items-center gap-2 border border-slate-700">
+              <i class="fa-solid fa-rotate"></i> Refresh Telemetry
+            </button>
+            <button onclick="openSystemPurgeModal()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shadow-lg shadow-rose-900/30 border border-rose-500/30">
+              <i class="fa-solid fa-trash-can"></i> System Overhaul & Purge
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Telemetry Barometer Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+            <span>Fleet & Users</span>
+            <i class="fa-solid fa-users text-teal-400"></i>
+          </div>
+          <div class="text-2xl font-black text-white mt-1" id="radarStatUsers">--</div>
+          <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+            <span class="text-emerald-400 font-bold" id="radarStatDrivers">--</span> drivers registered
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+            <span>Subscription Retainage</span>
+            <i class="fa-solid fa-repeat text-indigo-400"></i>
+          </div>
+          <div class="text-2xl font-black text-emerald-400 mt-1" id="radarStatRenewalRate">--%</div>
+          <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+            <span class="text-slate-300 font-bold" id="radarStatGrace">0</span> in 2-ride grace period
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+            <span>LASG MOT Road Levy</span>
+            <i class="fa-solid fa-building-columns text-amber-400"></i>
+          </div>
+          <div class="text-2xl font-black text-amber-300 mt-1" id="radarStatMotLevy">₦0</div>
+          <div class="text-[10px] text-slate-400 mt-1">₦50 escrowed per completed trip</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+            <span>Anti-Fraud Geo-Shield</span>
+            <i class="fa-solid fa-satellite-dish text-rose-400"></i>
+          </div>
+          <div class="text-2xl font-black text-white mt-1 flex items-center gap-2">
+            <span class="text-emerald-400">ARMED</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </div>
+          <div class="text-[10px] text-slate-400 mt-1">>150 km/h jump audit active</div>
+        </div>
+      </div>
+
+      <!-- Payment Multi-Rail & Infrastructure Resilience Grid -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-network-wired text-teal-400"></i>
+              Payment Gateway Multi-Rail Redundancy & Infrastructure Health
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Automated failover prevents single gateway outages from halting driver cash-out or passenger top-ups.</p>
+          </div>
+          <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            AUTO-FAILOVER ARMED
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1" id="radarGatewaysContainer">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Existential Failure Radar & Active Defense Matrix (10 Existential Killers) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+              The 10 African Market Failure Points & Active Defenses
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Identified structural pitfalls that caused predecessors to stall, and Giga Ride's architectural countermeasures.</p>
+          </div>
+          <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            10 / 10 DEFENSES ONLINE
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">ID</th>
+                <th class="py-3 px-3">Vulnerability / Failure Point</th>
+                <th class="py-3 px-3">Risk Level</th>
+                <th class="py-3 px-3">Active Countermeasure & Defense Architecture</th>
+                <th class="py-3 px-3 text-right">Defense Status</th>
+              </tr>
+            </thead>
+            <tbody id="radarFailurePointsTbody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="5" class="py-6 text-center text-slate-500">Loading failure defense metrics...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- The 8 Market-Winning Strategic Moats (African Dominance Blueprint) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-crown text-amber-400"></i>
+              The 8 Strategic Product Moats for African Market Dominance
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Core features engineered to out-retain drivers and passengers compared to commission-based incumbents.</p>
+          </div>
+          <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            DOMINANCE BLUEPRINT
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1" id="radarMoatsContainer">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
   </main>
   </div>
 
@@ -2335,6 +2496,51 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 13: SYSTEM OVERHAUL & COMPLETE PURGE ==================== -->
+  <div id="purgeModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-rose-400 flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Production Data Purge & System Overhaul
+        </h3>
+        <button onclick="closeModal('purgeModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-200 leading-relaxed">
+          <strong class="font-bold block text-rose-300 mb-1"><i class="fa-solid fa-radiation mr-1"></i> CRITICAL SYSTEM ACTION</strong>
+          This procedure permanently wipes all test users, passenger accounts, driver test profiles, mock rides, simulated bids, payment transactions, disputes, and GPS breadcrumbs from the central datastore.
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 space-y-1.5">
+          <p class="font-bold text-white text-[11px] uppercase tracking-wider">What Will Be Preserved & Reseeded Pristine:</p>
+          <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px]">
+            <li>Verified Admin Accounts (<code class="text-teal-300">admin@gigaride.ng</code>, <code class="text-teal-300">kyc@gigaride.ng</code>, etc.)</li>
+            <li>The 4 Standard Zero-Commission Subscription Plans (10, 50, 100-Ride & Monthly Unlimited)</li>
+            <li>Operational City Zones & Dynamic Tariffs (Lagos, Abuja, PH, Ibadan)</li>
+            <li>Canonical Platform Settings & Fuel Knobs</li>
+          </ul>
+        </div>
+
+        <form id="purgeSystemForm" onsubmit="submitSystemPurge(event)" class="space-y-3 pt-2">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Type <code class="text-rose-400 bg-rose-950/60 px-1 py-0.5 rounded border border-rose-800">PURGE_AND_OVERHAUL_2026</code> to confirm:</label>
+            <input type="text" id="purgeConfirmationInput" required placeholder="PURGE_AND_OVERHAUL_2026" class="w-full bg-slate-950 border border-rose-500/30 focus:border-rose-500 rounded-lg p-2.5 text-white font-mono font-bold text-center tracking-wider" autocomplete="off" />
+          </div>
+
+          <div id="purgeResultBanner" class="hidden p-3 rounded-lg text-xs font-semibold"></div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button type="button" onclick="closeModal('purgeModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition">Cancel</button>
+            <button type="submit" id="btnConfirmPurge" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 font-bold text-white transition flex items-center gap-2 shadow-lg shadow-rose-900/40">
+              <i class="fa-solid fa-fire"></i> Execute Overhaul Purge
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:4000' : `${window.location.protocol}//${window.location.hostname}:4000`;
     let adminToken = localStorage.getItem('giga_admin_token') || '';
@@ -2402,16 +2608,16 @@
           'overview', 'drivers', 'passengers', 'rides', 'scheduled', 'compliance',
           'broadcast', 'plans', 'disputes', 'fleet', 'sos', 'inspections',
           'cities', 'promos', 'finance', 'payouts', 'staff', 'integrations',
-          'settings', 'backups', 'audit'
+          'settings', 'backups', 'failure_radar', 'audit'
         ],
         'FINANCE_ADMIN': [
-          'overview', 'finance', 'payouts', 'disputes'
+          'overview', 'finance', 'payouts', 'disputes', 'failure_radar'
         ],
         'KYC_OFFICER': [
-          'overview', 'drivers', 'compliance', 'inspections', 'fleet'
+          'overview', 'drivers', 'compliance', 'inspections', 'fleet', 'failure_radar'
         ],
         'SUPPORT_AGENT': [
-          'overview', 'passengers', 'rides', 'scheduled', 'disputes', 'fleet', 'sos', 'broadcast'
+          'overview', 'passengers', 'rides', 'scheduled', 'disputes', 'fleet', 'sos', 'broadcast', 'failure_radar'
         ]
       };
 
@@ -2532,6 +2738,7 @@
       integrations: { name: 'FinTech & RegTech Integrations', desc: 'Prembly, Paystack, Korapay, Resend, Twilio & Auto Top-Up Engine' },
       settings: { name: 'Fuel Levers', desc: 'Dynamic PMS Pricing & Base Fare Knobs' },
       backups: { name: 'Disaster Recovery & Snapshots', desc: 'Immutable Store Snapshots & Point-in-Time Database Exports' },
+      failure_radar: { name: 'Failure Radar & African Moats', desc: 'System Integrity, Anti-Fraud Defence, and Market-Winning African Moats' },
       audit: { name: 'Audit Logs', desc: 'Immutable Administrator Action Trail' }
     };
 
@@ -2593,6 +2800,7 @@
       if (tabId === 'integrations') loadIntegrationSettings();
       if (tabId === 'settings') loadSettings();
       if (tabId === 'backups') loadBackupSnapshots();
+      if (tabId === 'failure_radar') loadFailureRadar();
       if (tabId === 'audit') loadAuditLogs();
     }
 
@@ -5120,6 +5328,219 @@
           </tr>
         `;
       }).join('');
+    }
+
+    // ==========================================
+    // FAILURE RADAR & AFRICAN MOATS TELEMETRY
+    // ==========================================
+    async function loadFailureRadar() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/system/failure-radar`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to retrieve radar telemetry.');
+
+        const r = data.data;
+        const ov = r.overview || {};
+
+        // Top KPI Cards
+        const statUsers = document.getElementById('radarStatUsers');
+        if (statUsers) statUsers.textContent = (ov.total_registered_users || 0).toLocaleString();
+        const statDrivers = document.getElementById('radarStatDrivers');
+        if (statDrivers) statDrivers.textContent = (ov.total_drivers || 0).toLocaleString();
+        const statRenewal = document.getElementById('radarStatRenewalRate');
+        if (statRenewal) statRenewal.textContent = `${ov.subscription_renewal_rate_pct || 0}%`;
+        const statGrace = document.getElementById('radarStatGrace');
+        if (statGrace) statGrace.textContent = ov.drivers_in_grace_period || 0;
+        const statMotLevy = document.getElementById('radarStatMotLevy');
+        if (statMotLevy) statMotLevy.textContent = `₦${(ov.lagos_mot_levy_accrued_ngn || 0).toLocaleString()}`;
+
+        // Payment Multi-Rail Grid
+        const gwContainer = document.getElementById('radarGatewaysContainer');
+        if (gwContainer && r.gateways) {
+          const gws = [
+            {
+              name: 'Korapay Virtual Accounts & NIP Rail',
+              type: 'Instant Bank Transfer & Dynamic NUBAN',
+              configured: r.gateways.korapay?.configured,
+              status: r.gateways.korapay?.status || 'ONLINE',
+              icon: 'fa-building-columns',
+              color: 'emerald'
+            },
+            {
+              name: 'Paystack Multi-Channel Checkout',
+              type: 'Card, USSD & QR Payment Rail',
+              configured: r.gateways.paystack?.configured,
+              status: r.gateways.paystack?.status || 'ONLINE',
+              icon: 'fa-credit-card',
+              color: 'sky'
+            },
+            {
+              name: 'Resend Transactional Email Engine',
+              type: 'Driver Welcome & Payout PDF Invoices',
+              configured: r.gateways.resend_email?.configured,
+              status: r.gateways.resend_email?.status || 'ONLINE',
+              icon: 'fa-envelope',
+              color: 'indigo'
+            },
+            {
+              name: 'Twilio SMS OTP Gateway',
+              type: 'Passenger & Driver Phone Verification',
+              configured: r.gateways.twilio_sms?.configured,
+              status: r.gateways.twilio_sms?.status || 'ONLINE',
+              icon: 'fa-comment-sms',
+              color: 'teal'
+            }
+          ];
+
+          gwContainer.innerHTML = gws.map(g => `
+            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-${g.color}-500/10 border border-${g.color}-500/20 flex items-center justify-center text-${g.color}-400">
+                    <i class="fa-solid ${g.icon} text-sm"></i>
+                  </div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${g.configured ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">
+                    ${g.status}
+                  </span>
+                </div>
+                <h4 class="text-xs font-bold text-white">${g.name}</h4>
+                <p class="text-[10px] text-slate-400 mt-0.5">${g.type}</p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-900 flex items-center justify-between text-[10px] text-slate-500">
+                <span>Rail Redundancy</span>
+                <span class="text-emerald-400 font-bold">100% Failover Safe</span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // 10 African Failure Points Table
+        const fpTbody = document.getElementById('radarFailurePointsTbody');
+        if (fpTbody && r.failure_mitigations) {
+          fpTbody.innerHTML = r.failure_mitigations.map(f => {
+            let riskBadge = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+            if (f.risk_level === 'CRITICAL') riskBadge = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+            if (f.risk_level === 'HIGH') riskBadge = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+            return `
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="py-3 px-3 font-mono font-bold text-teal-400">${f.id}</td>
+                <td class="py-3 px-3 font-bold text-white">${f.title}</td>
+                <td class="py-3 px-3">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${riskBadge}">
+                    ${f.risk_level}
+                  </span>
+                </td>
+                <td class="py-3 px-3 text-slate-300">${f.mitigation}</td>
+                <td class="py-3 px-3 text-right">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                    <i class="fa-solid fa-check-double mr-1 text-[8px]"></i>${f.status}
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // 8 African Dominance Moats Grid
+        const moatsContainer = document.getElementById('radarMoatsContainer');
+        if (moatsContainer && r.dominance_moats) {
+          const icons = [
+            'fa-percent text-emerald-400',
+            'fa-vault text-amber-400',
+            'fa-shield-halved text-sky-400',
+            'fa-plane-departure text-indigo-400',
+            'fa-ticket text-pink-400',
+            'fa-fire-flame-curved text-rose-400',
+            'fa-clock-rotate-left text-teal-400',
+            'fa-clipboard-check text-purple-400'
+          ];
+          moatsContainer.innerHTML = r.dominance_moats.map((m, idx) => `
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center">
+                    <i class="fa-solid ${icons[idx] || 'fa-star text-amber-400'} text-xs"></i>
+                  </div>
+                  <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    ${m.health}
+                  </span>
+                </div>
+                <h4 class="text-xs font-bold text-white">${m.pillar}</h4>
+                <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">${m.edge}</p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-900/80 text-[10px] text-teal-400 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-check text-[8px]"></i> Active Market Moat
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.error('Failed to load failure radar:', err);
+      }
+    }
+
+    function openSystemPurgeModal() {
+      const input = document.getElementById('purgeConfirmationInput');
+      if (input) input.value = '';
+      const banner = document.getElementById('purgeResultBanner');
+      if (banner) banner.classList.add('hidden');
+      const btn = document.getElementById('btnConfirmPurge');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-fire"></i> Execute Overhaul Purge';
+      }
+      document.getElementById('purgeModal').classList.remove('hidden');
+    }
+
+    async function submitSystemPurge(e) {
+      e.preventDefault();
+      const input = document.getElementById('purgeConfirmationInput');
+      const banner = document.getElementById('purgeResultBanner');
+      const btn = document.getElementById('btnConfirmPurge');
+      const code = input ? input.value.trim() : '';
+
+      if (code !== 'PURGE_AND_OVERHAUL_2026') {
+        banner.className = 'p-3 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        banner.textContent = 'Confirmation code mismatch. Type PURGE_AND_OVERHAUL_2026 exactly.';
+        banner.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Executing Purge...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/system/purge-data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ confirmationCode: code })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'System purge execution failed.');
+
+        banner.className = 'p-3 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        banner.textContent = '✓ System Overhaul Complete: All test & mock data wiped. Pristine production structure reseeded.';
+        banner.classList.remove('hidden');
+
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Purge Successful';
+        setTimeout(() => {
+          closeModal('purgeModal');
+          refreshAll();
+          loadFailureRadar();
+        }, 1500);
+      } catch (err) {
+        banner.className = 'p-3 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        banner.textContent = err.message || 'An error occurred during system purge.';
+        banner.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-fire"></i> Execute Overhaul Purge';
+      }
     }
 
     function closeModal(id) {

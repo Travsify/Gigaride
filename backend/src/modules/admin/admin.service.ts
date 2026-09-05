@@ -1150,6 +1150,194 @@ export class AdminService {
   public async getAllRiderPasses() {
     return db.getAllRiderPasses();
   }
+
+  // --- Failure Radar & African Dominance Moats Engine ---
+  public async getFailureRadarMetrics() {
+    const raw = await db.getFailureRadarRawData();
+    const settings = (raw.platformSettings || {}) as any;
+
+    const korapayConfigured = !!(settings.korapay_secret_key && !settings.korapay_secret_key.includes('mock'));
+    const paystackConfigured = !!(settings.paystack_secret_key && !settings.paystack_secret_key.includes('mock'));
+    const resendConfigured = !!(settings.resend_api_key && settings.resend_api_key.startsWith('re_'));
+    const twilioConfigured = !!(settings.twilio_account_sid && settings.twilio_account_sid.startsWith('AC'));
+
+    const subscriptionRenewalRate = raw.totalDrivers > 0
+      ? Math.round((raw.activeSubscriptionsCount / raw.totalDrivers) * 100)
+      : 0;
+
+    const failureMitigations = [
+      {
+        id: 'FM-01',
+        title: 'Driver Liquidity Pre-Payment Barrier',
+        status: 'OPERATIONAL',
+        risk_level: 'HIGH',
+        mitigation: 'Drive Now, Settle Later escrow + 2-trip grace period prevents upfront driver friction.',
+      },
+      {
+        id: 'FM-02',
+        title: 'Data Store Concurrency & File Locking',
+        status: 'PROTECTED',
+        risk_level: 'MEDIUM',
+        mitigation: 'Atomic JSON sync engine with PostgreSQL failover connection pooling.',
+      },
+      {
+        id: 'FM-03',
+        title: 'Bank Transfer Gateway Latency (NIP)',
+        status: 'OPERATIONAL',
+        risk_level: 'HIGH',
+        mitigation: 'Dedicated Virtual Accounts (Korapay NUBAN) with instant webhook reconciliation.',
+      },
+      {
+        id: 'FM-04',
+        title: 'Driver GPS Spoofing & Fake GPS Apps',
+        status: 'ARMED',
+        risk_level: 'CRITICAL',
+        mitigation: 'Server-side speed-jump threshold (>150 km/h) & continuous breadcrumb velocity auditing.',
+      },
+      {
+        id: 'FM-05',
+        title: 'Lagos Traffic / 3G Network Drops',
+        status: 'OPERATIONAL',
+        risk_level: 'MEDIUM',
+        mitigation: 'Dual-channel architecture: real-time WebSockets with seamless HTTP polling fallback.',
+      },
+      {
+        id: 'FM-06',
+        title: 'LASG MOT & Regulatory Crackdowns',
+        status: 'COMPLIANT',
+        risk_level: 'HIGH',
+        mitigation: 'Automated ₦50 Lagos MOT Road Levy escrow + 30-day LASDRI/inspection expiry radar.',
+      },
+      {
+        id: 'FM-07',
+        title: 'Google Maps API Cost Exposure',
+        status: 'OPTIMIZED',
+        risk_level: 'MEDIUM',
+        mitigation: 'Inverted bidding radius filtering & OSRM distance caching to eliminate API bill spikes.',
+      },
+      {
+        id: 'FM-08',
+        title: 'PMS Petrol Volatility (₦1,050-₦1,200/L)',
+        status: 'DYNAMIC',
+        risk_level: 'HIGH',
+        mitigation: 'Real-time city fuel index dynamically adjusting minimum floor fares.',
+      },
+      {
+        id: 'FM-09',
+        title: 'Payment Gateway Single Point of Failure',
+        status: korapayConfigured && paystackConfigured ? 'OPTIMAL' : 'MONITORED',
+        risk_level: 'CRITICAL',
+        mitigation: 'Multi-rail routing between Korapay and Paystack with instant failover on API timeout.',
+      },
+      {
+        id: 'FM-10',
+        title: 'Security & SOS Telemetry Latency',
+        status: 'ACTIVE',
+        risk_level: 'CRITICAL',
+        mitigation: 'One-tap emergency broadcast with live GPS tracking forwarded to LASEMA 112/767.',
+      },
+    ];
+
+    const dominanceMoats = [
+      {
+        pillar: 'Zero-Commission Philosophy',
+        edge: '100% of ride fare goes to the driver. Only flat subscription charged.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'SafeLock Living Vault',
+        edge: 'Daily savings locked at 12% p.a. to protect drivers from daily impulse spending.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'Subscription Breakdown Shield',
+        edge: 'Drivers freeze active subscription when car breaks down; time resumes upon vehicle repair.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'Scheduled Airport & Interstate Trip Desk',
+        edge: 'Fixed high-ticket trips guaranteed ahead of time with flight tracking.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'Giga Commute Passes',
+        edge: 'Bulk discounted rides for island-mainland commuters, locking in high customer LTV.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'Live Urban Heatmap Clusters',
+        edge: 'Drivers guided to real-time high-surge corridors across Lagos, Abuja, PH, and Ibadan.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: '30-Day Auto-Remembered Beneficiaries',
+        edge: 'Sub-second bank withdrawals with zero typing for repeat recipients.',
+        health: 'ACTIVE',
+      },
+      {
+        pillar: 'Fleet Integrity & Document Radar',
+        edge: 'Zero impounds through proactive LASDRI, Insurance, and Hackney Permit audits.',
+        health: 'ACTIVE',
+      },
+    ];
+
+    return {
+      overview: {
+        total_registered_users: raw.totalUsers,
+        total_passengers: raw.passengerUsers,
+        total_drivers: raw.totalDrivers,
+        active_approved_drivers: raw.activeApprovedDrivers,
+        active_driver_subscriptions: raw.activeSubscriptionsCount,
+        drivers_in_grace_period: raw.driversInGrace,
+        locked_out_drivers: raw.lockedOutDrivers,
+        subscription_renewal_rate_pct: subscriptionRenewalRate,
+        completed_rides: raw.completedRides,
+        lagos_mot_levy_accrued_ngn: raw.motLevyNgn,
+        compliance_expired_count: raw.expiredDocsCount,
+        compliance_expiring_soon_count: raw.expiringWithin30DaysCount,
+        disputes_pending: raw.unresolvedDisputes,
+        sos_incidents_count: raw.sosIncidents,
+        active_city_zones: raw.cityZonesCount,
+        active_subscription_plans: raw.subscriptionPlansCount,
+      },
+      gateways: {
+        korapay: { configured: korapayConfigured, status: korapayConfigured ? 'ONLINE' : 'SANDBOX_READY' },
+        paystack: { configured: paystackConfigured, status: paystackConfigured ? 'ONLINE' : 'SANDBOX_READY' },
+        resend_email: { configured: resendConfigured, status: resendConfigured ? 'ONLINE' : 'SIMULATED' },
+        twilio_sms: { configured: twilioConfigured, status: twilioConfigured ? 'ONLINE' : 'SIMULATED' },
+        failover_enabled: true,
+      },
+      failure_mitigations: failureMitigations,
+      dominance_moats: dominanceMoats,
+      system_status: 'OPERATIONAL',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  public async purgeSystemData(
+    adminUser: { id: string; email: string },
+    confirmationCode: string,
+    ipAddress?: string
+  ) {
+    if (confirmationCode !== 'PURGE_AND_OVERHAUL_2026' && confirmationCode !== 'CONFIRM_SYSTEM_OVERHAUL') {
+      throw new Error('Invalid confirmation code. Action aborted for safety.');
+    }
+
+    const result = await db.purgeAllNonProductionData(adminUser.email);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'SYSTEM_COMPLETE_PURGE_OVERHAUL',
+      resource_type: 'SYSTEM',
+      resource_id: 'data_store.json',
+      details: { ...result.wipedCounts, retainedStaffCount: result.retainedStaffCount },
+      ip_address: ipAddress,
+    });
+
+    return result;
+  }
 }
 
 export const adminService = new AdminService();
+

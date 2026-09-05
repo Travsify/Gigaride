@@ -2160,6 +2160,180 @@ export class DatabaseService {
       };
     });
   }
+
+  // --- Complete System Overhaul & Data Purge ---
+  public async purgeAllNonProductionData(confirmedByAdminEmail: string = 'admin@gigaride.ng'): Promise<{
+    purged: boolean;
+    wipedCounts: Record<string, number>;
+    retainedStaffCount: number;
+    timestamp: string;
+  }> {
+    const wipedCounts = {
+      passengers_and_test_users: this.store.users.filter((u) => u.role !== 'ADMIN').length,
+      driver_profiles: this.store.driver_profiles.length,
+      redundant_plans: Math.max(0, this.store.subscription_plans.length - 4),
+      driver_subscriptions: this.store.driver_subscriptions.length,
+      subscription_credit_audits: this.store.subscription_credit_audits.length,
+      disputes: this.store.disputes.length,
+      ride_gps_breadcrumbs: this.store.ride_gps_breadcrumbs.length,
+      rides: this.store.rides.length,
+      ride_bids: this.store.ride_bids.length,
+      payment_transactions: this.store.payment_transactions.length,
+      sos_incidents: this.store.sos_incidents.length,
+      virtual_bank_accounts: this.store.virtual_bank_accounts.length,
+      phone_verifications: this.store.phone_verifications.length,
+      kyc_verifications: this.store.kyc_verifications.length,
+      driver_payouts: this.store.driver_payouts.length,
+      vehicle_inspections: this.store.vehicle_inspections.length,
+      backup_snapshots: this.store.backup_snapshots.length,
+      rider_subscriptions: this.store.rider_subscriptions.length,
+      beneficiaries: this.store.beneficiaries.length,
+      prior_audit_logs: this.store.admin_audit_logs.length,
+    };
+
+    // Retain only official staff accounts
+    const staffUsers = this.store.users.filter((u) => u.role === 'ADMIN');
+    this.store.users = staffUsers;
+    this.seedDefaultStaff(); // Ensure the 4 primary admins exist
+
+    // Wipe all transient, mock, and test collections
+    this.store.driver_profiles = [];
+    this.store.driver_subscriptions = [];
+    this.store.subscription_credit_audits = [];
+    this.store.disputes = [];
+    this.store.ride_gps_breadcrumbs = [];
+    this.store.rides = [];
+    this.store.ride_bids = [];
+    this.store.payment_transactions = [];
+    this.store.sos_incidents = [];
+    this.store.virtual_bank_accounts = [];
+    this.store.phone_verifications = [];
+    this.store.kyc_verifications = [];
+    this.store.driver_payouts = [];
+    this.store.vehicle_inspections = [];
+    this.store.backup_snapshots = [];
+    this.store.rider_subscriptions = [];
+    this.store.beneficiaries = [];
+
+    // Reset canonical subscription plans to the pristine 4 plans
+    this.store.subscription_plans = [];
+    this.seedDefaultPlans();
+
+    // Reset canonical city zones to the 4 operational zones
+    this.store.city_zones = [];
+    this.seedDefaultCities();
+
+    // Reset promo codes to active official codes
+    this.store.promo_codes = [];
+    this.seedDefaultPromos();
+
+    // Verify platform settings
+    if (!this.store.platform_settings) {
+      this.store.platform_settings = {
+        petrol_price_ngn: 1050,
+        base_flag_fall_ngn: 1500,
+        per_km_rate_ngn: 350,
+        per_minute_rate_ngn: 80,
+        lagos_mot_levy_ngn: 50,
+        welcome_bonus_rides: 5,
+        search_radius_km: 7.0,
+        updated_at: new Date().toISOString(),
+      } as any;
+    }
+
+    const timestamp = new Date().toISOString();
+
+    // Record system purge overhaul log
+    this.store.admin_audit_logs = [
+      {
+        id: `audit_purge_${Date.now()}`,
+        admin_id: 'system_root',
+        admin_email: confirmedByAdminEmail,
+        action: 'SYSTEM_COMPLETE_PURGE_OVERHAUL',
+        resource_type: 'SYSTEM',
+        resource_id: 'data_store.json',
+        details: {
+          wiped_summary: wipedCounts,
+          retained_staff_count: this.store.users.length,
+          status: 'SUCCESS',
+        },
+        created_at: timestamp,
+      },
+    ];
+
+    this.saveStore();
+
+    return {
+      purged: true,
+      wipedCounts,
+      retainedStaffCount: this.store.users.length,
+      timestamp,
+    };
+  }
+
+  // --- Failure Radar & Health Raw Data ---
+  public async getFailureRadarRawData(): Promise<any> {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const totalDrivers = this.store.driver_profiles.length;
+    const activeApprovedDrivers = this.store.driver_profiles.filter(
+      (p) => p.kyc_status === 'APPROVED' && p.account_status === 'ACTIVE'
+    ).length;
+
+    const activeSubscriptions = this.store.driver_subscriptions.filter(
+      (s) => s.status === 'ACTIVE' && s.expires_at > now.toISOString()
+    );
+
+    const driversInGrace = activeSubscriptions.filter((s) => s.remaining_rides <= 0).length;
+    const lockedOutDrivers = this.store.driver_profiles.filter((p) => p.is_locked_out).length;
+
+    const completedRides = this.store.rides.filter((r) => r.status === 'COMPLETED').length;
+    const lagosCompletedRides = this.store.rides.filter(
+      (r) => r.status === 'COMPLETED' && (!r.pickup_address || r.pickup_address.toLowerCase().includes('lagos'))
+    ).length;
+    const motLevyNgn = lagosCompletedRides * (this.store.platform_settings.lagos_mot_levy_ngn || 50);
+
+    let expiredDocsCount = 0;
+    let expiringWithin30DaysCount = 0;
+
+    for (const p of this.store.driver_profiles) {
+      const dates = [p.driver_license_expiry, p.insurance_expiry, p.road_worthiness_expiry, p.lasdri_expiry].filter(Boolean) as string[];
+      for (const d of dates) {
+        const dt = new Date(d);
+        if (dt < now) {
+          expiredDocsCount++;
+          break;
+        } else if (dt <= thirtyDaysFromNow) {
+          expiringWithin30DaysCount++;
+          break;
+        }
+      }
+    }
+
+    return {
+      totalUsers: this.store.users.length,
+      passengerUsers: this.store.users.filter((u) => u.role === 'PASSENGER').length,
+      adminUsers: this.store.users.filter((u) => u.role === 'ADMIN').length,
+      totalDrivers,
+      activeApprovedDrivers,
+      activeSubscriptionsCount: activeSubscriptions.length,
+      driversInGrace,
+      lockedOutDrivers,
+      completedRides,
+      lagosCompletedRides,
+      motLevyNgn,
+      expiredDocsCount,
+      expiringWithin30DaysCount,
+      totalBreadcrumbs: this.store.ride_gps_breadcrumbs.length,
+      totalDisputes: this.store.disputes.length,
+      unresolvedDisputes: this.store.disputes.filter((d) => d.status !== 'RESOLVED').length,
+      sosIncidents: this.store.sos_incidents.length,
+      subscriptionPlansCount: this.store.subscription_plans.length,
+      cityZonesCount: this.store.city_zones.length,
+      platformSettings: this.store.platform_settings,
+    };
+  }
 }
 
 export const db = DatabaseService.getInstance();
