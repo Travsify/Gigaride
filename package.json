@@ -7,6 +7,7 @@
     "start:admin": "cd admin_dashboard && npm start",
     "test:backend": "cd backend && npm run test:e2e",
     "test:driver": "cd apps/driver_app && flutter test",
-    "test:passenger": "cd apps/passenger_app && flutter test"
+    "test:passenger": "cd apps/passenger_app && flutter test",
+    "deploy": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1"
   }
 }
