@@ -129,7 +129,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(nuban, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.black, fontSize: 22, letterSpacing: 2)),
+                        Text(nuban, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 2)),
                         IconButton(
                           icon: const Icon(Icons.copy, color: AppConstants.primaryColor, size: 20),
                           onPressed: () => _copyToClipboard(nuban, 'Account number'),
@@ -282,20 +282,17 @@ class _WalletScreenState extends State<WalletScreen> {
                         final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
                         if (amt <= 0) return;
                         Navigator.pop(ctx);
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           await _api.swapWalletVault(direction, amt);
                           _loadWalletData();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Swap successful: ${_currencyFormat.format(amt)} moved!'), backgroundColor: AppConstants.successColor),
-                            );
-                          }
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Swap successful: ${_currencyFormat.format(amt)} moved!'), backgroundColor: AppConstants.successColor),
+                          );
                         } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString()), backgroundColor: AppConstants.dangerColor),
-                            );
-                          }
+                          messenger.showSnackBar(
+                            SnackBar(content: Text(e.toString()), backgroundColor: AppConstants.dangerColor),
+                          );
                         }
                       },
                       child: const Text('Confirm Swap', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -352,7 +349,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _beneficiaries.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      separatorBuilder: (context, index) => const SizedBox(width: 8),
                       itemBuilder: (context, idx) {
                         final b = _beneficiaries[idx];
                         return InkWell(
@@ -517,7 +514,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         : ListView.separated(
                             controller: scrollCtrl,
                             itemCount: _statement.length,
-                            separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+                            separatorBuilder: (context, index) => const Divider(color: Colors.white10),
                             itemBuilder: (context, idx) {
                               final item = _statement[idx];
                               final amountNgn = ((item['amount_kobo'] ?? 0) / 100).round();
@@ -579,7 +576,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   children: [
                     const Text('Total Locked Vault Balance', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                     const SizedBox(height: 4),
-                    Text(_currencyFormat.format(vaultBal), style: const TextStyle(color: Colors.tealAccent, fontSize: 26, fontWeight: FontWeight.black)),
+                    Text(_currencyFormat.format(vaultBal), style: const TextStyle(color: Colors.tealAccent, fontSize: 26, fontWeight: FontWeight.w900)),
                   ],
                 ),
               ),
@@ -718,7 +715,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _hideBalance ? '₦ ••••••••' : _currencyFormat.format(mainBal),
-                        style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.black, letterSpacing: -0.5),
+                        style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                       ),
                       const SizedBox(height: 16),
                       // NUBAN Pill
@@ -825,7 +822,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _beneficiaries.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      separatorBuilder: (context, index) => const SizedBox(width: 10),
                       itemBuilder: (context, idx) {
                         final b = _beneficiaries[idx];
                         final name = b['account_name'] ?? 'Recipient';
@@ -898,7 +895,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _statement.take(5).length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
                     itemBuilder: (context, idx) {
                       final item = _statement[idx];
                       final amountNgn = ((item['amount_kobo'] ?? 0) / 100).round();
