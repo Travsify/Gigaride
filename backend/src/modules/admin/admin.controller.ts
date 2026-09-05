@@ -40,6 +40,20 @@ adminRouter.get('/drivers/pending-kyc', async (_req: AuthenticatedRequest, res: 
   }
 });
 
+// 3b. Driver Management: Quality & Strike Watchlist (Must be before /drivers/:id)
+adminRouter.get(
+  '/drivers/quality-watchlist',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT', 'KYC_OFFICER']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const watchlist = await adminService.getDriverQualityWatchlist();
+      res.json({ success: true, data: watchlist });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // 4. Driver Management: Full 360-degree Dossier
 adminRouter.get('/drivers/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -795,6 +809,334 @@ adminRouter.get(
     try {
       const report = await adminService.getFinancialReconciliation();
       res.json({ success: true, data: report });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 41. DRIVER PAYOUTS & SETTLEMENT DESK
+// ==========================================
+const payoutActionSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT']),
+  rejectionReason: z.string().optional(),
+});
+
+const driverPayoutRequestSchema = z.object({
+  driverId: z.string(),
+  amountNgn: z.number().positive(),
+  bankName: z.string().min(2),
+  accountNumber: z.string().min(10),
+  accountName: z.string().min(2),
+  bankCode: z.string().optional(),
+});
+
+adminRouter.get(
+  '/payouts',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const status = req.query.status as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined;
+      const payouts = await adminService.getDriverPayouts(status);
+      res.json({ success: true, data: payouts });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/payouts/request',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = driverPayoutRequestSchema.parse(req.body);
+      const payout = await adminService.createDriverPayout(payload);
+      res.status(201).json({ success: true, message: 'Payout request initiated.', data: payout });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/payouts/:id/action',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { action, rejectionReason } = payoutActionSchema.parse(req.body);
+      const payoutId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.processDriverPayout(adminUser, payoutId, action, rejectionReason, ip);
+      res.json({
+        success: true,
+        message: action === 'APPROVE' ? 'Payout approved and NIP transfer dispatched.' : 'Payout rejected and virtual account credited back.',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 42. MULTI-CITY & SURCHARGES GEOFENCING
+// ==========================================
+const createCityZoneSchema = z.object({
+  name: z.string().min(2),
+  state: z.string().min(2),
+  currency: z.string().optional(),
+  petrol_price_ngn: z.number().nonnegative(),
+  base_flag_fall_ngn: z.number().nonnegative(),
+  per_km_rate_ngn: z.number().nonnegative(),
+  per_minute_rate_ngn: z.number().nonnegative(),
+  state_levy_ngn: z.number().nonnegative(),
+  airport_surcharge_ngn: z.number().nonnegative(),
+  toll_surcharge_ngn: z.number().nonnegative(),
+  is_active: z.boolean().optional(),
+});
+
+const updateCityZoneSchema = z.object({
+  name: z.string().optional(),
+  state: z.string().optional(),
+  currency: z.string().optional(),
+  petrol_price_ngn: z.number().optional(),
+  base_flag_fall_ngn: z.number().optional(),
+  per_km_rate_ngn: z.number().optional(),
+  per_minute_rate_ngn: z.number().optional(),
+  state_levy_ngn: z.number().optional(),
+  airport_surcharge_ngn: z.number().optional(),
+  toll_surcharge_ngn: z.number().optional(),
+  is_active: z.boolean().optional(),
+});
+
+adminRouter.get(
+  '/cities',
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const cities = await adminService.getCityZones();
+      res.json({ success: true, data: cities });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/cities',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = createCityZoneSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const created = await adminService.createCityZone(adminUser, payload, ip);
+      res.status(201).json({ success: true, message: 'City zone added.', data: created });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.put(
+  '/cities/:id',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const updates = updateCityZoneSchema.parse(req.body);
+      const cityId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const updated = await adminService.updateCityZone(adminUser, cityId, updates, ip);
+      res.json({ success: true, message: 'City zone rates updated.', data: updated });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 43. PROMO CODES & MARKETING CAMPAIGNS
+// ==========================================
+const createPromoSchema = z.object({
+  code: z.string().min(3),
+  description: z.string().optional(),
+  discount_type: z.enum(['FLAT', 'PERCENTAGE']),
+  discount_value: z.number().positive(),
+  max_discount_ngn: z.number().positive().optional(),
+  max_uses: z.number().positive().optional(),
+  city: z.string().optional(),
+  expires_at: z.string(),
+  is_active: z.boolean().optional(),
+});
+
+const validatePromoSchema = z.object({
+  code: z.string().min(2),
+  trip_fare_ngn: z.number().positive(),
+});
+
+adminRouter.get(
+  '/promos',
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const promos = await adminService.getPromoCodes();
+      res.json({ success: true, data: promos });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/promos',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = createPromoSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const promo = await adminService.createPromoCode(adminUser, payload, ip);
+      res.status(201).json({ success: true, message: 'Promo code created.', data: promo });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.delete(
+  '/promos/:id',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const promoId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.deletePromoCode(adminUser, promoId, ip);
+      res.json({ success: true, message: 'Promo code deleted.', data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/promos/validate',
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { code, trip_fare_ngn } = validatePromoSchema.parse(req.body);
+      const result = await adminService.validatePromoCode(code, trip_fare_ngn);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+
+// ==========================================
+// 45. PAYSTACK DIRECT CARD REFUND DESK
+// ==========================================
+const refundSchema = z.object({
+  reason: z.string().min(3),
+});
+
+adminRouter.post(
+  '/transactions/:id/refund',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reason } = refundSchema.parse(req.body);
+      const txId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const refunded = await adminService.refundPaymentTransaction(adminUser, txId, reason, ip);
+      res.json({ success: true, message: 'Card transaction marked as refunded.', data: refunded });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 46. PHYSICAL VEHICLE HUB INSPECTION
+// ==========================================
+const vehicleInspectionSchema = z.object({
+  driver_id: z.string(),
+  hub_name: z.string().min(2),
+  inspector_name: z.string().optional(),
+  status: z.enum(['PASSED', 'FAILED', 'PENDING']),
+  ac_functional: z.boolean(),
+  tires_healthy: z.boolean(),
+  exterior_clean: z.boolean(),
+  lights_functional: z.boolean(),
+  notes: z.string().optional(),
+});
+
+adminRouter.get(
+  '/inspections',
+  requireAdminRole(['SUPER_ADMIN', 'KYC_OFFICER', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const driverId = req.query.driver_id as string | undefined;
+      const inspections = await adminService.getVehicleInspections(driverId);
+      res.json({ success: true, data: inspections });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/inspections',
+  requireAdminRole(['SUPER_ADMIN', 'KYC_OFFICER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const payload = vehicleInspectionSchema.parse(req.body);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const inspection = await adminService.recordVehicleInspection(adminUser, payload, ip);
+      res.status(201).json({ success: true, message: 'Vehicle hub inspection recorded.', data: inspection });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// ==========================================
+// 47. DATABASE SNAPSHOTS & DISASTER RECOVERY
+// ==========================================
+adminRouter.get(
+  '/backups',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const backups = await adminService.getBackupSnapshots();
+      res.json({ success: true, data: backups });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+adminRouter.post(
+  '/backups/generate',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const snapshot = await adminService.createBackupSnapshot(adminUser, ip);
+      res.status(201).json({ success: true, message: 'Disaster recovery snapshot created.', data: snapshot });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

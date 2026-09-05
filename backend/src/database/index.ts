@@ -150,11 +150,85 @@ export interface PaymentTransactionRow {
   reference: string;
   user_id: string;
   amount_kobo: number;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
   payment_type: 'SUBSCRIPTION_PURCHASE';
   channel: string;
   meta_data: any;
+  refunded_at?: string;
+  refund_reason?: string;
   created_at: string;
+}
+
+export interface DriverPayoutRow {
+  id: string;
+  driver_id: string;
+  amount_ngn: number;
+  fee_ngn: number;
+  net_amount_ngn: number;
+  bank_name: string;
+  bank_code: string;
+  account_number: string;
+  account_name: string;
+  status: 'PENDING' | 'APPROVED' | 'TRANSFERRED' | 'REJECTED';
+  rejection_reason?: string;
+  reference: string;
+  created_at: string;
+  processed_at?: string;
+}
+
+export interface CityZoneRow {
+  id: string;
+  name: string;
+  state: string;
+  currency: string;
+  petrol_price_ngn: number;
+  base_flag_fall_ngn: number;
+  per_km_rate_ngn: number;
+  per_minute_rate_ngn: number;
+  state_levy_ngn: number;
+  airport_surcharge_ngn: number;
+  toll_surcharge_ngn: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PromoCodeRow {
+  id: string;
+  code: string;
+  description: string;
+  discount_type: 'FLAT' | 'PERCENTAGE';
+  discount_value: number;
+  max_discount_ngn?: number;
+  max_uses: number;
+  current_uses: number;
+  city?: string;
+  is_active: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface VehicleInspectionRow {
+  id: string;
+  driver_id: string;
+  hub_name: string;
+  inspector_name: string;
+  status: 'PASSED' | 'FAILED' | 'PENDING';
+  ac_functional: boolean;
+  tires_healthy: boolean;
+  exterior_clean: boolean;
+  lights_functional: boolean;
+  notes?: string;
+  inspected_at: string;
+  created_at: string;
+}
+
+export interface BackupSnapshotRow {
+  id: string;
+  filename: string;
+  size_bytes: number;
+  record_count: number;
+  created_at: string;
+  created_by: string;
 }
 
 export interface SosIncidentRow {
@@ -265,6 +339,11 @@ export class DatabaseService {
     virtual_bank_accounts: [] as VirtualBankAccountRow[],
     phone_verifications: [] as PhoneVerificationRow[],
     kyc_verifications: [] as KycVerificationRow[],
+    driver_payouts: [] as DriverPayoutRow[],
+    city_zones: [] as CityZoneRow[],
+    promo_codes: [] as PromoCodeRow[],
+    vehicle_inspections: [] as VehicleInspectionRow[],
+    backup_snapshots: [] as BackupSnapshotRow[],
     platform_settings: {
       petrol_price_ngn: 1050,
       base_flag_fall_ngn: 1500,
@@ -333,11 +412,20 @@ export class DatabaseService {
         if (!this.store.admin_audit_logs) this.store.admin_audit_logs = [];
         if (!this.store.disputes) this.store.disputes = [];
         if (!this.store.ride_gps_breadcrumbs) this.store.ride_gps_breadcrumbs = [];
+        if (!this.store.driver_payouts) this.store.driver_payouts = [];
+        if (!this.store.city_zones) this.store.city_zones = [];
+        if (!this.store.promo_codes) this.store.promo_codes = [];
+        if (!this.store.vehicle_inspections) this.store.vehicle_inspections = [];
+        if (!this.store.backup_snapshots) this.store.backup_snapshots = [];
+        this.seedDefaultCities();
+        this.seedDefaultPromos();
       } catch {
         this.saveStore();
       }
     } else {
       this.seedDefaultPlans();
+      this.seedDefaultCities();
+      this.seedDefaultPromos();
       this.saveStore();
     }
   }
@@ -392,6 +480,107 @@ export class DatabaseService {
           duration_days: 30,
           price_kobo: 2500000,
           is_active: true,
+        },
+      ];
+    }
+  }
+
+  private seedDefaultCities() {
+    if (!this.store.city_zones || this.store.city_zones.length === 0) {
+      this.store.city_zones = [
+        {
+          id: 'city_lagos',
+          name: 'Lagos Metropolitan Area',
+          state: 'Lagos',
+          currency: 'NGN',
+          petrol_price_ngn: 1050,
+          base_flag_fall_ngn: 1500,
+          per_km_rate_ngn: 350,
+          per_minute_rate_ngn: 80,
+          state_levy_ngn: 50,
+          airport_surcharge_ngn: 1000,
+          toll_surcharge_ngn: 500,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'city_abuja',
+          name: 'Abuja Federal Capital Territory',
+          state: 'FCT',
+          currency: 'NGN',
+          petrol_price_ngn: 1020,
+          base_flag_fall_ngn: 1800,
+          per_km_rate_ngn: 380,
+          per_minute_rate_ngn: 90,
+          state_levy_ngn: 0,
+          airport_surcharge_ngn: 1500,
+          toll_surcharge_ngn: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'city_ph',
+          name: 'Port Harcourt Urban Corridor',
+          state: 'Rivers',
+          currency: 'NGN',
+          petrol_price_ngn: 1060,
+          base_flag_fall_ngn: 1600,
+          per_km_rate_ngn: 360,
+          per_minute_rate_ngn: 85,
+          state_levy_ngn: 0,
+          airport_surcharge_ngn: 1200,
+          toll_surcharge_ngn: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'city_ibadan',
+          name: 'Ibadan Greater Metro',
+          state: 'Oyo',
+          currency: 'NGN',
+          petrol_price_ngn: 1040,
+          base_flag_fall_ngn: 1200,
+          per_km_rate_ngn: 300,
+          per_minute_rate_ngn: 60,
+          state_levy_ngn: 0,
+          airport_surcharge_ngn: 800,
+          toll_surcharge_ngn: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ];
+    }
+  }
+
+  private seedDefaultPromos() {
+    if (!this.store.promo_codes || this.store.promo_codes.length === 0) {
+      this.store.promo_codes = [
+        {
+          id: 'promo_lagos500',
+          code: 'GIGALAGOS',
+          description: '₦500 Off your first ride across Lagos',
+          discount_type: 'FLAT',
+          discount_value: 500,
+          max_discount_ngn: 500,
+          max_uses: 5000,
+          current_uses: 142,
+          city: 'Lagos',
+          is_active: true,
+          expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'promo_welcome20',
+          code: 'WELCOME20',
+          description: '20% Off for new passenger registrations',
+          discount_type: 'PERCENTAGE',
+          discount_value: 20,
+          max_discount_ngn: 1000,
+          max_uses: 10000,
+          current_uses: 380,
+          is_active: true,
+          expires_at: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date().toISOString(),
         },
       ];
     }
@@ -1285,6 +1474,256 @@ export class DatabaseService {
       if (preferredPlanId) profile.preferred_plan_id = preferredPlanId;
       this.saveStore();
     }
+  }
+
+  // --- Driver Payouts & Settlement ---
+  public async getDriverPayouts(filter?: { status?: string; driverId?: string }): Promise<any[]> {
+    let payouts = [...this.store.driver_payouts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (filter?.status && filter.status !== 'ALL') {
+      payouts = payouts.filter((p) => p.status === filter.status);
+    }
+    if (filter?.driverId) {
+      payouts = payouts.filter((p) => p.driver_id === filter.driverId);
+    }
+    return payouts.map((p) => {
+      const driver = this.store.users.find((u) => u.id === p.driver_id);
+      const profile = this.store.driver_profiles.find((dp) => dp.driver_id === p.driver_id);
+      return { ...p, driver, profile };
+    });
+  }
+
+  public async createDriverPayout(data: {
+    driver_id: string;
+    amount_ngn: number;
+    bank_name: string;
+    bank_code: string;
+    account_number: string;
+    account_name: string;
+  }): Promise<DriverPayoutRow> {
+    const feeNgn = 50; // Standard ₦50 NIP settlement fee
+    if (data.amount_ngn < 1000) throw new Error('Minimum withdrawal amount is ₦1,000.');
+    const netAmountNgn = data.amount_ngn - feeNgn;
+
+    // Immediately debit virtual account
+    await this.debitVirtualAccountBalance(data.driver_id, data.amount_ngn);
+
+    const payout: DriverPayoutRow = {
+      id: `payout_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      driver_id: data.driver_id,
+      amount_ngn: data.amount_ngn,
+      fee_ngn: feeNgn,
+      net_amount_ngn: netAmountNgn,
+      bank_name: data.bank_name,
+      bank_code: data.bank_code,
+      account_number: data.account_number,
+      account_name: data.account_name,
+      status: 'PENDING',
+      reference: `KORA_PAYOUT_${Date.now()}`,
+      created_at: new Date().toISOString(),
+    };
+
+    this.store.driver_payouts.unshift(payout);
+    this.saveStore();
+    return payout;
+  }
+
+  public async updateDriverPayoutStatus(
+    id: string,
+    status: 'APPROVED' | 'TRANSFERRED' | 'REJECTED',
+    rejectionReason?: string
+  ): Promise<DriverPayoutRow> {
+    const payout = this.store.driver_payouts.find((p) => p.id === id);
+    if (!payout) throw new Error('Payout record not found.');
+    payout.status = status;
+    payout.processed_at = new Date().toISOString();
+    if (rejectionReason) payout.rejection_reason = rejectionReason;
+
+    // If rejected, refund the driver's virtual account balance
+    if (status === 'REJECTED') {
+      await this.creditVirtualAccountBalance(payout.driver_id, payout.amount_ngn);
+    }
+
+    this.saveStore();
+    return payout;
+  }
+
+  // --- Multi-City Pricing & Surcharges ---
+  public async getCityZones(): Promise<CityZoneRow[]> {
+    return this.store.city_zones;
+  }
+
+  public async getCityZoneById(id: string): Promise<CityZoneRow | undefined> {
+    return this.store.city_zones.find((c) => c.id === id);
+  }
+
+  public async createCityZone(zone: CityZoneRow): Promise<CityZoneRow> {
+    const exists = this.store.city_zones.find((c) => c.id === zone.id);
+    if (exists) throw new Error(`City with ID ${zone.id} already exists.`);
+    this.store.city_zones.push(zone);
+    this.saveStore();
+    return zone;
+  }
+
+  public async updateCityZone(id: string, updates: Partial<CityZoneRow>): Promise<CityZoneRow> {
+    const zone = this.store.city_zones.find((c) => c.id === id);
+    if (!zone) throw new Error('City zone not found.');
+    Object.assign(zone, updates);
+    this.saveStore();
+    return zone;
+  }
+
+  // --- Promo Codes & Acquisition Engine ---
+  public async getPromoCodes(): Promise<PromoCodeRow[]> {
+    return this.store.promo_codes;
+  }
+
+  public async createPromoCode(promo: PromoCodeRow): Promise<PromoCodeRow> {
+    const exists = this.store.promo_codes.find((p) => p.code.toUpperCase() === promo.code.toUpperCase());
+    if (exists) throw new Error(`Promo code ${promo.code} already exists.`);
+    promo.code = promo.code.toUpperCase();
+    this.store.promo_codes.push(promo);
+    this.saveStore();
+    return promo;
+  }
+
+  public async validateAndApplyPromo(code: string, fareNgn: number): Promise<{ valid: boolean; discountNgn: number; finalFareNgn: number; message: string }> {
+    const promo = this.store.promo_codes.find((p) => p.code.toUpperCase() === code.toUpperCase() && p.is_active);
+    if (!promo) return { valid: false, discountNgn: 0, finalFareNgn: fareNgn, message: 'Invalid or inactive promo code.' };
+    if (new Date(promo.expires_at).getTime() < Date.now()) {
+      return { valid: false, discountNgn: 0, finalFareNgn: fareNgn, message: 'Promo code has expired.' };
+    }
+    if (promo.current_uses >= promo.max_uses) {
+      return { valid: false, discountNgn: 0, finalFareNgn: fareNgn, message: 'Promo code redemption limit reached.' };
+    }
+
+    let discountNgn = 0;
+    if (promo.discount_type === 'FLAT') {
+      discountNgn = Math.min(fareNgn, promo.discount_value);
+    } else {
+      discountNgn = (fareNgn * promo.discount_value) / 100;
+      if (promo.max_discount_ngn) {
+        discountNgn = Math.min(discountNgn, promo.max_discount_ngn);
+      }
+    }
+    discountNgn = Math.round(discountNgn);
+    const finalFareNgn = Math.max(0, fareNgn - discountNgn);
+
+    promo.current_uses += 1;
+    this.saveStore();
+
+    return {
+      valid: true,
+      discountNgn,
+      finalFareNgn,
+      message: `₦${discountNgn.toLocaleString()} discount successfully applied!`,
+    };
+  }
+
+  public async deletePromoCode(id: string): Promise<boolean> {
+    const idx = this.store.promo_codes.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      this.store.promo_codes.splice(idx, 1);
+      this.saveStore();
+      return true;
+    }
+    return false;
+  }
+
+  // --- Driver Quality & Rating Watchlist ---
+  public async getDriverQualityWatchlist(): Promise<any[]> {
+    const watchlist: any[] = [];
+    for (const p of this.store.driver_profiles) {
+      const driverTrips = this.store.rides.filter((r) => r.driver_id === p.driver_id && r.status === 'COMPLETED');
+      const driverStrikes = this.store.disputes.filter((d) => {
+        const ride = this.store.rides.find((r) => r.id === d.ride_id);
+        return ride?.driver_id === p.driver_id && d.driver_strike_applied;
+      }).length;
+
+      const isLowRating = p.rating_average < 4.2 && driverTrips.length >= 3;
+      const hasStrikes = driverStrikes >= 1;
+
+      if (isLowRating || hasStrikes || p.is_locked_out) {
+        const user = this.store.users.find((u) => u.id === p.driver_id);
+        watchlist.push({
+          driver_id: p.driver_id,
+          driver_name: user?.full_name || 'Driver',
+          phone_number: user?.phone_number || '',
+          email: user?.email || '',
+          vehicle: `${p.vehicle_color} ${p.vehicle_make} ${p.vehicle_model}`,
+          license_plate: p.license_plate,
+          rating_average: p.rating_average,
+          total_trips: driverTrips.length,
+          warning_strikes: driverStrikes,
+          is_locked_out: p.is_locked_out,
+          account_status: p.account_status,
+          flag_reason: isLowRating ? 'Low Customer Rating (<4.2)' : hasStrikes ? `Disciplinary Strikes (${driverStrikes})` : 'System Dispatch Lockout',
+        });
+      }
+    }
+    return watchlist;
+  }
+
+  // --- 1-Click Paystack Card Refund ---
+  public async refundPaymentTransaction(txIdOrRef: string, reason: string): Promise<PaymentTransactionRow> {
+    const tx = this.store.payment_transactions.find((t) => t.id === txIdOrRef || t.reference === txIdOrRef);
+    if (!tx) throw new Error('Transaction record not found.');
+    if (tx.status === 'REFUNDED') throw new Error('Transaction is already refunded.');
+
+    tx.status = 'REFUNDED';
+    tx.refunded_at = new Date().toISOString();
+    tx.refund_reason = reason;
+    this.saveStore();
+    return tx;
+  }
+
+  // --- Physical Vehicle Hub Inspections ---
+  public async getVehicleInspections(driverId?: string): Promise<any[]> {
+    let list = [...this.store.vehicle_inspections].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (driverId) list = list.filter((i) => i.driver_id === driverId);
+    return list.map((i) => {
+      const driver = this.store.users.find((u) => u.id === i.driver_id);
+      const profile = this.store.driver_profiles.find((dp) => dp.driver_id === i.driver_id);
+      return { ...i, driver, profile };
+    });
+  }
+
+  public async recordVehicleInspection(data: Omit<VehicleInspectionRow, 'id' | 'created_at'>): Promise<VehicleInspectionRow> {
+    const entry: VehicleInspectionRow = {
+      id: `insp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ...data,
+      created_at: new Date().toISOString(),
+    };
+    this.store.vehicle_inspections.unshift(entry);
+    this.saveStore();
+    return entry;
+  }
+
+  // --- Database Snapshots & 1-Click Disaster Recovery ---
+  public async createBackupSnapshot(adminEmail: string): Promise<{ snapshot: BackupSnapshotRow; dataJson: string }> {
+    const dataJson = JSON.stringify(this.store, null, 2);
+    const sizeBytes = Buffer.byteLength(dataJson, 'utf8');
+    const totalRecords =
+      this.store.users.length +
+      this.store.driver_profiles.length +
+      this.store.rides.length +
+      this.store.payment_transactions.length;
+
+    const snapshot: BackupSnapshotRow = {
+      id: `snap_${Date.now()}`,
+      filename: `giga_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+      size_bytes: sizeBytes,
+      record_count: totalRecords,
+      created_at: new Date().toISOString(),
+      created_by: adminEmail,
+    };
+
+    this.store.backup_snapshots.unshift(snapshot);
+    this.saveStore();
+    return { snapshot, dataJson };
+  }
+
+  public async getBackupSnapshots(): Promise<BackupSnapshotRow[]> {
+    return this.store.backup_snapshots;
   }
 }
 

@@ -151,6 +151,76 @@ export class KorapayService {
 
     return await db.getVirtualAccountByUserId(userId);
   }
+
+  /**
+   * Disburses payout funds from company Korapay balance to driver's external Nigerian commercial bank account (NIP).
+   */
+  public async disbursePayout(params: {
+    reference: string;
+    amountNgn: number;
+    bankCode: string;
+    accountNumber: string;
+    accountName: string;
+    narration?: string;
+  }): Promise<{ success: boolean; transferReference: string; status: 'SUCCESS' | 'FAILED'; error?: string }> {
+    const settings = await db.getPlatformSettings();
+    const secretKey = settings.korapay_secret_key || ENV.KORAPAY_SECRET_KEY;
+
+    if (secretKey && !secretKey.includes('mock') && secretKey.startsWith('sk_')) {
+      try {
+        const response = await axios.post(
+          `${this.baseUrl}/transactions/disburse`,
+          {
+            reference: params.reference,
+            amount: params.amountNgn,
+            currency: 'NGN',
+            narration: params.narration || 'Giga Ride Driver Earnings Payout',
+            destination: {
+              type: 'bank_account',
+              amount: params.amountNgn,
+              currency: 'NGN',
+              narration: params.narration || 'Giga Ride Driver Settlement',
+              bank_account: {
+                bank: params.bankCode || '058',
+                account: params.accountNumber,
+              },
+              customer: {
+                name: params.accountName,
+              },
+            },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${secretKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        const data = response.data?.data;
+        return {
+          success: true,
+          transferReference: data?.reference || params.reference,
+          status: 'SUCCESS',
+        };
+      } catch (err: any) {
+        console.error('[Korapay Disburse Error]', err.response?.data || err.message);
+        return {
+          success: false,
+          transferReference: params.reference,
+          status: 'FAILED',
+          error: err.response?.data?.message || err.message,
+        };
+      }
+    }
+
+    // Simulated instant NIP settlement for dev/staging
+    console.log(`[Korapay Disburse Sim] Sent ₦${params.amountNgn} to ${params.accountNumber} (${params.accountName} - ${params.bankCode}) Ref: ${params.reference}`);
+    return {
+      success: true,
+      transferReference: `nip_sim_${Date.now()}_${params.reference}`,
+      status: 'SUCCESS',
+    };
+  }
 }
 
 export const korapayService = new KorapayService();

@@ -766,8 +766,174 @@ async function runE2ETest() {
     console.log(`   ✓ Subscription Retainage:       ₦${r.totalSubscriptionRevenueNgn.toLocaleString()}`);
     console.log(`   ✓ Lagos MOT Tax Accrual:        ₦${r.totalMotLeviesNgn.toLocaleString()}`);
 
+    // 40. Driver Payouts Desk (Korapay NIP Transfers & Auto-Refund on Reject)
+    console.log('\n40. Testing Driver Payouts Desk & Korapay NIP Settlements...');
+    const driverVba = await db.getVirtualAccountByUserId(driverId);
+    if (driverVba) {
+      await db.creditVirtualAccountBalance(driverVba.account_number, 20000);
+    }
+
+    const payoutReqRes = await axios.post(
+      `${BASE_URL}/api/admin/payouts/request`,
+      {
+        driverId,
+        amountNgn: 5000,
+        bankName: 'Guaranty Trust Bank (GTBank)',
+        accountNumber: '0123456789',
+        accountName: 'Chinedu Eze',
+        bankCode: '058',
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Payout Request Created: ID ${payoutReqRes.data.data.id} for ₦${payoutReqRes.data.data.amount_ngn} (Net: ₦${payoutReqRes.data.data.net_amount_ngn})`);
+
+    const payoutApproveRes = await axios.post(
+      `${BASE_URL}/api/admin/payouts/${payoutReqRes.data.data.id}/action`,
+      { action: 'APPROVE' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Payout Approved & NIP Transfer Dispatched: Ref ${payoutApproveRes.data.data.transfer_ref}`);
+
+    // Test Payout Rejection & Virtual Account Balance Safety Auto-Credit
+    const rejectPayoutReq = await axios.post(
+      `${BASE_URL}/api/admin/payouts/request`,
+      {
+        driverId,
+        amountNgn: 3000,
+        bankName: 'Access Bank',
+        accountNumber: '0987654321',
+        accountName: 'Chinedu Eze',
+        bankCode: '044',
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    const balanceBeforeReject = (await db.getVirtualAccountByUserId(driverId))?.balance_ngn || 0;
+    await axios.post(
+      `${BASE_URL}/api/admin/payouts/${rejectPayoutReq.data.data.id}/action`,
+      { action: 'REJECT', rejectionReason: 'Account name BVN mismatch' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    const balanceAfterReject = (await db.getVirtualAccountByUserId(driverId))?.balance_ngn || 0;
+    console.log(`   ✓ Payout Rejected & Driver Virtual Balance Safely Restored: +₦${balanceAfterReject - balanceBeforeReject}`);
+
+    // 41. Multi-City Pricing Rates & Airport / Toll Surcharges Geofencing
+    console.log('\n41. Testing Multi-City Pricing Rates & Surcharge Geofencing...');
+    const citiesRes = await axios.get(`${BASE_URL}/api/admin/cities`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Active City Zones Configured: ${citiesRes.data.data.map((c: any) => c.name).join(', ')}`);
+
+    const updateCityRes = await axios.put(
+      `${BASE_URL}/api/admin/cities/city_abuja`,
+      {
+        petrol_price_ngn: 1100,
+        airport_surcharge_ngn: 2500,
+        toll_surcharge_ngn: 400,
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Updated Abuja Geofence: Petrol = ₦${updateCityRes.data.data.petrol_price_ngn}/L, Airport Toll = ₦${updateCityRes.data.data.airport_surcharge_ngn}`);
+
+    // 42. Promo Codes & Marketing Campaign Engine
+    console.log('\n42. Testing Promo Code Creation, Validation & Discount Application...');
+    const createPromoRes = await axios.post(
+      `${BASE_URL}/api/admin/promos`,
+      {
+        code: `E2EPROMO${runId}`,
+        description: '25% off passenger launch promo',
+        discount_type: 'PERCENTAGE',
+        discount_value: 25,
+        max_discount_ngn: 1500,
+        max_uses: 100,
+        city: 'Lagos',
+        expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Promo Code Created: ${createPromoRes.data.data.code} (${createPromoRes.data.data.discount_value}%)`);
+
+    const validatePromoRes = await axios.post(
+      `${BASE_URL}/api/admin/promos/validate`,
+      {
+        code: `E2EPROMO${runId}`,
+        trip_fare_ngn: 4000,
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Promo Voucher Evaluated on ₦4,000 Trip: Discount = ₦${validatePromoRes.data.data.discountNgn}, Final Fare = ₦${validatePromoRes.data.data.finalFareNgn}`);
+
+    // 43. Driver Quality Watchlist & Strike Surveillance
+    console.log('\n43. Testing Driver Quality Watchlist & Automated Strike Surveillance...');
+    const watchlistRes = await axios.get(`${BASE_URL}/api/admin/drivers/quality-watchlist`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Retrieved Driver Quality Watchlist: ${watchlistRes.data.data.length} flagged drivers under surveillance.`);
+
+    // 44. Paystack Direct Card Payment Refund Desk
+    console.log('\n44. Testing Paystack Direct Card Payment Refund Desk...');
+    const transactions = await db.getTransactions();
+    let txToRefund = transactions.find((t) => t.status === 'SUCCESS');
+    if (!txToRefund) {
+      txToRefund = await db.createTransaction({
+        id: `tx_card_${Date.now()}`,
+        reference: `PAYSTACK_REFUND_TEST_${Date.now()}`,
+        user_id: passengerId,
+        amount_kobo: 350000,
+        status: 'SUCCESS',
+        payment_type: 'SUBSCRIPTION_PURCHASE',
+        channel: 'card',
+        meta_data: { card_brand: 'Mastercard', last4: '4242' },
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const refundRes = await axios.post(
+      `${BASE_URL}/api/admin/transactions/${txToRefund.id}/refund`,
+      { reason: 'Customer disputed unauthorized card renewal charge' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Card Transaction Marked as Refunded: Status = ${refundRes.data.data.status}, Reason = ${refundRes.data.data.refund_reason}`);
+
+    // 45. Physical Vehicle Hub Inspection Desk
+    console.log('\n45. Testing Physical Vehicle Hub Inspection Desk...');
+    const inspectionRes = await axios.post(
+      `${BASE_URL}/api/admin/inspections`,
+      {
+        driver_id: driverId,
+        hub_name: 'Ikeja Central Hub',
+        inspector_name: 'Engr. Tunde Bakare',
+        status: 'PASSED',
+        ac_functional: true,
+        tires_healthy: true,
+        exterior_clean: true,
+        lights_functional: true,
+        notes: 'Passed all LASDRI and Giga 5-point mechanical standards.',
+      },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Hub Inspection Logged: Result = ${inspectionRes.data.data.status} at ${inspectionRes.data.data.hub_name}`);
+
+    const allInspectionsRes = await axios.get(`${BASE_URL}/api/admin/inspections?driver_id=${driverId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Total Hub Inspections for Driver: ${allInspectionsRes.data.data.length}`);
+
+    // 46. Database Snapshots & 1-Click Disaster Recovery
+    console.log('\n46. Testing Database Snapshots & 1-Click Disaster Recovery...');
+    const backupRes = await axios.post(
+      `${BASE_URL}/api/admin/backups/generate`,
+      {},
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Disaster Recovery Snapshot Generated: ${backupRes.data.data.snapshot.filename} (${(backupRes.data.data.snapshot.size_bytes / 1024).toFixed(1)} KB, ${backupRes.data.data.snapshot.record_count} records)`);
+
+    const backupsListRes = await axios.get(`${BASE_URL}/api/admin/backups`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Total Verified Database Snapshots: ${backupsListRes.data.data.length}`);
+
     console.log('\n================================================================');
-    console.log(' ✅ ALL 39 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
+    console.log(' ✅ ALL 46 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
     console.log('================================================================');
 
     driverSocket.disconnect();

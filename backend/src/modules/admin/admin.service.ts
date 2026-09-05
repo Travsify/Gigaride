@@ -1,10 +1,11 @@
-import { db, PlatformSettingsRow, SubscriptionPlanRow, AdminAuditLogRow, DisputeRow, AdminRole, UserRow } from '../../database';
+import { db, PlatformSettingsRow, SubscriptionPlanRow, AdminAuditLogRow, DisputeRow, AdminRole, UserRow, CityZoneRow, PromoCodeRow, DriverPayoutRow, VehicleInspectionRow, BackupSnapshotRow } from '../../database';
 import { geoSessionManager } from '../../common/redis';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { broadcastFleetAlert } from '../bidding/bidding.gateway';
 import { resendService } from '../notifications/resend.service';
 import { twilioService } from '../notifications/twilio.service';
+import { korapayService } from '../payments/korapay.service';
 
 export class AdminService {
   public async getAnalytics() {
@@ -760,6 +761,319 @@ export class AdminService {
 
   public async getTransactions() {
     return db.getTransactions();
+  }
+
+  // ==========================================
+  // MODULE 1: DRIVER PAYOUTS & SETTLEMENT DESK
+  // ==========================================
+  public async getDriverPayouts(filter?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+    return db.getDriverPayouts(filter ? { status: filter } : undefined);
+  }
+
+  public async createDriverPayout(params: {
+    driverId: string;
+    amountNgn: number;
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+    bankCode?: string;
+  }) {
+    return db.createDriverPayout({
+      driver_id: params.driverId,
+      amount_ngn: params.amountNgn,
+      bank_name: params.bankName,
+      account_number: params.accountNumber,
+      account_name: params.accountName,
+      bank_code: params.bankCode || '058',
+    });
+  }
+
+  public async processDriverPayout(
+    adminUser: { id: string; email: string },
+    payoutId: string,
+    action: 'APPROVE' | 'REJECT',
+    rejectionReason?: string,
+    ipAddress?: string
+  ) {
+    const payouts = await db.getDriverPayouts();
+    const payout = payouts.find((p) => p.id === payoutId);
+    if (!payout) throw new Error('Payout request not found.');
+    if (payout.status !== 'PENDING') throw new Error(`Payout request is already ${payout.status}.`);
+
+    let transferRef: string | undefined;
+
+    if (action === 'APPROVE') {
+      const disburseResult = await korapayService.disbursePayout({
+        reference: `payout_${payout.id}_${Date.now()}`,
+        amountNgn: payout.amount_ngn,
+        bankCode: payout.bank_code || '058',
+        accountNumber: payout.account_number,
+        accountName: payout.account_name,
+      });
+
+      if (!disburseResult.success) {
+        throw new Error(`Korapay NIP transfer failed: ${disburseResult.error || 'Unknown provider error'}`);
+      }
+      transferRef = disburseResult.transferReference;
+    }
+
+    const updated = await db.updateDriverPayoutStatus(payoutId, action === 'APPROVE' ? 'APPROVED' : 'REJECTED', rejectionReason);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: action === 'APPROVE' ? 'DRIVER_PAYOUT_APPROVED' : 'DRIVER_PAYOUT_REJECTED',
+      resource_type: 'DRIVER_PAYOUT',
+      resource_id: payoutId,
+      details: { amount_ngn: payout.amount_ngn, driver_id: payout.driver_id, transfer_ref: transferRef, rejectionReason },
+      ip_address: ipAddress,
+    });
+
+    return { ...updated, transfer_ref: transferRef };
+  }
+
+  // ==========================================
+  // MODULE 2: MULTI-CITY & SURCHARGES GEOFENCING
+  // ==========================================
+  public async getCityZones() {
+    return db.getCityZones();
+  }
+
+  public async createCityZone(
+    adminUser: { id: string; email: string },
+    payload: {
+      name: string;
+      state: string;
+      currency?: string;
+      petrol_price_ngn: number;
+      base_flag_fall_ngn: number;
+      per_km_rate_ngn: number;
+      per_minute_rate_ngn: number;
+      state_levy_ngn: number;
+      airport_surcharge_ngn: number;
+      toll_surcharge_ngn: number;
+      is_active?: boolean;
+    },
+    ipAddress?: string
+  ) {
+    const id = `city_${payload.name.toLowerCase().replace(/\s+/g, '_')}`;
+    const zone: CityZoneRow = {
+      id,
+      name: payload.name,
+      state: payload.state,
+      currency: payload.currency || 'NGN',
+      petrol_price_ngn: payload.petrol_price_ngn,
+      base_flag_fall_ngn: payload.base_flag_fall_ngn,
+      per_km_rate_ngn: payload.per_km_rate_ngn,
+      per_minute_rate_ngn: payload.per_minute_rate_ngn,
+      state_levy_ngn: payload.state_levy_ngn,
+      airport_surcharge_ngn: payload.airport_surcharge_ngn,
+      toll_surcharge_ngn: payload.toll_surcharge_ngn,
+      is_active: payload.is_active !== undefined ? payload.is_active : true,
+      created_at: new Date().toISOString(),
+    };
+    const created = await db.createCityZone(zone);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'CITY_ZONE_CREATED',
+      resource_type: 'CITY_ZONE',
+      resource_id: created.id,
+      details: payload,
+      ip_address: ipAddress,
+    });
+    return created;
+  }
+
+  public async updateCityZone(
+    adminUser: { id: string; email: string },
+    cityId: string,
+    updates: Partial<CityZoneRow>,
+    ipAddress?: string
+  ) {
+    const updated = await db.updateCityZone(cityId, updates);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'CITY_ZONE_UPDATED',
+      resource_type: 'CITY_ZONE',
+      resource_id: cityId,
+      details: updates,
+      ip_address: ipAddress,
+    });
+    return updated;
+  }
+
+  // ==========================================
+  // MODULE 3: PROMO CODES & MARKETING CAMPAIGNS
+  // ==========================================
+  public async getPromoCodes() {
+    return db.getPromoCodes();
+  }
+
+  public async createPromoCode(
+    adminUser: { id: string; email: string },
+    payload: {
+      code: string;
+      description?: string;
+      discount_type: 'FLAT' | 'PERCENTAGE';
+      discount_value: number;
+      max_discount_ngn?: number;
+      max_uses?: number;
+      city?: string;
+      expires_at: string;
+      is_active?: boolean;
+    },
+    ipAddress?: string
+  ) {
+    const promo: PromoCodeRow = {
+      id: `promo_${Date.now()}`,
+      code: payload.code.toUpperCase(),
+      description: payload.description || `${payload.code} Promotion`,
+      discount_type: payload.discount_type,
+      discount_value: payload.discount_value,
+      max_discount_ngn: payload.max_discount_ngn,
+      max_uses: payload.max_uses || 1000,
+      current_uses: 0,
+      city: payload.city,
+      is_active: payload.is_active !== undefined ? payload.is_active : true,
+      expires_at: payload.expires_at,
+      created_at: new Date().toISOString(),
+    };
+    const created = await db.createPromoCode(promo);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'PROMO_CODE_CREATED',
+      resource_type: 'PROMO_CODE',
+      resource_id: promo.id,
+      details: payload,
+      ip_address: ipAddress,
+    });
+    return promo;
+  }
+
+  public async deletePromoCode(
+    adminUser: { id: string; email: string },
+    promoId: string,
+    ipAddress?: string
+  ) {
+    const deleted = await db.deletePromoCode(promoId);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'PROMO_CODE_DELETED',
+      resource_type: 'PROMO_CODE',
+      resource_id: promoId,
+      details: { deleted },
+      ip_address: ipAddress,
+    });
+    return { success: deleted, promoId };
+  }
+
+  public async validatePromoCode(code: string, tripFareNgn: number) {
+    return db.validateAndApplyPromo(code, tripFareNgn);
+  }
+
+  // ==========================================
+  // MODULE 4: DRIVER QUALITY & STRIKE WATCHLIST
+  // ==========================================
+  public async getDriverQualityWatchlist() {
+    return db.getDriverQualityWatchlist();
+  }
+
+  // ==========================================
+  // MODULE 5: PAYSTACK DIRECT REFUNDS
+  // ==========================================
+  public async refundPaymentTransaction(
+    adminUser: { id: string; email: string },
+    transactionId: string,
+    reason: string,
+    ipAddress?: string
+  ) {
+    const refunded = await db.refundPaymentTransaction(transactionId, reason);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'PAYMENT_TRANSACTION_REFUNDED',
+      resource_type: 'PAYMENT_TRANSACTION',
+      resource_id: transactionId,
+      details: { reason, amount_ngn: refunded.amount_kobo / 100, reference: refunded.reference },
+      ip_address: ipAddress,
+    });
+    return refunded;
+  }
+
+  // ==========================================
+  // MODULE 6: PHYSICAL VEHICLE HUB INSPECTION
+  // ==========================================
+  public async getVehicleInspections(driverId?: string) {
+    return db.getVehicleInspections(driverId);
+  }
+
+  public async recordVehicleInspection(
+    adminUser: { id: string; email: string },
+    payload: {
+      driver_id: string;
+      hub_name: string;
+      inspector_name?: string;
+      status: 'PASSED' | 'FAILED' | 'PENDING';
+      ac_functional: boolean;
+      tires_healthy: boolean;
+      exterior_clean: boolean;
+      lights_functional: boolean;
+      notes?: string;
+    },
+    ipAddress?: string
+  ) {
+    const inspection = await db.recordVehicleInspection({
+      driver_id: payload.driver_id,
+      hub_name: payload.hub_name,
+      inspector_name: payload.inspector_name || adminUser.email,
+      status: payload.status,
+      ac_functional: payload.ac_functional,
+      tires_healthy: payload.tires_healthy,
+      exterior_clean: payload.exterior_clean,
+      lights_functional: payload.lights_functional,
+      notes: payload.notes,
+      inspected_at: new Date().toISOString(),
+    });
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'VEHICLE_INSPECTION_RECORDED',
+      resource_type: 'VEHICLE_INSPECTION',
+      resource_id: inspection.id,
+      details: { driver_id: payload.driver_id, status: payload.status, hub_name: payload.hub_name },
+      ip_address: ipAddress,
+    });
+
+    return inspection;
+  }
+
+  // ==========================================
+  // MODULE 7: BACKUP SNAPSHOTS & DISASTER RECOVERY
+  // ==========================================
+  public async createBackupSnapshot(
+    adminUser: { id: string; email: string },
+    ipAddress?: string
+  ) {
+    const { snapshot, dataJson } = await db.createBackupSnapshot(adminUser.email);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'DATABASE_BACKUP_CREATED',
+      resource_type: 'DATABASE_BACKUP',
+      resource_id: snapshot.id,
+      details: { filename: snapshot.filename, size_bytes: snapshot.size_bytes, record_count: snapshot.record_count },
+      ip_address: ipAddress,
+    });
+    return { snapshot, dataJson };
+  }
+
+  public async getBackupSnapshots() {
+    return db.getBackupSnapshots();
   }
 }
 

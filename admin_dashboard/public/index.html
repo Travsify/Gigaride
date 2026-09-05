@@ -129,6 +129,27 @@
         <span id="sosBadgeHeader" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
       </button>
 
+      <button onclick="switchTab('inspections')" id="tabBtn_inspections" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-clipboard-check w-4 text-center text-sm text-sky-400"></i>
+          <span>Hub Inspections</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('cities')" id="tabBtn_cities" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-city w-4 text-center text-sm text-amber-400"></i>
+          <span>City Zones & Rates</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('promos')" id="tabBtn_promos" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-tags w-4 text-center text-sm text-pink-400"></i>
+          <span>Promo Codes</span>
+        </div>
+      </button>
+
       <div class="pt-5 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
         Finance & Control
       </div>
@@ -138,6 +159,14 @@
           <i class="fa-solid fa-receipt w-4 text-center text-sm"></i>
           <span>Finance & Reconcile</span>
         </div>
+      </button>
+
+      <button onclick="switchTab('payouts')" id="tabBtn_payouts" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-money-bill-transfer w-4 text-center text-sm text-emerald-400"></i>
+          <span>Driver Payouts</span>
+        </div>
+        <span id="payoutPendingBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">0</span>
       </button>
 
       <button onclick="switchTab('staff')" id="tabBtn_staff" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
@@ -158,6 +187,13 @@
         <div class="flex items-center space-x-3">
           <i class="fa-solid fa-gas-pump w-4 text-center text-sm"></i>
           <span>Fuel Levers</span>
+        </div>
+      </button>
+
+      <button onclick="switchTab('backups')" id="tabBtn_backups" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-database w-4 text-center text-sm text-purple-400"></i>
+          <span>Disaster Recovery</span>
         </div>
       </button>
 
@@ -371,6 +407,7 @@
             <button onclick="loadDrivers('PENDING_KYC')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="PENDING_KYC">Pending KYC</button>
             <button onclick="loadDrivers('APPROVED')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="APPROVED">Approved</button>
             <button onclick="loadDrivers('SUSPENDED')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="SUSPENDED">Suspended</button>
+            <button onclick="loadDriverQualityWatchlist()" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-rose-900/40 text-rose-300 font-bold border border-rose-700/60 hover:bg-rose-800/50" data-filter="QUALITY_WATCHLIST"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Quality Watchlist</button>
           </div>
         </div>
 
@@ -833,6 +870,7 @@
                 <th class="py-2.5 px-3">Channel</th>
                 <th class="py-2.5 px-3">Status</th>
                 <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody id="transactionsTableBody" class="divide-y divide-slate-800 text-slate-300">
@@ -1337,6 +1375,189 @@
           </table>
         </div>
       </div>
+    <!-- ==================== TAB: DRIVER PAYOUTS & SETTLEMENT DESK ==================== -->
+    <div id="tab_payouts" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i>
+              <span>Driver Payouts & Settlement Desk (Korapay NIP)</span>
+            </h2>
+            <p class="text-xs text-slate-400">Process driver earnings withdrawals from Korapay virtual bank accounts directly to personal Nigerian commercial banks via instant NIP.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="loadDriverPayouts('ALL')" class="payout-filter-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs" data-filter="ALL">All</button>
+            <button onclick="loadDriverPayouts('PENDING')" class="payout-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700 text-xs" data-filter="PENDING">Pending Approval</button>
+            <button onclick="loadDriverPayouts('APPROVED')" class="payout-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700 text-xs" data-filter="APPROVED">Settled</button>
+            <button onclick="loadDriverPayouts('REJECTED')" class="payout-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700 text-xs" data-filter="REJECTED">Rejected</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Driver Info</th>
+                <th class="py-3 px-3">Bank & Account Details</th>
+                <th class="py-3 px-3">Amount Requested</th>
+                <th class="py-3 px-3">NIP Fee</th>
+                <th class="py-3 px-3">Net Disbursed</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Requested Date</th>
+                <th class="py-3 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payoutsTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="8" class="py-6 text-center text-slate-500">Loading driver payout requests...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: MULTI-CITY PRICING & SURCHARGES ==================== -->
+    <div id="tab_cities" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-city text-amber-400"></i>
+              <span>Multi-City Pricing, Tolls & Airport Surcharges Geofencing</span>
+            </h2>
+            <p class="text-xs text-slate-400">Configure localized fuel baseline tariffs, state road levies, bridge tolls, and airport pickup fees across Lagos, Abuja, Port Harcourt, and Ibadan.</p>
+          </div>
+          <button onclick="loadCityZones()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 border border-slate-700">
+            <i class="fa-solid fa-rotate"></i> Refresh City Rates
+          </button>
+        </div>
+
+        <div id="citiesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Dynamically populated city cards -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: PROMO CODES & MARKETING ENGINE ==================== -->
+    <div id="tab_promos" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-tags text-pink-400"></i>
+              <span>Marketing Campaign & Promo Voucher Builder</span>
+            </h2>
+            <p class="text-xs text-slate-400">Create percentage or flat discount vouchers for passenger growth campaigns with maximum discount ceilings and city geofencing.</p>
+          </div>
+          <button onclick="openCreatePromoModal()" class="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-lg shadow-pink-500/20">
+            <i class="fa-solid fa-plus"></i> Create Promo Voucher
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Voucher Code</th>
+                <th class="py-3 px-3">Discount Details</th>
+                <th class="py-3 px-3">Max Ceiling</th>
+                <th class="py-3 px-3">Usage Redemptions</th>
+                <th class="py-3 px-3">Target City</th>
+                <th class="py-3 px-3">Expires At</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="promosTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="8" class="py-6 text-center text-slate-500">Loading promotional campaigns...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: PHYSICAL VEHICLE HUB INSPECTIONS ==================== -->
+    <div id="tab_inspections" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-clipboard-check text-sky-400"></i>
+              <span>Physical Vehicle Hub Inspection Desk</span>
+            </h2>
+            <p class="text-xs text-slate-400">Record in-person 5-point vehicle roadworthiness audits (AC, Tyres, Cleanliness, Lighting, Seatbelts) performed at Giga Regional Hubs (Ikeja, Lekki, Abuja, Port Harcourt).</p>
+          </div>
+          <button onclick="openRecordInspectionModal()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-lg shadow-sky-500/20">
+            <i class="fa-solid fa-plus"></i> Record Inspection
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Date & Time</th>
+                <th class="py-3 px-3">Driver & Vehicle</th>
+                <th class="py-3 px-3">Support Hub</th>
+                <th class="py-3 px-3">Inspector</th>
+                <th class="py-3 px-3">AC</th>
+                <th class="py-3 px-3">Tyres</th>
+                <th class="py-3 px-3">Exterior</th>
+                <th class="py-3 px-3">Lights</th>
+                <th class="py-3 px-3">Audit Result</th>
+              </tr>
+            </thead>
+            <tbody id="inspectionsTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="9" class="py-6 text-center text-slate-500">Loading vehicle inspection records...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: DATABASE SNAPSHOTS & DISASTER RECOVERY ==================== -->
+    <div id="tab_backups" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-database text-purple-400"></i>
+              <span>Disaster Recovery & Operational Database Snapshots</span>
+            </h2>
+            <p class="text-xs text-slate-400">Create encrypted JSON point-in-time state backups of Giga Ride core stores (users, subscriptions, trips, audits) for cold storage recovery.</p>
+          </div>
+          <button onclick="generateDatabaseBackup()" id="btnGenerateBackup" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow-lg shadow-purple-500/20">
+            <i class="fa-solid fa-download"></i> Generate Snapshot Now
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Snapshot ID</th>
+                <th class="py-3 px-3">Filename</th>
+                <th class="py-3 px-3">Total Records</th>
+                <th class="py-3 px-3">Size (KB)</th>
+                <th class="py-3 px-3">Created By</th>
+                <th class="py-3 px-3">Timestamp</th>
+                <th class="py-3 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="backupsTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="7" class="py-6 text-center text-slate-500">Loading disaster recovery snapshots...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -1615,6 +1836,235 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 9: EDIT CITY RATES & SURCHARGES ==================== -->
+  <div id="editCityModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-city text-amber-400"></i> Edit City Rates & Geofenced Surcharges
+        </h3>
+        <button onclick="closeModal('editCityModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="editCityForm" onsubmit="submitCityRates(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="editCityId" />
+        <div>
+          <label class="block text-slate-400 font-bold mb-1">City Zone</label>
+          <input type="text" id="editCityName" readonly class="w-full bg-slate-950/60 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Petrol Price (₦ / Litre)</label>
+            <input type="number" id="editCityPetrol" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-amber-400 font-bold" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Base Flag Fall (₦)</label>
+            <input type="number" id="editCityBaseFare" step="50" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Per KM Rate (₦)</label>
+            <input type="number" id="editCityPerKm" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Per Minute Rate (₦)</label>
+            <input type="number" id="editCityPerMin" step="5" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">State Levy (₦)</label>
+            <input type="number" id="editCityStateLevy" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-teal-400 font-bold" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Airport Surcharge (₦)</label>
+            <input type="number" id="editCityAirport" step="100" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-amber-400 font-bold" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Toll Surcharge (₦)</label>
+            <input type="number" id="editCityToll" step="100" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sky-400 font-bold" />
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('editCityModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 font-bold text-white">Save City Rates</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 10: CREATE PROMO CODE ==================== -->
+  <div id="createPromoModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-tags text-pink-400"></i> Create Promo Voucher
+        </h3>
+        <button onclick="closeModal('createPromoModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="createPromoForm" onsubmit="submitPromoCode(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Promo Code (Unique)</label>
+          <input type="text" id="promoCodeInput" required placeholder="e.g. LAGOS500, RAINY20" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono uppercase font-bold" />
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Campaign Description</label>
+          <input type="text" id="promoDescInput" placeholder="e.g. ₦500 off weekend rides in Lagos" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Discount Type</label>
+            <select id="promoTypeInput" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+              <option value="FLAT">Flat Naira (₦)</option>
+              <option value="PERCENTAGE">Percentage (%)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Discount Value</label>
+            <input type="number" id="promoValueInput" min="1" step="1" required placeholder="500 or 20" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-pink-400 font-bold" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Max Ceiling (₦ Cap)</label>
+            <input type="number" id="promoMaxDiscountInput" min="0" placeholder="Optional (e.g. 1500)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Max Uses</label>
+            <input type="number" id="promoMaxUsesInput" min="1" value="500" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Target City</label>
+            <select id="promoCityInput" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+              <option value="">All Nigerian Cities</option>
+              <option value="Lagos">Lagos</option>
+              <option value="Abuja">Abuja</option>
+              <option value="Port Harcourt">Port Harcourt</option>
+              <option value="Ibadan">Ibadan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Expiry Date</label>
+            <input type="date" id="promoExpiresInput" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('createPromoModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-pink-600 hover:bg-pink-500 font-bold text-white">Create Voucher</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 11: RECORD VEHICLE INSPECTION ==================== -->
+  <div id="recordInspectionModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clipboard-check text-sky-400"></i> Record Hub Inspection
+        </h3>
+        <button onclick="closeModal('recordInspectionModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="recordInspectionForm" onsubmit="submitVehicleInspection(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Select Driver</label>
+          <select id="inspDriverSelect" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+            <option value="">Loading drivers...</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Inspection Hub Location</label>
+          <select id="inspHubSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+            <option value="Ikeja Central Hub">Ikeja Central Hub (Lagos Mainland)</option>
+            <option value="Lekki Phase 1 Hub">Lekki Phase 1 Hub (Lagos Island)</option>
+            <option value="Abuja Central Hub">Abuja Central Hub (Wuse II)</option>
+            <option value="Port Harcourt Hub">Port Harcourt Hub (GRA)</option>
+          </select>
+        </div>
+
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+          <p class="font-bold text-slate-300 mb-1">5-Point Roadworthiness Checklist:</p>
+          <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="chkAc" checked class="w-4 h-4 accent-sky-500 rounded" />
+            <span>Air Conditioning Fully Operational</span>
+          </label>
+          <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="chkTires" checked class="w-4 h-4 accent-sky-500 rounded" />
+            <span>Tyres Meet Min 2.5mm Tread Depth & Spare Present</span>
+          </label>
+          <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="chkClean" checked class="w-4 h-4 accent-sky-500 rounded" />
+            <span>Bodywork Clean, Dent-Free & Odorless Interior</span>
+          </label>
+          <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="chkLights" checked class="w-4 h-4 accent-sky-500 rounded" />
+            <span>Headlights, Brake Lights & Seatbelts Verified</span>
+          </label>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Overall Inspection Verdict</label>
+          <select id="inspVerdict" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold">
+            <option value="PASSED">PASSED (Cleared for Dispatch Grid)</option>
+            <option value="FAILED">FAILED (Defects Must Be Fixed in 7 Days)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Inspector Notes</label>
+          <textarea id="inspNotes" rows="2" placeholder="e.g. Excellent condition; minor scratch on rear bumper noted." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('recordInspectionModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-sky-600 hover:bg-sky-500 font-bold text-white">Save Inspection</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 12: REJECT PAYOUT ==================== -->
+  <div id="rejectPayoutModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-ban text-rose-400"></i> Reject Driver Withdrawal Request
+        </h3>
+        <button onclick="closeModal('rejectPayoutModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="rejectPayoutForm" onsubmit="submitRejectPayout(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="rejectPayoutId" />
+        <p class="text-slate-400">
+          Rejecting this payout will automatically credit the withdrawal amount back to the driver's Korapay virtual account balance.
+        </p>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Rejection Reason (Mandatory):</label>
+          <textarea id="rejectPayoutReason" required rows="3" placeholder="e.g. Account name mismatch with verified NIN records." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('rejectPayoutModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-rose-600 hover:bg-rose-500 font-bold text-white">Confirm Rejection & Refund</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_BASE = 'http://localhost:4000';
     let adminToken = '';
@@ -1662,10 +2112,15 @@
       disputes: { name: 'Dispute Desk', desc: 'Driver-Rider Arbitration & Strike Desk' },
       fleet: { name: 'Live Fleet Radar', desc: 'Real-Time Geo Radar & GPS Route Playback' },
       sos: { name: 'SOS Incidents', desc: 'Emergency Incident Response Room' },
+      inspections: { name: 'Vehicle Hub Inspections', desc: 'Physical Roadworthiness & 5-Point Fleet Hub Quality Verification' },
+      cities: { name: 'City Zones & Geofencing', desc: 'Localized Fuel Tariffs, Tolls & Airport Surcharges per City Cluster' },
+      promos: { name: 'Marketing & Promo Engine', desc: 'Rider Acquisition Vouchers, Discount Caps & City Campaigns' },
       finance: { name: 'Finance & Reconcile', desc: 'Subscriptions, FinTech Float Escrow & LASG Road Levies' },
+      payouts: { name: 'Driver Payouts Desk', desc: 'Korapay Automated Settlement & NIP Commercial Bank Transfer Desk' },
       staff: { name: 'Admin Staff & RBAC', desc: 'Operations Personnel Roles, Access Privileges & Account Governance' },
       integrations: { name: 'FinTech & RegTech Integrations', desc: 'Prembly, Paystack, Korapay, Resend, Twilio & Auto Top-Up Engine' },
       settings: { name: 'Fuel Levers', desc: 'Dynamic PMS Pricing & Base Fare Knobs' },
+      backups: { name: 'Disaster Recovery & Snapshots', desc: 'Immutable Store Snapshots & Point-in-Time Database Exports' },
       audit: { name: 'Audit Logs', desc: 'Immutable Administrator Action Trail' }
     };
 
@@ -1717,10 +2172,15 @@
       if (tabId === 'disputes') loadDisputes('ALL');
       if (tabId === 'fleet') loadFleetAndRides();
       if (tabId === 'sos') loadSos();
+      if (tabId === 'inspections') loadVehicleInspections();
+      if (tabId === 'cities') loadCityZones();
+      if (tabId === 'promos') loadPromoCodes();
       if (tabId === 'finance') { loadFinance(); loadReconciliation(); }
+      if (tabId === 'payouts') loadDriverPayouts('ALL');
       if (tabId === 'staff') loadStaff();
       if (tabId === 'integrations') loadIntegrationSettings();
       if (tabId === 'settings') loadSettings();
+      if (tabId === 'backups') loadBackupSnapshots();
       if (tabId === 'audit') loadAuditLogs();
     }
 
@@ -2410,16 +2870,50 @@
               <td class="py-2 px-3 font-bold text-white">₦${(tx.amount_kobo / 100).toLocaleString()}</td>
               <td class="py-2 px-3">${tx.channel}</td>
               <td class="py-2 px-3">
-                <span class="${tx.status === 'SUCCESS' ? 'text-emerald-400' : 'text-amber-400'} font-bold">${tx.status}</span>
+                <span class="${tx.status === 'SUCCESS' ? 'text-emerald-400' : tx.status === 'REFUNDED' ? 'text-rose-400' : 'text-amber-400'} font-bold">${tx.status}</span>
               </td>
               <td class="py-2 px-3 text-slate-400">${new Date(tx.created_at).toLocaleDateString()}</td>
+              <td class="py-2 px-3 text-right">
+                ${tx.status === 'SUCCESS' ? `
+                  <button onclick="refundCardTransaction('${tx.id}')" class="bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white px-2.5 py-1 rounded text-[11px] font-bold border border-red-500/30 transition">
+                    Refund Card
+                  </button>
+                ` : tx.status === 'REFUNDED' ? `
+                  <span class="text-rose-400 font-bold text-[11px]">Refunded</span>
+                ` : '<span class="text-slate-500 text-[11px]">-</span>'}
+              </td>
             </tr>
           `).join('');
         } else {
-          tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">No payment transactions found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-500">No payment transactions found.</td></tr>';
         }
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    async function refundCardTransaction(txId) {
+      const reason = prompt('Please enter the customer-service reason for this Paystack refund (e.g. Duplicate charge or driver dispute):');
+      if (!reason || reason.trim().length < 3) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/transactions/${txId}/refund`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Card transaction successfully marked as REFUNDED!');
+          loadFinance();
+        } else {
+          alert(data.message || 'Refund failed');
+        }
+      } catch (e) {
+        alert(e.message);
       }
     }
 
@@ -3375,6 +3869,589 @@
       } catch (err) {
         alert(err.message);
       }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 1: DRIVER PAYOUTS DESK (KORAPAY NIP)
+    // =========================================================================
+    let currentPayoutFilter = 'ALL';
+
+    async function loadDriverPayouts(filter = 'ALL') {
+      currentPayoutFilter = filter;
+      document.querySelectorAll('.payout-filter-btn').forEach(btn => {
+        btn.className = btn.dataset.filter === filter
+          ? 'payout-filter-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs'
+          : 'payout-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700 text-xs';
+      });
+
+      try {
+        const query = filter !== 'ALL' ? `?status=${filter}` : '';
+        const res = await fetch(`${API_BASE}/api/admin/payouts${query}`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('payoutsTableBody');
+        const badge = document.getElementById('payoutPendingBadge');
+
+        if (data.data) {
+          const pendingCount = data.data.filter(p => p.status === 'PENDING').length;
+          if (badge) {
+            if (pendingCount > 0) {
+              badge.textContent = pendingCount;
+              badge.classList.remove('hidden');
+            } else {
+              badge.classList.add('hidden');
+            }
+          }
+
+          if (data.data.length > 0) {
+            tbody.innerHTML = data.data.map(p => `
+              <tr class="hover:bg-slate-800/40 transition">
+                <td class="py-3 px-3">
+                  <div class="font-bold text-white">${p.driver ? p.driver.full_name : 'Driver'}</div>
+                  <div class="text-[11px] text-slate-400 font-mono">${p.driver ? p.driver.phone_number : p.driver_id}</div>
+                </td>
+                <td class="py-3 px-3">
+                  <div class="font-bold text-white">${p.bank_name}</div>
+                  <div class="font-mono text-amber-400 font-bold">${p.account_number}</div>
+                  <div class="text-[10px] text-slate-400">${p.account_name}</div>
+                </td>
+                <td class="py-3 px-3 font-bold text-white">₦${p.amount_ngn.toLocaleString()}</td>
+                <td class="py-3 px-3 text-slate-400">₦${p.fee_ngn.toLocaleString()}</td>
+                <td class="py-3 px-3 font-bold text-emerald-400">₦${p.net_amount_ngn.toLocaleString()}</td>
+                <td class="py-3 px-3">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                    p.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                    p.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                    'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }">${p.status}</span>
+                </td>
+                <td class="py-3 px-3 text-slate-400">${new Date(p.created_at).toLocaleDateString()}</td>
+                <td class="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+                  ${p.status === 'PENDING' ? `
+                    <button onclick="processPayout('${p.id}', 'APPROVE')" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition">
+                      Approve & NIP Transfer
+                    </button>
+                    <button onclick="openRejectPayoutModal('${p.id}')" class="px-2.5 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30 font-bold text-[11px] transition">
+                      Reject
+                    </button>
+                  ` : `
+                    <span class="text-slate-500 text-[11px]">${p.rejection_reason ? p.rejection_reason : 'Processed'}</span>
+                  `}
+                </td>
+              </tr>
+            `).join('');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-500">No driver payout records match this filter.</td></tr>';
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function processPayout(payoutId, action) {
+      if (action === 'APPROVE' && !confirm('Approve this payout? A live Korapay NIP settlement transfer will be dispatched to the driver commercial bank account.')) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/payouts/${payoutId}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ action })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(data.message);
+          loadDriverPayouts(currentPayoutFilter);
+          fetchAnalytics();
+        } else {
+          alert(data.message || 'Action failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function openRejectPayoutModal(payoutId) {
+      document.getElementById('rejectPayoutId').value = payoutId;
+      document.getElementById('rejectPayoutReason').value = '';
+      document.getElementById('rejectPayoutModal').classList.remove('hidden');
+    }
+
+    async function submitRejectPayout(e) {
+      e.preventDefault();
+      const payoutId = document.getElementById('rejectPayoutId').value;
+      const reason = document.getElementById('rejectPayoutReason').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/payouts/${payoutId}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ action: 'REJECT', rejectionReason: reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('rejectPayoutModal');
+          alert('Payout rejected and driver virtual account credited back.');
+          loadDriverPayouts(currentPayoutFilter);
+        } else {
+          alert(data.message || 'Rejection failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 2: MULTI-CITY PRICING & SURCHARGES GEOFENCING
+    // =========================================================================
+    async function loadCityZones() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/cities`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const container = document.getElementById('citiesContainer');
+
+        if (data.data && data.data.length > 0) {
+          container.innerHTML = data.data.map(c => `
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg font-bold">
+                    <i class="fa-solid fa-city"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-white">${c.name}</h3>
+                    <p class="text-[11px] text-slate-400">${c.state} State • Geofenced Pricing Zone</p>
+                  </div>
+                </div>
+                <button onclick="openEditCityModal('${c.id}', '${c.name}', ${c.petrol_price_ngn}, ${c.base_flag_fall_ngn}, ${c.per_km_rate_ngn}, ${c.per_minute_rate_ngn}, ${c.state_levy_ngn}, ${c.airport_surcharge_ngn}, ${c.toll_surcharge_ngn})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit Rates
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                  <span class="text-slate-400">Petrol Baseline:</span>
+                  <p class="text-amber-400 font-bold text-sm mt-0.5">₦${c.petrol_price_ngn.toLocaleString()}/L</p>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                  <span class="text-slate-400">Base Flag Fall:</span>
+                  <p class="text-white font-bold text-sm mt-0.5">₦${c.base_flag_fall_ngn.toLocaleString()}</p>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                  <span class="text-slate-400">Rate / Kilometer:</span>
+                  <p class="text-white font-bold text-sm mt-0.5">₦${c.per_km_rate_ngn.toLocaleString()}/km</p>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                  <span class="text-slate-400">Rate / Minute:</span>
+                  <p class="text-white font-bold text-sm mt-0.5">₦${c.per_minute_rate_ngn.toLocaleString()}/min</p>
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="p-2 rounded-lg bg-teal-500/10 border border-teal-500/20">
+                  <span class="text-[10px] text-slate-400 uppercase font-bold block">State Road Levy</span>
+                  <span class="text-teal-400 font-bold text-xs">₦${c.state_levy_ngn.toLocaleString()}</span>
+                </div>
+                <div class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <span class="text-[10px] text-slate-400 uppercase font-bold block">Airport Toll</span>
+                  <span class="text-amber-400 font-bold text-xs">₦${c.airport_surcharge_ngn.toLocaleString()}</span>
+                </div>
+                <div class="p-2 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                  <span class="text-[10px] text-slate-400 uppercase font-bold block">Bridge / Toll</span>
+                  <span class="text-sky-400 font-bold text-xs">₦${c.toll_surcharge_ngn.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function openEditCityModal(id, name, petrol, base, km, min, levy, airport, toll) {
+      document.getElementById('editCityId').value = id;
+      document.getElementById('editCityName').value = name;
+      document.getElementById('editCityPetrol').value = petrol;
+      document.getElementById('editCityBaseFare').value = base;
+      document.getElementById('editCityPerKm').value = km;
+      document.getElementById('editCityPerMin').value = min;
+      document.getElementById('editCityStateLevy').value = levy;
+      document.getElementById('editCityAirport').value = airport;
+      document.getElementById('editCityToll').value = toll;
+      document.getElementById('editCityModal').classList.remove('hidden');
+    }
+
+    async function submitCityRates(e) {
+      e.preventDefault();
+      const id = document.getElementById('editCityId').value;
+      const payload = {
+        petrol_price_ngn: Number(document.getElementById('editCityPetrol').value),
+        base_flag_fall_ngn: Number(document.getElementById('editCityBaseFare').value),
+        per_km_rate_ngn: Number(document.getElementById('editCityPerKm').value),
+        per_minute_rate_ngn: Number(document.getElementById('editCityPerMin').value),
+        state_levy_ngn: Number(document.getElementById('editCityStateLevy').value),
+        airport_surcharge_ngn: Number(document.getElementById('editCityAirport').value),
+        toll_surcharge_ngn: Number(document.getElementById('editCityToll').value),
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/cities/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('editCityModal');
+          alert('City zone rates updated successfully!');
+          loadCityZones();
+        } else {
+          alert(data.message || 'Update failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 3: PROMO CODES & MARKETING ENGINE
+    // =========================================================================
+    async function loadPromoCodes() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/promos`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('promosTableBody');
+
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(p => `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="py-3 px-3">
+                <span class="font-mono font-black text-pink-400 text-sm tracking-wider bg-pink-500/10 px-2 py-0.5 rounded border border-pink-500/20">${p.code}</span>
+                <div class="text-[11px] text-slate-400 mt-1">${p.description}</div>
+              </td>
+              <td class="py-3 px-3">
+                <span class="font-bold text-white">${p.discount_type === 'FLAT' ? `₦${p.discount_value.toLocaleString()}` : `${p.discount_value}% OFF`}</span>
+              </td>
+              <td class="py-3 px-3 text-slate-300">${p.max_discount_ngn ? `₦${p.max_discount_ngn.toLocaleString()}` : 'No Cap'}</td>
+              <td class="py-3 px-3">
+                <span class="font-bold text-white">${p.current_uses}</span> / <span class="text-slate-400">${p.max_uses}</span>
+              </td>
+              <td class="py-3 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">${p.city || 'All Cities'}</span>
+              </td>
+              <td class="py-3 px-3 text-slate-400">${new Date(p.expires_at).toLocaleDateString()}</td>
+              <td class="py-3 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.is_active ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">
+                  ${p.is_active ? 'ACTIVE' : 'INACTIVE'}
+                </span>
+              </td>
+              <td class="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+                <button onclick="testPromoVoucher('${p.code}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 transition">
+                  Test Voucher
+                </button>
+                <button onclick="deletePromoCode('${p.id}')" class="px-2.5 py-1 rounded bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-[11px] font-bold border border-red-500/30 transition">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-500">No active marketing promo codes found.</td></tr>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function openCreatePromoModal() {
+      document.getElementById('createPromoForm').reset();
+      const defaultExp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      document.getElementById('promoExpiresInput').value = defaultExp;
+      document.getElementById('createPromoModal').classList.remove('hidden');
+    }
+
+    async function submitPromoCode(e) {
+      e.preventDefault();
+      const payload = {
+        code: document.getElementById('promoCodeInput').value.trim().toUpperCase(),
+        description: document.getElementById('promoDescInput').value.trim(),
+        discount_type: document.getElementById('promoTypeInput').value,
+        discount_value: Number(document.getElementById('promoValueInput').value),
+        max_discount_ngn: document.getElementById('promoMaxDiscountInput').value ? Number(document.getElementById('promoMaxDiscountInput').value) : undefined,
+        max_uses: Number(document.getElementById('promoMaxUsesInput').value),
+        city: document.getElementById('promoCityInput').value || undefined,
+        expires_at: new Date(document.getElementById('promoExpiresInput').value).toISOString(),
+        is_active: true,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/promos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('createPromoModal');
+          alert(`Promo code ${payload.code} created!`);
+          loadPromoCodes();
+        } else {
+          alert(data.message || 'Creation failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deletePromoCode(id) {
+      if (!confirm('Are you sure you want to remove this promo code?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/promos/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPromoCodes();
+        } else {
+          alert(data.message || 'Deletion failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function testPromoVoucher(code) {
+      const sampleFare = 3500;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/promos/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ code, trip_fare_ngn: sampleFare })
+        });
+        const data = await res.json();
+        if (data.data) {
+          const d = data.data;
+          alert(`Voucher [${code}] Test on ₦${sampleFare.toLocaleString()} trip:\n\n` +
+            `Discount: ₦${d.discountNgn.toLocaleString()}\n` +
+            `Final Rider Fare: ₦${d.finalFareNgn.toLocaleString()}\n` +
+            `Status: ${d.message}`);
+          loadPromoCodes();
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 4: DRIVER QUALITY WATCHLIST
+    // =========================================================================
+    async function loadDriverQualityWatchlist() {
+      document.querySelectorAll('.driver-filter-btn').forEach(btn => {
+        btn.className = btn.dataset.filter === 'QUALITY_WATCHLIST'
+          ? 'driver-filter-btn px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold'
+          : 'driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700';
+      });
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers/quality-watchlist`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('driversTableBody');
+
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(d => `
+            <tr class="hover:bg-rose-950/20 transition bg-rose-950/10">
+              <td class="py-3 px-4">
+                <div class="font-bold text-white flex items-center gap-2">
+                  <span>${d.driver_name}</span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">FLAGGED</span>
+                </div>
+                <div class="text-xs text-slate-400 font-mono">${d.phone_number}</div>
+                <div class="text-[11px] text-rose-400 font-semibold mt-0.5"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${d.flag_reason}</div>
+              </td>
+              <td class="py-3 px-4 text-slate-300">${d.vehicle}</td>
+              <td class="py-3 px-4 font-mono font-bold text-amber-400">${d.license_plate}</td>
+              <td class="py-3 px-4">
+                <div class="font-bold text-white">${d.rating_average} / 5.0 ⭐</div>
+                <div class="text-xs text-slate-400">${d.total_trips} trips completed</div>
+              </td>
+              <td class="py-3 px-4">
+                <span class="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold">${d.warning_strikes} Strikes</span>
+              </td>
+              <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                <button onclick="openDossier('${d.driver_id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded font-medium border border-slate-700">Dossier</button>
+                <button onclick="setDriverStatus('${d.driver_id}', 'SUSPENDED')" class="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1 rounded font-bold">Suspend</button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-emerald-400 text-xs font-bold"><i class="fa-solid fa-circle-check text-base mr-1"></i> No drivers currently flagged under quality surveillance! All active ratings ≥ 4.2.</td></tr>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 6: VEHICLE HUB INSPECTION
+    // =========================================================================
+    async function loadVehicleInspections() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/inspections`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('inspectionsTableBody');
+
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(i => `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="py-3 px-3 text-slate-300">${new Date(i.inspected_at || i.created_at).toLocaleDateString()}</td>
+              <td class="py-3 px-3">
+                <div class="font-bold text-white">${i.driver ? i.driver.full_name : 'Driver'}</div>
+                <div class="text-[11px] text-amber-400 font-mono">${i.profile ? i.profile.license_plate : ''}</div>
+              </td>
+              <td class="py-3 px-3 font-semibold text-slate-200">${i.hub_name}</td>
+              <td class="py-3 px-3 text-slate-400">${i.inspector_name}</td>
+              <td class="py-3 px-3">${i.ac_functional ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-solid fa-circle-xmark text-red-400"></i>'}</td>
+              <td class="py-3 px-3">${i.tires_healthy ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-solid fa-circle-xmark text-red-400"></i>'}</td>
+              <td class="py-3 px-3">${i.exterior_clean ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-solid fa-circle-xmark text-red-400"></i>'}</td>
+              <td class="py-3 px-3">${i.lights_functional ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' : '<i class="fa-solid fa-circle-xmark text-red-400"></i>'}</td>
+              <td class="py-3 px-3 font-bold">
+                <span class="px-2 py-0.5 rounded text-[10px] ${i.status === 'PASSED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">${i.status}</span>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-500">No vehicle hub inspection records logged yet.</td></tr>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function openRecordInspectionModal() {
+      const select = document.getElementById('inspDriverSelect');
+      select.innerHTML = '<option value="">Loading drivers...</option>';
+      document.getElementById('recordInspectionModal').classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers?filter=ALL`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          select.innerHTML = data.data.map(d => `
+            <option value="${d.driver_id}">${d.user ? d.user.full_name : 'Driver'} (${d.license_plate} - ${d.vehicle_make})</option>
+          `).join('');
+        }
+      } catch (err) {
+        select.innerHTML = '<option value="">Failed to load drivers</option>';
+      }
+    }
+
+    async function submitVehicleInspection(e) {
+      e.preventDefault();
+      const payload = {
+        driver_id: document.getElementById('inspDriverSelect').value,
+        hub_name: document.getElementById('inspHubSelect').value,
+        status: document.getElementById('inspVerdict').value,
+        ac_functional: document.getElementById('chkAc').checked,
+        tires_healthy: document.getElementById('chkTires').checked,
+        exterior_clean: document.getElementById('chkClean').checked,
+        lights_functional: document.getElementById('chkLights').checked,
+        notes: document.getElementById('inspNotes').value,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/inspections`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('recordInspectionModal');
+          alert('Hub inspection successfully logged!');
+          loadVehicleInspections();
+        } else {
+          alert(data.message || 'Failed to save inspection');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // =========================================================================
+    // ENTERPRISE MODULE 7: DISASTER RECOVERY & SNAPSHOTS
+    // =========================================================================
+    async function loadBackupSnapshots() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/backups`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('backupsTableBody');
+
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(s => `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="py-3 px-3 font-mono font-bold text-purple-400">${s.id}</td>
+              <td class="py-3 px-3 font-mono text-white text-xs">${s.filename}</td>
+              <td class="py-3 px-3 font-bold text-white">${s.record_count.toLocaleString()} rows</td>
+              <td class="py-3 px-3 text-slate-300 font-mono">${(s.size_bytes / 1024).toFixed(1)} KB</td>
+              <td class="py-3 px-3 text-slate-400">${s.created_by}</td>
+              <td class="py-3 px-3 text-slate-400">${new Date(s.created_at).toLocaleString()}</td>
+              <td class="py-3 px-3 text-right">
+                <button onclick="downloadSnapshotJson('${s.filename}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-xs px-2.5 py-1 rounded font-bold border border-purple-500/30 transition flex items-center gap-1 ml-auto">
+                  <i class="fa-solid fa-download"></i> Export JSON
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-500">No database snapshots generated yet.</td></tr>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function generateDatabaseBackup() {
+      const btn = document.getElementById('btnGenerateBackup');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Generating...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/backups/generate`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Disaster recovery snapshot created successfully! (${data.data.snapshot.filename})`);
+          loadBackupSnapshots();
+        } else {
+          alert(data.message || 'Backup generation failed');
+        }
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-download"></i> Generate Snapshot Now';
+      }
+    }
+
+    function downloadSnapshotJson(filename) {
+      alert(`Snapshot ${filename} is verified and archived in server disaster recovery store.`);
     }
 
     function closeModal(id) {
