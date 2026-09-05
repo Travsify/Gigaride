@@ -203,7 +203,7 @@ class _RadarScreenState extends State<RadarScreen> {
                       const Icon(Icons.near_me, size: 16, color: AppConstants.accentColor),
                       const SizedBox(width: 4),
                       Text(
-                        '${pickupDist} km away to pickup',
+                        '$pickupDist km away to pickup',
                         style: const TextStyle(color: AppConstants.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ],

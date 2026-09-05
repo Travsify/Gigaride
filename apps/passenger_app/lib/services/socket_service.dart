@@ -1,8 +1,8 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../core/constants.dart';
 
 class SocketService {
-  IO.Socket? socket;
+  io.Socket? socket;
   bool isConnected = false;
 
   void connect(
@@ -13,9 +13,9 @@ class SocketService {
   }) {
     disconnect();
 
-    socket = IO.io(
+    socket = io.io(
       AppConstants.defaultSocketUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
           .setAuth({'token': token})
