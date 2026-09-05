@@ -6,18 +6,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REVERSE PROXY: Forward all /api/* and /socket.io/* requests to the backend
-// running on localhost:4000.  This means the browser only ever needs to reach
-// port 3000 — the server handles the tunnel to port 4000 internally.
+// REVERSE PROXY: Forward all /api/*, /socket.io/*, and /health requests to the
+// backend running on localhost:4000.
+// We use pathFilter directly in createProxyMiddleware so Express does NOT strip
+// the '/api' prefix from req.url.
 // ─────────────────────────────────────────────────────────────────────────────
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
 app.use(
-  '/api',
   createProxyMiddleware({
     target: BACKEND_URL,
     changeOrigin: true,
-    ws: false,
+    ws: true,
+    pathFilter: ['/api', '/socket.io', '/health'],
     on: {
       error: (err, req, res) => {
         console.error('[Proxy Error]', err.message);
@@ -26,15 +27,6 @@ app.use(
         }
       },
     },
-  })
-);
-
-app.use(
-  '/socket.io',
-  createProxyMiddleware({
-    target: BACKEND_URL,
-    changeOrigin: true,
-    ws: true,
   })
 );
 
