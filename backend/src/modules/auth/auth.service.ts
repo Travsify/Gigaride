@@ -95,6 +95,14 @@ export class AuthService {
     if (!user) {
       user = await db.findUserByEmail(dto.identifier);
     }
+    if (!user && dto.identifier.toLowerCase().includes('@giga.internal')) {
+      const alias = dto.identifier.toLowerCase().replace('@giga.internal', '@gigaride.ng');
+      user = await db.findUserByEmail(alias);
+    }
+    if (!user && dto.identifier.toLowerCase().includes('@gigaride.ng')) {
+      const alias = dto.identifier.toLowerCase().replace('@gigaride.ng', '@giga.internal');
+      user = await db.findUserByEmail(alias);
+    }
 
     if (!user) {
       throw new Error('Invalid phone/email or password.');

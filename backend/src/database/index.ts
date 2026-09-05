@@ -641,10 +641,24 @@ export class DatabaseService {
         admin_role: 'SUPER_ADMIN' as AdminRole,
       },
       {
+        email: 'admin@giga.internal',
+        password: 'admin_password_2026',
+        full_name: 'Lead Super Admin (Internal)',
+        phone_number: '08000000011',
+        admin_role: 'SUPER_ADMIN' as AdminRole,
+      },
+      {
         email: 'kyc@gigaride.ng',
         password: 'kyc_password_2026',
         full_name: 'Lead KYC Officer',
         phone_number: '08000000002',
+        admin_role: 'KYC_OFFICER' as AdminRole,
+      },
+      {
+        email: 'kyc@giga.internal',
+        password: 'kyc_password_2026',
+        full_name: 'Lead KYC Officer (Internal)',
+        phone_number: '08000000012',
         admin_role: 'KYC_OFFICER' as AdminRole,
       },
       {
@@ -655,10 +669,24 @@ export class DatabaseService {
         admin_role: 'SUPPORT_AGENT' as AdminRole,
       },
       {
+        email: 'support@giga.internal',
+        password: 'support_password_2026',
+        full_name: 'Senior Support Agent (Internal)',
+        phone_number: '08000000013',
+        admin_role: 'SUPPORT_AGENT' as AdminRole,
+      },
+      {
         email: 'finance@gigaride.ng',
         password: 'finance_password_2026',
         full_name: 'Finance & Treasury Admin',
         phone_number: '08000000004',
+        admin_role: 'FINANCE_ADMIN' as AdminRole,
+      },
+      {
+        email: 'finance@giga.internal',
+        password: 'finance_password_2026',
+        full_name: 'Finance & Treasury Admin (Internal)',
+        phone_number: '08000000014',
         admin_role: 'FINANCE_ADMIN' as AdminRole,
       },
     ];
