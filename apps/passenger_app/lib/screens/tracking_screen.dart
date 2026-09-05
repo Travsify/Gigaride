@@ -17,6 +17,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   bool _walletPaymentSuccess = false;
   bool _isSettlingWallet = false;
   bool _sosDispatched = false;
+  int _driverRating = 5;
+  int? _selectedTip;
 
   void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver) {
     final phone = driver?['driverPhone'] ?? driver?['phone'] ?? '+234 800 000 0000';
@@ -258,7 +260,68 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+
+                // Rating & Zero-Commission Driver Tip Card
+                Container(
+                  margin: const EdgeInsets.only(top: 14),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppConstants.cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Rate your Trip Experience', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final star = index + 1;
+                          return IconButton(
+                            icon: Icon(
+                              star <= _driverRating ? Icons.star_rounded : Icons.star_border_rounded,
+                              color: star <= _driverRating ? Colors.amberAccent : AppConstants.textMuted,
+                              size: 28,
+                            ),
+                            onPressed: () => setState(() => _driverRating = star),
+                          );
+                        }),
+                      ),
+                      const Divider(color: Colors.white10, height: 16),
+                      const Text('Add 100% Zero-Commission Driver Tip', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [200, 500, 1000].map((tipAmt) {
+                          final isSelected = _selectedTip == tipAmt;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: ActionChip(
+                              backgroundColor: isSelected ? AppConstants.primaryColor : AppConstants.surfaceBg,
+                              label: Text('+₦$tipAmt', style: TextStyle(color: isSelected ? Colors.white : AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                setState(() => _selectedTip = isSelected ? null : tipAmt);
+                                if (!isSelected) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Added ₦$tipAmt tip! 100% will go directly to your driver.'),
+                                      backgroundColor: AppConstants.successColor,
+                                      duration: const Duration(seconds: 2),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 18),
 
                 // Pay With Living Wallet Button (if not already settled)
                 if (!_walletPaymentSuccess) ...[

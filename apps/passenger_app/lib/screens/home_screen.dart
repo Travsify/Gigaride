@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../core/constants.dart';
@@ -22,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final _dropoffCtrl = TextEditingController();
   final _offerCtrl = TextEditingController();
   final _flightCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _corporateTagCtrl = TextEditingController();
 
   // Active coordinates (default center: Lagos Mainland / Island corridor)
   final double _pickupLat = 6.5244;
@@ -31,6 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
   DateTime? _scheduledDateTime;
+  bool _isCorporateMode = false;
+  bool _showNotesField = false;
 
   final List<Map<String, dynamic>> _quickDestinations = [
     {
@@ -69,7 +74,145 @@ class _HomeScreenState extends State<HomeScreen> {
     _dropoffCtrl.dispose();
     _offerCtrl.dispose();
     _flightCtrl.dispose();
+    _notesCtrl.dispose();
+    _corporateTagCtrl.dispose();
     super.dispose();
+  }
+
+  void _showOfflineBookingModal(BuildContext context) {
+    final pickup = _pickupCtrl.text.trim().isNotEmpty ? _pickupCtrl.text.trim() : 'Current Location';
+    final dropoff = _dropoffCtrl.text.trim().isNotEmpty ? _dropoffCtrl.text.trim() : 'Destination';
+    final fare = _offerCtrl.text.trim().isNotEmpty ? _offerCtrl.text.trim() : 'Agreed Fare';
+    final bookingMsg = 'Hello Giga Ride! Requesting ride from *$pickup* to *$dropoff*. Offer: ₦$fare';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppConstants.accentColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.offline_bolt_rounded, color: AppConstants.accentColor, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Low Data & Offline Booking', style: TextStyle(color: AppConstants.textLight, fontSize: 17, fontWeight: FontWeight.bold)),
+                        Text('Book without mobile internet or on slow network', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // WhatsApp AI Dispatcher
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.chat_bubble_outline_rounded, color: Colors.greenAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text('WhatsApp AI Automated Dispatch', style: TextStyle(color: Colors.greenAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Transmits your trip request directly to Giga WhatsApp AI Dispatcher (+234 810 000 GIGA) for automated driver matching.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
+                        label: const Text('Copy Booking Text for WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: bookingMsg));
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Copied booking request! Paste in WhatsApp to +234 810 000 GIGA'),
+                              backgroundColor: Color(0xFF25D366),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // USSD Instant Shortcode
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.dialpad_rounded, color: AppConstants.accentColor, size: 18),
+                        SizedBox(width: 8),
+                        Text('Instant USSD Dial (*384*234#)', style: TextStyle(color: AppConstants.accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text('Works with zero data on all Nigerian mobile telecom lines (MTN, Airtel, Glo, 9mobile).', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(side: const BorderSide(color: AppConstants.accentColor)),
+                        icon: const Icon(Icons.call, color: AppConstants.accentColor, size: 16),
+                        label: const Text('Copy USSD Code *384*234#', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                        onPressed: () {
+                          Clipboard.setData(const ClipboardData(text: '*384*234#'));
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('USSD *384*234# copied! Open your phone dialer to book instantly.'),
+                              backgroundColor: AppConstants.primaryColor,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _selectQuickDestination(Map<String, dynamic> dest) {
@@ -271,6 +414,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // On-Demand City Ride Handling
     try {
+      final noteText = _notesCtrl.text.trim();
+      final corpTag = _corporateTagCtrl.text.trim();
+      final fullNotes = _isCorporateMode && corpTag.isNotEmpty
+          ? '[Corporate: $corpTag] $noteText'.trim()
+          : (noteText.isNotEmpty ? noteText : null);
+
       await provider.submitRideRequest(
         pickupLat: _pickupLat,
         pickupLng: _pickupLng,
@@ -279,6 +428,8 @@ class _HomeScreenState extends State<HomeScreen> {
         dropoffLng: _dropoffLng,
         dropoffAddress: dropoffText,
         riderOfferNgn: offer > 0 ? offer : 2500,
+        notes: fullNotes,
+        isBusiness: _isCorporateMode,
       );
 
       if (mounted) {
@@ -360,23 +511,67 @@ class _HomeScreenState extends State<HomeScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const Row(
-                          children: [
-                            Icon(Icons.circle, color: AppConstants.successColor, size: 7),
-                            SizedBox(width: 4),
-                            Text(
-                              'Zero Commission Network',
-                              style: TextStyle(
-                                color: AppConstants.textMuted,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                        GestureDetector(
+                          onTap: () {
+                            setState(() => _isCorporateMode = !_isCorporateMode);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(_isCorporateMode ? '🏢 Business Profile Active: Corporate expense tracking enabled.' : '🟢 Personal Profile Active: Standard zero-commission trips.'),
+                                backgroundColor: _isCorporateMode ? AppConstants.primaryColor : AppConstants.successColor,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
                               ),
-                            ),
-                          ],
+                            );
+                          },
+                          child: Row(
+                            children: [
+                              Icon(Icons.circle, color: _isCorporateMode ? Colors.cyanAccent : AppConstants.successColor, size: 7),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isCorporateMode ? '🏢 Business Mode' : '🟢 Personal • 0% Cut',
+                                style: TextStyle(
+                                  color: _isCorporateMode ? Colors.cyanAccent : AppConstants.textMuted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Icon(Icons.sync_alt_rounded, size: 10, color: AppConstants.textMuted),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
+
+                  // Offline / Low-Data Booking Pill
+                  GestureDetector(
+                    onTap: () => _showOfflineBookingModal(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 13),
+                          SizedBox(width: 3),
+                          Text(
+                            'Offline',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 6),
 
                   // Living Wallet Balance Pill
                   GestureDetector(
@@ -530,6 +725,31 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 8),
                           _buildCategoryPill('INTERSTATE', '🛣️ Interstate', Icons.alt_route_rounded),
                         ],
+                      ),
+                    ),
+
+                    // Decacorn Fuel Index & Savings Moat Ticker
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0C2422),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.local_gas_station_rounded, color: AppConstants.accentColor, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'PMS Fuel Moat: ₦1,050/L • You save ~₦750/trip vs 25% commission apps (100% to driver)',
+                                style: TextStyle(color: AppConstants.textLight.withOpacity(0.9), fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -687,6 +907,88 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                 ],
+                              ),
+                            ],
+
+                            // Corporate Billing Department Code
+                            if (_isCorporateMode) ...[
+                              const Divider(color: AppConstants.surfaceBg, height: 18),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Colors.cyan.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.corporate_fare_rounded, color: Colors.cyanAccent, size: 12),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _corporateTagCtrl,
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                      decoration: const InputDecoration(
+                                        hintText: 'Cost Center / Dept Tag (e.g. Audit, Sales)',
+                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+
+                            // Driver Instructions / Gate Notes
+                            if (_showNotesField) ...[
+                              const Divider(color: AppConstants.surfaceBg, height: 18),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.accentColor.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.notes_rounded, color: AppConstants.accentColor, size: 12),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _notesCtrl,
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                      decoration: const InputDecoration(
+                                        hintText: 'Note for driver (e.g. Call at gate, 2 bags)',
+                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 14, color: AppConstants.textMuted),
+                                    onPressed: () => setState(() => _showNotesField = false),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _showNotesField = true),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.add_circle_outline_rounded, color: AppConstants.primaryLight, size: 13),
+                                      SizedBox(width: 4),
+                                      Text('Add Gate Note / Driver Instructions', style: TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ],

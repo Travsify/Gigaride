@@ -111,6 +111,8 @@ class PassengerProvider with ChangeNotifier {
     required double dropoffLng,
     required String dropoffAddress,
     required int riderOfferNgn,
+    String? notes,
+    bool isBusiness = false,
   }) async {
     isLoading = true;
     incomingBids.clear();
@@ -126,6 +128,8 @@ class PassengerProvider with ChangeNotifier {
         dropoffLng: dropoffLng,
         dropoffAddress: dropoffAddress,
         riderOfferNgn: riderOfferNgn,
+        notes: notes,
+        isBusiness: isBusiness,
       );
 
       // Broadcast ride request to nearby drivers via Socket.io

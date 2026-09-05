@@ -108,6 +108,8 @@ class ApiService {
     required double dropoffLng,
     required String dropoffAddress,
     required int riderOfferNgn,
+    String? notes,
+    bool isBusiness = false,
   }) async {
     final token = await getToken();
     final response = await http.post(
@@ -124,6 +126,8 @@ class ApiService {
         'dropoffLng': dropoffLng,
         'dropoffAddress': dropoffAddress,
         'riderOfferNgn': riderOfferNgn,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (isBusiness) 'isBusiness': true,
       }),
     );
 
