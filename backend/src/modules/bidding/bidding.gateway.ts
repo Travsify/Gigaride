@@ -47,6 +47,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
       socket.emit('subscription:status', subStatus);
     } else if (user.role === 'PASSENGER') {
       socket.join('passengers_pool');
+    } else if (user.role === 'ADMIN') {
+      socket.join('admin_room');
     }
 
     // --- Driver Location Updates & Entitlement Refresh ---
@@ -75,11 +77,14 @@ export function setupBiddingGateway(io: SocketIOServer) {
           return;
         }
 
+        const settings = await db.getPlatformSettings();
+        const radius = settings.search_radius_km || 7.0;
+
         // Find nearby eligible drivers (has active subscription and remaining rides)
         const nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
           ride.pickup_lat,
           ride.pickup_lng,
-          7.0 // 7km radius in Nigerian cities
+          radius
         );
 
         console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible nearby drivers.`);
@@ -245,6 +250,37 @@ export function setupBiddingGateway(io: SocketIOServer) {
             finalFareNgn: ride.agreed_fare_ngn,
           });
         }
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // --- Emergency SOS Trigger (Passenger or Driver) ---
+    socket.on('ride:sos_trigger', async (data: { rideId: string; latitude: number; longitude: number; notes?: string }) => {
+      try {
+        const ride = await db.getRideById(data.rideId);
+        const incident = await db.createSosIncident({
+          id: `sos_${Date.now()}_${user.userId.slice(0, 5)}`,
+          ride_id: data.rideId,
+          driver_id: ride?.driver_id ?? undefined,
+          rider_id: ride?.rider_id ?? user.userId,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          status: 'OPEN',
+          notes: data.notes || 'Emergency SOS triggered from mobile app',
+          created_at: new Date().toISOString(),
+        });
+
+        console.log(`🚨 [EMERGENCY SOS ALERT] Ride ${data.rideId} triggered by ${user.userId}!`);
+
+        // Broadcast to Admin room in real-time
+        io.to('admin_room').emit('admin:sos_alert', {
+          incident,
+          ride,
+          triggeredByRole: user.role,
+        });
+
+        socket.emit('sos:acknowledged', { success: true, incidentId: incident.id });
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }

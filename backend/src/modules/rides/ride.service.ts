@@ -1,21 +1,21 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db, RideRow } from '../../database';
-import { calculateSuggestedFare } from '../../common/fareCalculator';
+import { calculateSuggestedFare, calculateSuggestedFareWithDb } from '../../common/fareCalculator';
 import { CreateRideRequestDto } from './ride.types';
 
 export class RideService {
   /**
    * Calculates real fare estimate with floor guardrails.
    */
-  public getFareEstimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number) {
-    return calculateSuggestedFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  public async getFareEstimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number) {
+    return calculateSuggestedFareWithDb(pickupLat, pickupLng, dropoffLat, dropoffLng);
   }
 
   /**
    * Creates a ride request in NEGOTIATING status.
    */
   public async createRide(riderId: string, dto: CreateRideRequestDto): Promise<RideRow> {
-    const estimate = calculateSuggestedFare(
+    const estimate = await calculateSuggestedFareWithDb(
       dto.pickupLat,
       dto.pickupLng,
       dto.dropoffLat,

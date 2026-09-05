@@ -22,8 +22,12 @@ export interface DriverProfileRow {
   license_plate: string;
   vehicle_color: string;
   kyc_status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_reason?: string | null;
+  account_status: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   nin?: string;
   bvn?: string;
+  rating_average: number;
+  total_trips_completed: number;
   is_online: boolean;
   created_at: string;
 }
@@ -47,6 +51,17 @@ export interface DriverSubscriptionRow {
   remaining_rides: number; // e.g. 50, 0, or down to -2 for grace
   starts_at: string;
   expires_at: string;
+  created_at: string;
+}
+
+export interface SubscriptionCreditAuditRow {
+  id: string;
+  admin_id: string;
+  driver_id: string;
+  rides_added: number;
+  previous_rides: number;
+  new_rides: number;
+  reason: string;
   created_at: string;
 }
 
@@ -91,21 +106,56 @@ export interface PaymentTransactionRow {
   created_at: string;
 }
 
+export interface SosIncidentRow {
+  id: string;
+  ride_id: string;
+  driver_id?: string;
+  rider_id: string;
+  latitude: number;
+  longitude: number;
+  status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
+  notes?: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
+export interface PlatformSettingsRow {
+  petrol_price_ngn: number;
+  base_flag_fall_ngn: number;
+  per_km_rate_ngn: number;
+  per_minute_rate_ngn: number;
+  lagos_mot_levy_ngn: number;
+  welcome_bonus_rides: number;
+  search_radius_km: number;
+  updated_at: string;
+}
+
 export class DatabaseService {
   private static instance: DatabaseService;
   private pgPool: Pool | null = null;
   private isPostgresConnected = false;
 
-  // Local persistent state file for seamless offline development
   private dbFilePath = path.join(__dirname, '../../../data_store.json');
   private store = {
     users: [] as UserRow[],
     driver_profiles: [] as DriverProfileRow[],
     subscription_plans: [] as SubscriptionPlanRow[],
     driver_subscriptions: [] as DriverSubscriptionRow[],
+    subscription_credit_audits: [] as SubscriptionCreditAuditRow[],
     rides: [] as RideRow[],
     ride_bids: [] as RideBidRow[],
     payment_transactions: [] as PaymentTransactionRow[],
+    sos_incidents: [] as SosIncidentRow[],
+    platform_settings: {
+      petrol_price_ngn: 1050,
+      base_flag_fall_ngn: 1500,
+      per_km_rate_ngn: 350,
+      per_minute_rate_ngn: 80,
+      lagos_mot_levy_ngn: 50,
+      welcome_bonus_rides: 5,
+      search_radius_km: 7.0,
+      updated_at: new Date().toISOString(),
+    } as PlatformSettingsRow,
   };
 
   private constructor() {
@@ -124,7 +174,22 @@ export class DatabaseService {
     if (fs.existsSync(this.dbFilePath)) {
       try {
         const raw = fs.readFileSync(this.dbFilePath, 'utf8');
-        this.store = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        this.store = { ...this.store, ...parsed };
+        if (!this.store.platform_settings) {
+          this.store.platform_settings = {
+            petrol_price_ngn: 1050,
+            base_flag_fall_ngn: 1500,
+            per_km_rate_ngn: 350,
+            per_minute_rate_ngn: 80,
+            lagos_mot_levy_ngn: 50,
+            welcome_bonus_rides: 5,
+            search_radius_km: 7.0,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        if (!this.store.sos_incidents) this.store.sos_incidents = [];
+        if (!this.store.subscription_credit_audits) this.store.subscription_credit_audits = [];
       } catch {
         this.saveStore();
       }
@@ -152,7 +217,7 @@ export class DatabaseService {
           plan_type: 'RIDE_COUNT',
           total_rides: 10,
           duration_days: 1,
-          price_kobo: 150000, // ₦1,500 (₦150 per trip platform cost!)
+          price_kobo: 150000,
           is_active: true,
         },
         {
@@ -162,7 +227,7 @@ export class DatabaseService {
           plan_type: 'RIDE_COUNT',
           total_rides: 50,
           duration_days: 7,
-          price_kobo: 600000, // ₦6,000 (₦120 per trip platform cost)
+          price_kobo: 600000,
           is_active: true,
         },
         {
@@ -172,7 +237,7 @@ export class DatabaseService {
           plan_type: 'RIDE_COUNT',
           total_rides: 100,
           duration_days: 14,
-          price_kobo: 1000000, // ₦10,000 (₦100 per trip platform cost)
+          price_kobo: 1000000,
           is_active: true,
         },
         {
@@ -182,7 +247,7 @@ export class DatabaseService {
           plan_type: 'UNLIMITED',
           total_rides: null,
           duration_days: 30,
-          price_kobo: 2500000, // ₦25,000/month flat
+          price_kobo: 2500000,
           is_active: true,
         },
       ];
@@ -201,8 +266,23 @@ export class DatabaseService {
       console.log('[PostgreSQL] Connected successfully to', ENV.DATABASE_URL);
     } catch {
       this.isPostgresConnected = false;
-      console.log('[Database] PostgreSQL not active locally. Operating on persistent ACID file-backed store.');
+      console.log('[Database] Operating on persistent ACID JSON store.');
     }
+  }
+
+  // --- Platform Settings ---
+  public async getPlatformSettings(): Promise<PlatformSettingsRow> {
+    return this.store.platform_settings;
+  }
+
+  public async updatePlatformSettings(settings: Partial<PlatformSettingsRow>): Promise<PlatformSettingsRow> {
+    this.store.platform_settings = {
+      ...this.store.platform_settings,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    };
+    this.saveStore();
+    return this.store.platform_settings;
   }
 
   // --- User Repository ---
@@ -224,6 +304,15 @@ export class DatabaseService {
     return this.store.users.find((u) => u.id === id);
   }
 
+  public async getPassengers(): Promise<(UserRow & { totalRides: number })[]> {
+    return this.store.users
+      .filter((u) => u.role === 'PASSENGER')
+      .map((u) => {
+        const totalRides = this.store.rides.filter((r) => r.rider_id === u.id && r.status === 'COMPLETED').length;
+        return { ...u, totalRides };
+      });
+  }
+
   // --- Driver Profile Repository ---
   public async createDriverProfile(profile: DriverProfileRow): Promise<DriverProfileRow> {
     this.store.driver_profiles.push(profile);
@@ -235,6 +324,54 @@ export class DatabaseService {
     return this.store.driver_profiles.find((d) => d.driver_id === driverId);
   }
 
+  public async getAllDrivers(filter?: 'ALL' | 'PENDING_KYC' | 'APPROVED' | 'REJECTED' | 'EXHAUSTED' | 'SUSPENDED'): Promise<any[]> {
+    let profiles = [...this.store.driver_profiles];
+
+    if (filter === 'PENDING_KYC') {
+      profiles = profiles.filter((p) => p.kyc_status === 'PENDING');
+    } else if (filter === 'APPROVED') {
+      profiles = profiles.filter((p) => p.kyc_status === 'APPROVED');
+    } else if (filter === 'REJECTED') {
+      profiles = profiles.filter((p) => p.kyc_status === 'REJECTED');
+    } else if (filter === 'SUSPENDED') {
+      profiles = profiles.filter((p) => p.account_status === 'SUSPENDED');
+    }
+
+    return profiles.map((p) => {
+      const user = this.store.users.find((u) => u.id === p.driver_id);
+      const activeSub = this.store.driver_subscriptions
+        .filter((s) => s.driver_id === p.driver_id)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      const plan = activeSub ? this.store.subscription_plans.find((pl) => pl.id === activeSub.plan_id) : undefined;
+
+      return {
+        ...p,
+        user,
+        subscription: activeSub ? { ...activeSub, planName: plan?.name } : null,
+      };
+    });
+  }
+
+  public async getDriverDossier(driverId: string): Promise<any> {
+    const profile = await this.getDriverProfile(driverId);
+    if (!profile) return null;
+    const user = await this.findUserById(driverId);
+    const subscriptions = this.store.driver_subscriptions
+      .filter((s) => s.driver_id === driverId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const creditAudits = this.store.subscription_credit_audits.filter((c) => c.driver_id === driverId);
+    const trips = this.store.rides.filter((r) => r.driver_id === driverId);
+
+    return {
+      profile,
+      user,
+      subscriptions,
+      creditAudits,
+      totalTrips: trips.length,
+      completedTrips: trips.filter((t) => t.status === 'COMPLETED').length,
+    };
+  }
+
   public async updateDriverOnlineStatus(driverId: string, isOnline: boolean): Promise<void> {
     const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
     if (profile) {
@@ -243,10 +380,22 @@ export class DatabaseService {
     }
   }
 
-  public async updateDriverKyc(driverId: string, status: 'APPROVED' | 'REJECTED'): Promise<void> {
+  public async updateDriverKyc(driverId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string): Promise<void> {
     const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
     if (profile) {
       profile.kyc_status = status;
+      profile.rejection_reason = rejectionReason || null;
+      this.saveStore();
+    }
+  }
+
+  public async setDriverAccountStatus(driverId: string, accountStatus: 'ACTIVE' | 'SUSPENDED' | 'BANNED'): Promise<void> {
+    const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
+    if (profile) {
+      profile.account_status = accountStatus;
+      if (accountStatus !== 'ACTIVE') {
+        profile.is_online = false;
+      }
       this.saveStore();
     }
   }
@@ -260,9 +409,65 @@ export class DatabaseService {
       }));
   }
 
+  // --- Manual Ride Credit & Audit ---
+  public async addManualRideCredit(
+    adminId: string,
+    driverId: string,
+    ridesToAdd: number,
+    reason: string
+  ): Promise<DriverSubscriptionRow> {
+    let activeSub = await this.getActiveDriverSubscription(driverId);
+    const previousRides = activeSub ? activeSub.remaining_rides : 0;
+
+    if (!activeSub) {
+      // Create a manual support subscription bundle
+      const now = new Date();
+      activeSub = {
+        id: `manual_sub_${Date.now()}`,
+        driver_id: driverId,
+        plan_id: 'plan_starter_10',
+        status: 'ACTIVE',
+        remaining_rides: ridesToAdd,
+        starts_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: now.toISOString(),
+      };
+      this.store.driver_subscriptions.push(activeSub);
+    } else {
+      activeSub.remaining_rides += ridesToAdd;
+      activeSub.status = 'ACTIVE';
+    }
+
+    // Log the audit trail
+    this.store.subscription_credit_audits.push({
+      id: `audit_${Date.now()}`,
+      admin_id: adminId,
+      driver_id: driverId,
+      rides_added: ridesToAdd,
+      previous_rides: previousRides,
+      new_rides: activeSub.remaining_rides,
+      reason,
+      created_at: new Date().toISOString(),
+    });
+
+    this.saveStore();
+    return activeSub;
+  }
+
+  public async getCreditAudits(driverId?: string): Promise<SubscriptionCreditAuditRow[]> {
+    if (driverId) {
+      return this.store.subscription_credit_audits.filter((a) => a.driver_id === driverId);
+    }
+    return this.store.subscription_credit_audits;
+  }
+
   // --- Subscription Plans ---
   public async getActivePlans(): Promise<SubscriptionPlanRow[]> {
     return this.store.subscription_plans.filter((p) => p.is_active);
+  }
+
+  public async getAllPlans(): Promise<SubscriptionPlanRow[]> {
+    return this.store.subscription_plans;
   }
 
   public async getPlanById(planId: string): Promise<SubscriptionPlanRow | undefined> {
@@ -278,7 +483,6 @@ export class DatabaseService {
   }
 
   public async createDriverSubscription(sub: DriverSubscriptionRow): Promise<DriverSubscriptionRow> {
-    // Expire any existing active subscriptions
     this.store.driver_subscriptions.forEach((s) => {
       if (s.driver_id === sub.driver_id && s.status === 'ACTIVE') {
         s.status = 'EXPIRED';
@@ -315,6 +519,12 @@ export class DatabaseService {
       activeSub.status = 'EXHAUSTED';
     }
 
+    // Increment driver's total trips
+    const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
+    if (profile) {
+      profile.total_trips_completed = (profile.total_trips_completed || 0) + 1;
+    }
+
     this.saveStore();
 
     return {
@@ -333,6 +543,19 @@ export class DatabaseService {
 
   public async getRideById(id: string): Promise<RideRow | undefined> {
     return this.store.rides.find((r) => r.id === id);
+  }
+
+  public async getActiveRides(): Promise<any[]> {
+    const active = this.store.rides.filter((r) =>
+      ['REQUESTED', 'NEGOTIATING', 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT'].includes(r.status)
+    );
+
+    return active.map((r) => ({
+      ...r,
+      rider: this.store.users.find((u) => u.id === r.rider_id),
+      driver: r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : null,
+      driverProfile: r.driver_id ? this.store.driver_profiles.find((d) => d.driver_id === r.driver_id) : null,
+    }));
   }
 
   public async updateRideStatus(
@@ -395,11 +618,49 @@ export class DatabaseService {
     this.saveStore();
   }
 
+  // --- Emergency SOS Incidents ---
+  public async createSosIncident(incident: SosIncidentRow): Promise<SosIncidentRow> {
+    this.store.sos_incidents.push(incident);
+    this.saveStore();
+    return incident;
+  }
+
+  public async getSosIncidents(status?: 'OPEN' | 'IN_REVIEW' | 'RESOLVED'): Promise<any[]> {
+    let incidents = [...this.store.sos_incidents];
+    if (status) {
+      incidents = incidents.filter((i) => i.status === status);
+    }
+    return incidents.map((i) => {
+      const ride = this.store.rides.find((r) => r.id === i.ride_id);
+      const rider = this.store.users.find((u) => u.id === i.rider_id);
+      const driver = i.driver_id ? this.store.users.find((u) => u.id === i.driver_id) : null;
+      const driverProfile = i.driver_id ? this.store.driver_profiles.find((d) => d.driver_id === i.driver_id) : null;
+      return { ...i, ride, rider, driver, driverProfile };
+    });
+  }
+
+  public async resolveSosIncident(id: string, notes: string): Promise<void> {
+    const inc = this.store.sos_incidents.find((i) => i.id === id);
+    if (inc) {
+      inc.status = 'RESOLVED';
+      inc.notes = notes;
+      inc.resolved_at = new Date().toISOString();
+      this.saveStore();
+    }
+  }
+
   // --- Transactions ---
   public async createTransaction(tx: PaymentTransactionRow): Promise<PaymentTransactionRow> {
     this.store.payment_transactions.push(tx);
     this.saveStore();
     return tx;
+  }
+
+  public async getTransactions(): Promise<any[]> {
+    return this.store.payment_transactions.map((tx) => {
+      const user = this.store.users.find((u) => u.id === tx.user_id);
+      return { ...tx, user };
+    });
   }
 
   public async getTransactionByRef(reference: string): Promise<PaymentTransactionRow | undefined> {
@@ -414,21 +675,35 @@ export class DatabaseService {
     }
   }
 
-  // --- Platform Analytics ---
+  // --- Platform Analytics & Lagos MOT Audit ---
   public async getAnalytics() {
     const totalDrivers = this.store.driver_profiles.length;
+    const pendingKyc = this.store.driver_profiles.filter((d) => d.kyc_status === 'PENDING').length;
+    const activeDrivers = this.store.driver_profiles.filter((d) => d.is_online).length;
     const totalPassengers = this.store.users.filter((u) => u.role === 'PASSENGER').length;
-    const totalRidesCompleted = this.store.rides.filter((r) => r.status === 'COMPLETED').length;
+    const completedRides = this.store.rides.filter((r) => r.status === 'COMPLETED');
+    const totalRidesCompleted = completedRides.length;
+
     const totalSubscriptionRevenueKobo = this.store.payment_transactions
       .filter((t) => t.status === 'SUCCESS')
       .reduce((sum, t) => sum + t.amount_kobo, 0);
 
+    // Lagos State Ministry of Transportation (MOT) ₦50 e-hailing levy audit
+    const lagosMotLevyTotalNgn = totalRidesCompleted * this.store.platform_settings.lagos_mot_levy_ngn;
+
+    const openSosCount = this.store.sos_incidents.filter((s) => s.status === 'OPEN').length;
+
     return {
       totalDrivers,
+      pendingKyc,
+      activeDrivers,
       totalPassengers,
       totalRidesCompleted,
       totalSubscriptionRevenueNgn: totalSubscriptionRevenueKobo / 100,
+      lagosMotLevyTotalNgn,
       activePlans: this.store.subscription_plans.length,
+      openSosCount,
+      platformSettings: this.store.platform_settings,
     };
   }
 }

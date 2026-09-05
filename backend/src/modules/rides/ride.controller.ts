@@ -26,7 +26,7 @@ const createRideSchema = z.object({
 rideRouter.post('/estimate', async (req, res: Response): Promise<void> => {
   try {
     const { pickupLat, pickupLng, dropoffLat, dropoffLng } = estimateSchema.parse(req.body);
-    const estimate = rideService.getFareEstimate(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const estimate = await rideService.getFareEstimate(pickupLat, pickupLng, dropoffLat, dropoffLng);
     res.status(200).json({ success: true, data: estimate });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });

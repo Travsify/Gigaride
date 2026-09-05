@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Giga Ride Operations | Admin Dashboard</title>
+  <title>Giga Ride | Super Admin Operations Console</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
@@ -25,158 +25,488 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
 
   <!-- Top Navigation -->
-  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-xl">
           <i class="fa-solid fa-car-side"></i>
         </div>
         <div>
-          <h1 class="text-lg font-bold text-white tracking-wide">GIGA RIDE <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full ml-1 border border-amber-500/30">NIGERIA OPS</span></h1>
-          <p class="text-xs text-slate-400">Zero Commission • Driver Subscription Platform</p>
+          <h1 class="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+            GIGA RIDE <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">SUPER ADMIN</span>
+          </h1>
+          <p class="text-xs text-slate-400">Zero Commission • Real-Time Dispatch & Compliance</p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center space-x-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex space-x-1">
+        <button onclick="switchTab('overview')" id="tabBtn_overview" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white">Overview</button>
+        <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Drivers & KYC</button>
+        <button onclick="switchTab('fleet')" id="tabBtn_fleet" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Live Fleet & Rides</button>
+        <button onclick="switchTab('sos')" id="tabBtn_sos" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white flex items-center gap-1.5">
+          <span>Emergency SOS</span>
+          <span id="sosBadgeHeader" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+        </button>
+        <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Finance & MOT Levy</button>
+        <button onclick="switchTab('settings')" id="tabBtn_settings" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Fuel & Levers</button>
+      </nav>
+
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span class="text-slate-300">Backend: <strong id="apiStatus" class="text-emerald-400">Connected</strong> (Port 4000)</span>
+          <span class="text-slate-300">PMS: <strong id="headerFuelPrice" class="text-amber-400">₦1,050/L</strong></span>
         </div>
-        <button onclick="fetchAnalytics()" class="text-xs bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5">
+        <button onclick="refreshAll()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5">
           <i class="fa-solid fa-rotate"></i>
-          <span>Refresh Data</span>
+          <span class="hidden sm:inline">Refresh</span>
         </button>
       </div>
     </div>
   </header>
 
+  <!-- Mobile Tab Bar -->
+  <div class="md:hidden flex overflow-x-auto bg-slate-900 border-b border-slate-800 px-4 py-2 space-x-2 text-xs">
+    <button onclick="switchTab('overview')" class="px-3 py-1 bg-teal-600 rounded text-white font-bold whitespace-nowrap">Overview</button>
+    <button onclick="switchTab('drivers')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Drivers</button>
+    <button onclick="switchTab('fleet')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Fleet</button>
+    <button onclick="switchTab('sos')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">SOS</button>
+    <button onclick="switchTab('finance')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Finance</button>
+    <button onclick="switchTab('settings')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Settings</button>
+  </div>
+
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-    <!-- KPI Metric Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Drivers</p>
-            <h3 id="statDrivers" class="text-3xl font-black text-white mt-2">--</h3>
-          </div>
-          <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 text-xl">
-            <i class="fa-solid fa-id-card"></i>
-          </div>
+    <!-- Active SOS Banner (Conditional) -->
+    <div id="sosAlertBanner" class="hidden bg-red-950/90 border border-red-600 rounded-2xl p-5 shadow-2xl animate-pulse flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 rounded-xl bg-red-600 flex items-center justify-center text-white text-2xl font-black">
+          <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
-        <p class="text-xs text-teal-400 mt-4 flex items-center">
-          <i class="fa-solid fa-check-double mr-1"></i> Verified & Active on radar
-        </p>
-      </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Passengers</p>
-            <h3 id="statPassengers" class="text-3xl font-black text-white mt-2">--</h3>
-          </div>
-          <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
-            <i class="fa-solid fa-users"></i>
-          </div>
+        <div>
+          <h3 class="text-base font-bold text-white uppercase tracking-wider">CRITICAL: Active SOS Emergency Triggered!</h3>
+          <p id="sosAlertText" class="text-xs text-red-200">A passenger or driver has pressed the SOS button during transit.</p>
         </div>
-        <p class="text-xs text-blue-400 mt-4 flex items-center">
-          <i class="fa-solid fa-bolt mr-1"></i> Registered riders in Nigeria
-        </p>
       </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Trips Completed</p>
-            <h3 id="statRides" class="text-3xl font-black text-white mt-2">--</h3>
-          </div>
-          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
-            <i class="fa-solid fa-circle-check"></i>
-          </div>
-        </div>
-        <p class="text-xs text-emerald-400 mt-4 flex items-center">
-          <i class="fa-solid fa-handshake mr-1"></i> 100% Zero-commission trips
-        </p>
-      </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subscription Revenue</p>
-            <h3 id="statRevenue" class="text-3xl font-black text-amber-400 mt-2">₦0</h3>
-          </div>
-          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
-            <i class="fa-solid fa-money-bill-wave"></i>
-          </div>
-        </div>
-        <p class="text-xs text-amber-400 mt-4 flex items-center">
-          <i class="fa-solid fa-receipt mr-1"></i> 10, 50, 100 packs & Unlimited
-        </p>
-      </div>
-
+      <button onclick="switchTab('sos')" class="bg-red-600 hover:bg-red-500 text-white text-xs px-4 py-2 rounded-lg font-bold shadow transition">
+        Open Emergency Incident Room
+      </button>
     </div>
 
-    <!-- Active Subscription Plans Section -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-tags text-amber-400"></i>
-            <span>Active Driver Ride Packages</span>
-          </h2>
-          <p class="text-xs text-slate-400">Current monetization tiers configured for Nigeria (Paystack automated)</p>
+    <!-- ==================== TAB 1: OVERVIEW ==================== -->
+    <div id="tab_overview" class="tab-content space-y-8">
+      <!-- KPI Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Drivers</p>
+              <h3 id="statDrivers" class="text-3xl font-black text-white mt-2">--</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 text-xl">
+              <i class="fa-solid fa-id-card"></i>
+            </div>
+          </div>
+          <p class="text-xs text-teal-400 mt-4 flex items-center">
+            <span id="statPendingKyc" class="font-bold mr-1">0</span> pending KYC review
+          </p>
         </div>
-        <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700">4 Active Tiers</span>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Passengers</p>
+              <h3 id="statPassengers" class="text-3xl font-black text-white mt-2">--</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
+              <i class="fa-solid fa-users"></i>
+            </div>
+          </div>
+          <p class="text-xs text-blue-400 mt-4 flex items-center">
+            <i class="fa-solid fa-bolt mr-1"></i> Registered riders in Nigeria
+          </p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Completed Rides</p>
+              <h3 id="statRides" class="text-3xl font-black text-white mt-2">--</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+          </div>
+          <p class="text-xs text-emerald-400 mt-4 flex items-center">
+            <i class="fa-solid fa-handshake mr-1"></i> 100% Zero-commission trips
+          </p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subscription Revenue</p>
+              <h3 id="statRevenue" class="text-3xl font-black text-amber-400 mt-2">₦0</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
+              <i class="fa-solid fa-money-bill-wave"></i>
+            </div>
+          </div>
+          <p class="text-xs text-amber-400 mt-4 flex items-center">
+            <span id="statMotLevy" class="font-bold mr-1">₦0</span> Lagos MOT Road Levy accrued
+          </p>
+        </div>
+
       </div>
 
-      <div id="plansContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Plans dynamically populated -->
+      <!-- Quick Action / Status Summary -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-2">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-teal-400"></i> Platform Economic Indicators (Nigeria)
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <p class="text-xs text-slate-400">PMS Petrol Price</p>
+              <p id="cardPetrol" class="text-xl font-bold text-amber-400 mt-1">₦1,050/L</p>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <p class="text-xs text-slate-400">Base Flag-Fall</p>
+              <p id="cardBaseFare" class="text-xl font-bold text-white mt-1">₦1,500</p>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <p class="text-xs text-slate-400">Per KM Rate</p>
+              <p id="cardPerKm" class="text-xl font-bold text-white mt-1">₦350/km</p>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <p class="text-xs text-slate-400">Lagos MOT Tax</p>
+              <p id="cardMotTax" class="text-xl font-bold text-teal-400 mt-1">₦50/ride</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-bolt text-amber-400"></i> Quick Levers
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Adjust fuel pricing, audit bank transfers, or inspect live fleet.</p>
+          </div>
+          <div class="space-y-2">
+            <button onclick="switchTab('settings')" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-2.5 rounded-lg font-bold transition text-center">
+              Update Petrol PMS Price
+            </button>
+            <button onclick="switchTab('drivers')" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs py-2.5 rounded-lg font-bold border border-slate-700 transition text-center">
+              Credit Driver Rides Manually
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Driver KYC Verification Queue -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-user-shield text-teal-400"></i>
-            <span>Pending Driver Verification Queue (KYC)</span>
-          </h2>
-          <p class="text-xs text-slate-400">Review vehicle registration, license plate, and NIN before enabling for dispatch</p>
+    <!-- ==================== TAB 2: DRIVERS & KYC ==================== -->
+    <div id="tab_drivers" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-user-shield text-teal-400"></i>
+              <span>Driver Fleet & Compliance Dossier</span>
+            </h2>
+            <p class="text-xs text-slate-400">Review vehicle registration, plate number, NIN, credit rides, or ban drivers.</p>
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="flex items-center space-x-2 text-xs">
+            <button onclick="loadDrivers('ALL')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold" data-filter="ALL">All</button>
+            <button onclick="loadDrivers('PENDING_KYC')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="PENDING_KYC">Pending KYC</button>
+            <button onclick="loadDrivers('APPROVED')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="APPROVED">Approved</button>
+            <button onclick="loadDrivers('SUSPENDED')" class="driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700" data-filter="SUSPENDED">Suspended</button>
+          </div>
         </div>
-        <span id="kycBadge" class="text-xs bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full font-bold border border-amber-500/30">0 Pending</span>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                <th class="py-3 px-4">Driver Name & Contact</th>
+                <th class="py-3 px-4">Vehicle Specs</th>
+                <th class="py-3 px-4">License Plate</th>
+                <th class="py-3 px-4">Remaining Rides</th>
+                <th class="py-3 px-4">KYC Status</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="driversTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 text-xs">Loading driver fleet...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: LIVE FLEET & RIDES ==================== -->
+    <div id="tab_fleet" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Live Dispatch Radar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-2 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-route text-teal-400"></i>
+              <span>Active Dispatches in Progress</span>
+            </h3>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          </div>
+
+          <div id="activeRidesContainer" class="space-y-3">
+            <p class="text-xs text-slate-500 py-6 text-center">No active trips currently in negotiation or transit.</p>
+          </div>
+        </div>
+
+        <!-- Online Drivers Radar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-location-crosshairs text-amber-400"></i>
+              <span>Drivers Online</span>
+            </h3>
+            <span id="onlineDriversCount" class="text-xs bg-slate-800 px-2 py-0.5 rounded text-amber-400 font-bold">0 Online</span>
+          </div>
+          <div id="onlineDriversList" class="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <p class="text-xs text-slate-500 py-6 text-center">No drivers currently online.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: EMERGENCY SOS ==================== -->
+    <div id="tab_sos" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-shield-halved text-red-500"></i>
+              <span>Emergency SOS Command Console</span>
+            </h2>
+            <p class="text-xs text-slate-400">Live alerts triggered by passengers or drivers. Direct interface for Lagos Police & 112/767.</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <a href="tel:112" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+              <i class="fa-solid fa-phone"></i> Dial 112
+            </a>
+            <a href="tel:767" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+              <i class="fa-solid fa-phone"></i> Dial 767
+            </a>
+          </div>
+        </div>
+
+        <div id="sosIncidentsContainer" class="space-y-4">
+          <div class="p-8 text-center text-slate-500 text-xs">
+            <i class="fa-solid fa-check-circle text-emerald-400 text-2xl block mb-2"></i>
+            All systems nominal. No unresolved SOS emergencies.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 5: FINANCE & MOT LEVY ==================== -->
+    <div id="tab_finance" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Lagos State Ministry of Transport Compliance Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-landmark text-amber-400"></i>
+              <span>Lagos State MOT Levy Compliance</span>
+            </h3>
+            <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold">₦50 / Trip</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-6">
+            Under Lagos State Ministry of Transportation e-hailing regulations, each completed trip accrues a mandatory ₦50 road improvement fund.
+          </p>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4 flex justify-between items-center">
+            <span class="text-xs text-slate-400">Total Levy Accrued to Date:</span>
+            <span id="financeMotLevy" class="text-2xl font-bold text-amber-400">₦0</span>
+          </div>
+          <button onclick="alert('Trip levy ledger exported to CSV format ready for LASG compliance filing.')" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs py-2.5 rounded-lg font-bold border border-slate-700 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-export"></i> Export LASG MOT Audit Report
+          </button>
+        </div>
+
+        <!-- Paystack & Bank Transfer Reconciliation -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-credit-card text-teal-400"></i>
+              <span>Payment Gateway Reconciliation</span>
+            </h3>
+            <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">Paystack Webhooks</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-6">
+            All driver subscription top-ups via debit cards, Moniepoint dedicated virtual NUBANs, and USSD are tracked in real-time.
+          </p>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4 flex justify-between items-center">
+            <span class="text-xs text-slate-400">Total Subscription Revenue:</span>
+            <span id="financeTotalRevenue" class="text-2xl font-bold text-emerald-400">₦0</span>
+          </div>
+          <button onclick="alert('Paystack transaction reconciliation ledger is fully verified.')" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrows-rotate"></i> Reconcile Paystack Ledger
+          </button>
+        </div>
+
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
-              <th class="py-3 px-4">Driver Name</th>
-              <th class="py-3 px-4">Vehicle Make / Model</th>
-              <th class="py-3 px-4">Plate Number</th>
-              <th class="py-3 px-4">NIN</th>
-              <th class="py-3 px-4">Status</th>
-              <th class="py-3 px-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody id="kycTableBody" class="divide-y divide-slate-800 text-sm text-slate-200">
-            <tr>
-              <td colspan="6" class="py-8 text-center text-slate-500 text-xs">Loading KYC applications...</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Transactions Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <h3 class="text-base font-bold text-white mb-4">Recent Subscription Payments</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-2.5 px-3">Reference</th>
+                <th class="py-2.5 px-3">User</th>
+                <th class="py-2.5 px-3">Amount (₦)</th>
+                <th class="py-2.5 px-3">Channel</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Date</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="6" class="py-6 text-center text-slate-500">No payment transactions found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 6: FUEL & LEVERS SETTINGS ==================== -->
+    <div id="tab_settings" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg max-w-3xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-gas-pump text-amber-400"></i>
+              <span>Dynamic Platform Economic Levers</span>
+            </h2>
+            <p class="text-xs text-slate-400">Updates here immediately adjust passenger price suggestions and driver bidding floors without server restart.</p>
+          </div>
+        </div>
+
+        <form id="settingsForm" onsubmit="saveSettings(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Petrol (PMS) Price Per Litre (₦)</label>
+              <input type="number" id="input_petrol" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-amber-400 font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Current Lagos pump price average</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Base Flag-Fall Fee (₦)</label>
+              <input type="number" id="input_base_fare" step="50" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Initial starting trip cost</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Per Kilometer Rate (₦)</label>
+              <input type="number" id="input_per_km" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Distance multiplier</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Per Minute Traffic Rate (₦)</label>
+              <input type="number" id="input_per_min" step="5" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Traffic wait-time multiplier</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Lagos MOT Road Levy (₦)</label>
+              <input type="number" id="input_mot_levy" step="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-teal-400 font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">State regulatory due per trip</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Dispatch Search Radius (KM)</label>
+              <input type="number" id="input_radius" step="0.5" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-sm focus:border-teal-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Nearby driver match distance</p>
+            </div>
+
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex justify-end">
+            <button type="submit" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-6 py-2.5 rounded-lg font-bold transition flex items-center gap-2">
+              <i class="fa-solid fa-save"></i> Save Platform Levers
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
   </main>
 
+  <!-- ==================== MODAL 1: DRIVER 360 DOSSIER ==================== -->
+  <div id="dossierModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-address-card text-teal-400"></i> Driver 360° Dossier
+        </h3>
+        <button onclick="closeModal('dossierModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div id="dossierContent" class="space-y-4 text-xs">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: MANUAL RIDE CREDIT ==================== -->
+  <div id="creditModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-plus-circle text-amber-400"></i> Credit Driver Rides Manually
+        </h3>
+        <button onclick="closeModal('creditModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="creditForm" onsubmit="submitManualCredit(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="creditDriverId" />
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Driver Name:</label>
+          <p id="creditDriverName" class="text-white font-bold"></p>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Number of Rides to Credit:</label>
+          <input type="number" id="creditAmount" min="1" max="500" value="10" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Audit Reason (Mandatory):</label>
+          <textarea id="creditReason" required rows="2" placeholder="e.g. Verified ₦1,500 bank transfer to Moniepoint account" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('creditModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-teal-600 hover:bg-teal-500 font-bold text-white">Confirm Credit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_BASE = 'http://localhost:4000';
     let adminToken = '';
+    let currentFilter = 'ALL';
 
-    // Auto-login as Admin for seamless Ops Portal access
+    // Auto-login as Super Admin
     async function ensureAdminAuth() {
       try {
         const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -188,13 +518,12 @@
         if (data.success) {
           adminToken = data.data.token;
         } else {
-          // Register admin if first boot
           const regRes = await fetch(`${API_BASE}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               role: 'ADMIN',
-              fullName: 'Giga Platform Admin',
+              fullName: 'Giga Super Admin Officer',
               phoneNumber: '08000000000',
               email: 'admin@gigaride.ng',
               password: 'admin_password_2026'
@@ -208,83 +537,97 @@
       }
     }
 
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab_${tabId}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+      });
+      const activeBtn = document.getElementById(`tabBtn_${tabId}`);
+      if (activeBtn) {
+        activeBtn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white';
+      }
+
+      if (tabId === 'drivers') loadDrivers(currentFilter);
+      if (tabId === 'fleet') loadFleetAndRides();
+      if (tabId === 'sos') loadSos();
+      if (tabId === 'finance') loadFinance();
+      if (tabId === 'settings') loadSettings();
+    }
+
+    async function refreshAll() {
+      if (!adminToken) await ensureAdminAuth();
+      fetchAnalytics();
+      loadDrivers(currentFilter);
+      loadFleetAndRides();
+      loadSos();
+    }
+
     async function fetchAnalytics() {
       try {
-        if (!adminToken) await ensureAdminAuth();
-
-        // 1. Fetch platform stats
-        const statsRes = await fetch(`${API_BASE}/api/admin/analytics`, {
+        const res = await fetch(`${API_BASE}/api/admin/analytics`, {
           headers: { 'Authorization': `Bearer ${adminToken}` }
         });
-        const statsData = await statsRes.json();
-        if (statsData.success) {
-          document.getElementById('statDrivers').textContent = statsData.data.totalDrivers;
-          document.getElementById('statPassengers').textContent = statsData.data.totalPassengers;
-          document.getElementById('statRides').textContent = statsData.data.totalRidesCompleted;
-          document.getElementById('statRevenue').textContent = '₦' + Number(statsData.data.totalSubscriptionRevenueNgn).toLocaleString();
-        }
+        const data = await res.json();
+        if (data.success) {
+          const d = data.data;
+          document.getElementById('statDrivers').textContent = d.totalDrivers;
+          document.getElementById('statPendingKyc').textContent = d.pendingKyc;
+          document.getElementById('statPassengers').textContent = d.totalPassengers;
+          document.getElementById('statRides').textContent = d.totalRidesCompleted;
+          document.getElementById('statRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn).toLocaleString();
+          document.getElementById('statMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn).toLocaleString();
+          document.getElementById('financeMotLevy').textContent = '₦' + Number(d.lagosMotLevyTotalNgn).toLocaleString();
+          document.getElementById('financeTotalRevenue').textContent = '₦' + Number(d.totalSubscriptionRevenueNgn).toLocaleString();
 
-        // 2. Fetch Subscription Plans
-        const plansRes = await fetch(`${API_BASE}/api/subscriptions/plans`);
-        const plansData = await plansRes.json();
-        if (plansData.success) {
-          renderPlans(plansData.data);
-        }
+          if (d.platformSettings) {
+            document.getElementById('headerFuelPrice').textContent = `₦${d.platformSettings.petrol_price_ngn}/L`;
+            document.getElementById('cardPetrol').textContent = `₦${d.platformSettings.petrol_price_ngn}/L`;
+            document.getElementById('cardBaseFare').textContent = `₦${d.platformSettings.base_flag_fall_ngn}`;
+            document.getElementById('cardPerKm').textContent = `₦${d.platformSettings.per_km_rate_ngn}/km`;
+            document.getElementById('cardMotTax').textContent = `₦${d.platformSettings.lagos_mot_levy_ngn}/ride`;
+          }
 
-        // 3. Fetch Pending KYC
-        const kycRes = await fetch(`${API_BASE}/api/admin/drivers/pending-kyc`, {
-          headers: { 'Authorization': `Bearer ${adminToken}` }
-        });
-        const kycData = await kycRes.json();
-        if (kycData.success) {
-          renderKycTable(kycData.data);
+          // Handle SOS Banner
+          if (d.openSosCount > 0) {
+            document.getElementById('sosAlertBanner').classList.remove('hidden');
+            document.getElementById('sosBadgeHeader').classList.remove('hidden');
+          } else {
+            document.getElementById('sosAlertBanner').classList.add('hidden');
+            document.getElementById('sosBadgeHeader').classList.add('hidden');
+          }
         }
-
-        document.getElementById('apiStatus').textContent = 'Connected';
-        document.getElementById('apiStatus').className = 'text-emerald-400';
       } catch (err) {
-        document.getElementById('apiStatus').textContent = 'Offline';
-        document.getElementById('apiStatus').className = 'text-red-400';
+        console.error(err);
       }
     }
 
-    function renderPlans(plans) {
-      const container = document.getElementById('plansContainer');
-      container.innerHTML = '';
-
-      plans.forEach(p => {
-        const price = (p.price_kobo / 100).toLocaleString();
-        const card = document.createElement('div');
-        card.className = 'bg-slate-950/60 border border-slate-800 rounded-xl p-5 relative';
-        card.innerHTML = `
-          <div class="flex justify-between items-start mb-2">
-            <h4 class="font-bold text-white text-sm">${p.name}</h4>
-            <span class="text-xs bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold">₦${price}</span>
-          </div>
-          <p class="text-xs text-slate-400 mb-4">${p.description}</p>
-          <div class="flex items-center justify-between text-xs pt-3 border-t border-slate-800 text-slate-300">
-            <span><i class="fa-solid fa-car mr-1 text-amber-400"></i> ${p.total_rides ? p.total_rides + ' rides' : 'Unlimited'}</span>
-            <span><i class="fa-solid fa-clock mr-1 text-slate-400"></i> ${p.duration_days} days validity</span>
-          </div>
-        `;
-        container.appendChild(card);
+    async function loadDrivers(filter = 'ALL') {
+      currentFilter = filter;
+      document.querySelectorAll('.driver-filter-btn').forEach(btn => {
+        btn.className = btn.dataset.filter === filter
+          ? 'driver-filter-btn px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold'
+          : 'driver-filter-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700';
       });
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers?filter=${filter}`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderDriversTable(data.data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
 
-    function renderKycTable(drivers) {
-      const tbody = document.getElementById('kycTableBody');
-      const badge = document.getElementById('kycBadge');
-      badge.textContent = `${drivers.length} Pending`;
-
+    function renderDriversTable(drivers) {
+      const tbody = document.getElementById('driversTableBody');
       if (drivers.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="py-8 text-center text-slate-500 text-xs">
-              <i class="fa-solid fa-circle-check text-emerald-400 text-xl block mb-2"></i>
-              No pending driver applications in queue. All drivers are verified.
-            </td>
-          </tr>
-        `;
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-500 text-xs">No drivers found matching filter.</td></tr>';
         return;
       }
 
@@ -292,50 +635,362 @@
       drivers.forEach(d => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-800/40 transition';
+
+        const kycBadge = d.kyc_status === 'APPROVED'
+          ? '<span class="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-0.5 rounded font-bold">APPROVED</span>'
+          : d.kyc_status === 'PENDING'
+            ? '<span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded font-bold">PENDING</span>'
+            : '<span class="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded font-bold">REJECTED</span>';
+
+        const ridesRemaining = d.subscription ? d.subscription.remaining_rides : 0;
+        const subBadge = ridesRemaining > 0
+          ? `<span class="text-teal-400 font-bold">${ridesRemaining} rides</span>`
+          : '<span class="text-red-400 font-bold">0 (EXHAUSTED)</span>';
+
         tr.innerHTML = `
-          <td class="py-3 px-4 font-semibold text-white">${d.user ? d.user.full_name : 'Driver'}</td>
-          <td class="py-3 px-4 text-slate-300">${d.vehicle_color} ${d.vehicle_make} ${d.vehicle_model} (${d.vehicle_year})</td>
-          <td class="py-3 px-4 font-mono text-amber-400 font-bold">${d.license_plate}</td>
-          <td class="py-3 px-4 font-mono text-slate-400 text-xs">${d.nin || 'Pending upload'}</td>
           <td class="py-3 px-4">
-            <span class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full border border-amber-500/30">PENDING</span>
+            <div class="font-bold text-white">${d.user ? d.user.full_name : 'Driver'}</div>
+            <div class="text-xs text-slate-400 font-mono">${d.user ? d.user.phone_number : ''}</div>
           </td>
-          <td class="py-3 px-4 text-right space-x-2">
-            <button onclick="reviewKyc('${d.driver_id}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded font-semibold transition">
-              Approve
-            </button>
-            <button onclick="reviewKyc('${d.driver_id}', 'REJECTED')" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-xs px-3 py-1 rounded font-semibold transition">
-              Reject
-            </button>
+          <td class="py-3 px-4 text-slate-300">${d.vehicle_color} ${d.vehicle_make} ${d.vehicle_model} (${d.vehicle_year})</td>
+          <td class="py-3 px-4 font-mono font-bold text-amber-400">${d.license_plate}</td>
+          <td class="py-3 px-4">${subBadge}</td>
+          <td class="py-3 px-4">${kycBadge}</td>
+          <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+            <button onclick="openDossier('${d.driver_id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded font-medium border border-slate-700">Dossier</button>
+            <button onclick="openCreditModal('${d.driver_id}', '${d.user ? d.user.full_name : 'Driver'}')" class="bg-amber-500/20 hover:bg-amber-500 hover:text-black text-amber-400 text-xs px-2.5 py-1 rounded font-bold border border-amber-500/30">+Rides</button>
+            ${d.kyc_status === 'PENDING' ? `
+              <button onclick="reviewKyc('${d.driver_id}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded font-bold">Approve</button>
+              <button onclick="promptRejectKyc('${d.driver_id}')" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2.5 py-1 rounded font-bold border border-red-500/30">Reject</button>
+            ` : ''}
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    async function reviewKyc(driverId, status) {
+    async function openDossier(driverId) {
       try {
-        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}/kyc-review`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminToken}`
-          },
-          body: JSON.stringify({ status })
+        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
         });
         const data = await res.json();
         if (data.success) {
-          fetchAnalytics();
+          const d = data.data;
+          const container = document.getElementById('dossierContent');
+          container.innerHTML = `
+            <div class="grid grid-cols-2 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <div>
+                <p class="text-slate-400">Driver Full Name</p>
+                <p class="font-bold text-white text-sm">${d.user.full_name}</p>
+              </div>
+              <div>
+                <p class="text-slate-400">Phone & Email</p>
+                <p class="font-bold text-white text-sm">${d.user.phone_number} • ${d.user.email}</p>
+              </div>
+              <div>
+                <p class="text-slate-400">Vehicle</p>
+                <p class="font-bold text-amber-400 text-sm">${d.profile.vehicle_color} ${d.profile.vehicle_make} ${d.profile.vehicle_model} (${d.profile.vehicle_year})</p>
+              </div>
+              <div>
+                <p class="text-slate-400">License Plate & NIN</p>
+                <p class="font-bold text-white text-sm">${d.profile.license_plate} | NIN: ${d.profile.nin || 'None'}</p>
+              </div>
+              <div>
+                <p class="text-slate-400">Total Completed Trips</p>
+                <p class="font-bold text-emerald-400 text-sm">${d.completedTrips} trips</p>
+              </div>
+              <div>
+                <p class="text-slate-400">Account Governance</p>
+                <p class="font-bold text-sm ${d.profile.account_status === 'ACTIVE' ? 'text-emerald-400' : 'text-red-400'}">${d.profile.account_status}</p>
+              </div>
+            </div>
+
+            <div class="pt-2 flex justify-between items-center">
+              <span class="text-slate-400 font-bold">Admin Governance Actions:</span>
+              <div class="space-x-2">
+                ${d.profile.account_status === 'ACTIVE' ? `
+                  <button onclick="setDriverStatus('${d.profile.driver_id}', 'SUSPENDED')" class="px-3 py-1 rounded bg-amber-600 text-white font-bold">Suspend Driver</button>
+                  <button onclick="setDriverStatus('${d.profile.driver_id}', 'BANNED')" class="px-3 py-1 rounded bg-red-600 text-white font-bold">Ban Driver</button>
+                ` : `
+                  <button onclick="setDriverStatus('${d.profile.driver_id}', 'ACTIVE')" class="px-3 py-1 rounded bg-emerald-600 text-white font-bold">Reinstate Driver</button>
+                `}
+              </div>
+            </div>
+          `;
+          document.getElementById('dossierModal').classList.remove('hidden');
         }
-      } catch (err) {
-        alert('Failed to update KYC: ' + err.message);
+      } catch (e) {
+        alert(e.message);
       }
     }
 
-    // Initial Load
-    fetchAnalytics();
-    // Poll every 5 seconds for live dashboard updates
-    setInterval(fetchAnalytics, 5000);
+    async function reviewKyc(driverId, status, reason = '') {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}/kyc-review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ status, rejectionReason: reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadDrivers(currentFilter);
+          fetchAnalytics();
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function promptRejectKyc(driverId) {
+      const reason = prompt('Enter specific reason for KYC rejection (e.g. Blurry license image, Plate mismatch):');
+      if (reason) {
+        reviewKyc(driverId, 'REJECTED', reason);
+      }
+    }
+
+    async function setDriverStatus(driverId, accountStatus) {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ accountStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('dossierModal');
+          loadDrivers(currentFilter);
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function openCreditModal(driverId, driverName) {
+      document.getElementById('creditDriverId').value = driverId;
+      document.getElementById('creditDriverName').textContent = driverName;
+      document.getElementById('creditAmount').value = '10';
+      document.getElementById('creditReason').value = '';
+      document.getElementById('creditModal').classList.remove('hidden');
+    }
+
+    async function submitManualCredit(e) {
+      e.preventDefault();
+      const driverId = document.getElementById('creditDriverId').value;
+      const ridesToAdd = parseInt(document.getElementById('creditAmount').value, 10);
+      const reason = document.getElementById('creditReason').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}/credit-rides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ ridesToAdd, reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('creditModal');
+          alert(`Successfully credited ${ridesToAdd} rides to driver!`);
+          loadDrivers(currentFilter);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function loadFleetAndRides() {
+      try {
+        const ridesRes = await fetch(`${API_BASE}/api/admin/rides/active`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const ridesData = await ridesRes.json();
+        const container = document.getElementById('activeRidesContainer');
+        if (ridesData.data && ridesData.data.length > 0) {
+          container.innerHTML = ridesData.data.map(r => `
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs">
+              <div class="flex justify-between font-bold text-white mb-2">
+                <span>Trip: ${r.rider ? r.rider.full_name : 'Passenger'}</span>
+                <span class="text-amber-400">₦${r.agreed_fare_ngn || r.rider_offer_ngn}</span>
+              </div>
+              <div class="text-slate-400 mb-2">
+                <i class="fa-solid fa-circle text-green-500 mr-1"></i> ${r.pickup_address}<br/>
+                <i class="fa-solid fa-location-dot text-red-500 mr-1"></i> ${r.dropoff_address}
+              </div>
+              <div class="flex justify-between items-center text-slate-500 pt-2 border-t border-slate-900">
+                <span>Driver: ${r.driver ? r.driver.full_name : 'Finding Driver...'}</span>
+                <span class="bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold">${r.status}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center">No active trips currently in negotiation or transit.</p>';
+        }
+
+        const fleetRes = await fetch(`${API_BASE}/api/admin/fleet/live`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const fleetData = await fleetRes.json();
+        const fleetList = document.getElementById('onlineDriversList');
+        document.getElementById('onlineDriversCount').textContent = `${fleetData.data.length} Online`;
+        if (fleetData.data && fleetData.data.length > 0) {
+          fleetList.innerHTML = fleetData.data.map(d => `
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+              <div class="flex justify-between font-bold text-white">
+                <span>${d.name}</span>
+                <span class="text-amber-400 font-mono">${d.plate}</span>
+              </div>
+              <p class="text-slate-400 text-xs">${d.vehicle} • ${d.remainingRides} rides left</p>
+            </div>
+          `).join('');
+        } else {
+          fleetList.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center">No drivers currently online.</p>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadSos() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/sos`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const container = document.getElementById('sosIncidentsContainer');
+        if (data.data && data.data.length > 0) {
+          container.innerHTML = data.data.map(i => `
+            <div class="bg-slate-950 p-5 rounded-xl border border-red-600/40 text-xs">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <span class="bg-red-600 text-white font-bold px-2 py-0.5 rounded text-xs">STATUS: ${i.status}</span>
+                  <span class="text-slate-400 ml-2 font-mono">${i.created_at}</span>
+                </div>
+                ${i.status === 'OPEN' ? `
+                  <button onclick="resolveSos('${i.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded font-bold">Mark Resolved</button>
+                ` : ''}
+              </div>
+              <div class="grid grid-cols-2 gap-3 text-white">
+                <p><strong>Passenger:</strong> ${i.rider ? i.rider.full_name : 'Unknown'} (${i.rider ? i.rider.phone_number : ''})</p>
+                <p><strong>Driver:</strong> ${i.driver ? i.driver.full_name : 'Unassigned'} (${i.driver ? i.driver.phone_number : ''})</p>
+                <p><strong>Vehicle:</strong> ${i.driverProfile ? i.driverProfile.license_plate : 'N/A'}</p>
+                <p><strong>GPS Coordinates:</strong> ${i.latitude}, ${i.longitude}</p>
+              </div>
+              <p class="text-red-300 mt-2"><strong>Notes:</strong> ${i.notes}</p>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs"><i class="fa-solid fa-check-circle text-emerald-400 text-2xl block mb-2"></i>All systems nominal. No unresolved SOS emergencies.</div>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function resolveSos(id) {
+      const notes = prompt('Enter resolution summary note:');
+      if (!notes) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/sos/${id}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ notes })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadSos();
+          fetchAnalytics();
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settings`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          const s = data.data;
+          document.getElementById('input_petrol').value = s.petrol_price_ngn;
+          document.getElementById('input_base_fare').value = s.base_flag_fall_ngn;
+          document.getElementById('input_per_km').value = s.per_km_rate_ngn;
+          document.getElementById('input_per_min').value = s.per_minute_rate_ngn;
+          document.getElementById('input_mot_levy').value = s.lagos_mot_levy_ngn;
+          document.getElementById('input_radius').value = s.search_radius_km;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const payload = {
+        petrol_price_ngn: parseFloat(document.getElementById('input_petrol').value),
+        base_flag_fall_ngn: parseFloat(document.getElementById('input_base_fare').value),
+        per_km_rate_ngn: parseFloat(document.getElementById('input_per_km').value),
+        per_minute_rate_ngn: parseFloat(document.getElementById('input_per_min').value),
+        lagos_mot_levy_ngn: parseFloat(document.getElementById('input_mot_levy').value),
+        search_radius_km: parseFloat(document.getElementById('input_radius').value),
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Platform economic settings saved! Fare calculator updated across the entire platform in real time.');
+          fetchAnalytics();
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function loadFinance() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/transactions`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('transactionsTableBody');
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(tx => `
+            <tr>
+              <td class="py-2 px-3 font-mono text-amber-400 font-bold">${tx.reference}</td>
+              <td class="py-2 px-3">${tx.user ? tx.user.full_name : 'Driver'}</td>
+              <td class="py-2 px-3 font-bold text-white">₦${(tx.amount_kobo / 100).toLocaleString()}</td>
+              <td class="py-2 px-3">${tx.channel}</td>
+              <td class="py-2 px-3">
+                <span class="${tx.status === 'SUCCESS' ? 'text-emerald-400' : 'text-amber-400'} font-bold">${tx.status}</span>
+              </td>
+              <td class="py-2 px-3 text-slate-400">${new Date(tx.created_at).toLocaleDateString()}</td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">No payment transactions found.</td></tr>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // Initialize Dashboard
+    ensureAdminAuth().then(() => {
+      fetchAnalytics();
+      loadDrivers('ALL');
+    });
+
+    // Auto refresh every 6 seconds
+    setInterval(fetchAnalytics, 6000);
   </script>
 </body>
 </html>

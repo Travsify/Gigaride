@@ -27,8 +27,12 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
     license_plate VARCHAR(20) UNIQUE NOT NULL,
     vehicle_color VARCHAR(30) NOT NULL,
     kyc_status VARCHAR(20) DEFAULT 'PENDING' CHECK (kyc_status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    rejection_reason TEXT,
+    account_status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (account_status IN ('ACTIVE', 'SUSPENDED', 'BANNED')),
     nin VARCHAR(20),
     bvn VARCHAR(20),
+    rating_average NUMERIC(3, 2) DEFAULT 5.0,
+    total_trips_completed INT DEFAULT 0,
     is_online BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_driver_profile UNIQUE (driver_id)
@@ -36,6 +40,7 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_driver_kyc ON driver_profiles(kyc_status);
 CREATE INDEX IF NOT EXISTS idx_driver_online ON driver_profiles(is_online);
+CREATE INDEX IF NOT EXISTS idx_driver_status ON driver_profiles(account_status);
 
 -- 3. Subscription Plans
 CREATE TABLE IF NOT EXISTS subscription_plans (
@@ -63,7 +68,21 @@ CREATE TABLE IF NOT EXISTS driver_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_driver_sub_status ON driver_subscriptions(driver_id, status);
 
--- 5. Rides
+-- 5. Subscription Credit Audits (Manual Support/Admin allocations)
+CREATE TABLE IF NOT EXISTS subscription_credit_audits (
+    id VARCHAR(50) PRIMARY KEY,
+    admin_id UUID NOT NULL REFERENCES users(id),
+    driver_id UUID NOT NULL REFERENCES users(id),
+    rides_added INT NOT NULL,
+    previous_rides INT NOT NULL,
+    new_rides INT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_audit_driver ON subscription_credit_audits(driver_id);
+
+-- 6. Rides
 CREATE TABLE IF NOT EXISTS rides (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     rider_id UUID NOT NULL REFERENCES users(id),
@@ -89,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id);
 CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id);
 CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
 
--- 6. Ride Bids (Bargaining table)
+-- 7. Ride Bids (Bargaining table)
 CREATE TABLE IF NOT EXISTS ride_bids (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ride_id UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
@@ -102,7 +121,23 @@ CREATE TABLE IF NOT EXISTS ride_bids (
 
 CREATE INDEX IF NOT EXISTS idx_bids_ride ON ride_bids(ride_id);
 
--- 7. Payment Transactions
+-- 8. Emergency SOS Incidents
+CREATE TABLE IF NOT EXISTS sos_incidents (
+    id VARCHAR(50) PRIMARY KEY,
+    ride_id UUID NOT NULL REFERENCES rides(id),
+    driver_id UUID REFERENCES users(id),
+    rider_id UUID NOT NULL REFERENCES users(id),
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    status VARCHAR(20) DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_REVIEW', 'RESOLVED')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_incidents(status);
+
+-- 9. Payment Transactions
 CREATE TABLE IF NOT EXISTS payment_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reference VARCHAR(100) UNIQUE NOT NULL,
@@ -117,3 +152,16 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 
 CREATE INDEX IF NOT EXISTS idx_tx_reference ON payment_transactions(reference);
 CREATE INDEX IF NOT EXISTS idx_tx_user ON payment_transactions(user_id);
+
+-- 10. Dynamic Platform Settings (Fuel Levers)
+CREATE TABLE IF NOT EXISTS platform_settings (
+    id INT PRIMARY KEY DEFAULT 1,
+    petrol_price_ngn NUMERIC(10, 2) NOT NULL DEFAULT 1050,
+    base_flag_fall_ngn NUMERIC(10, 2) NOT NULL DEFAULT 1500,
+    per_km_rate_ngn NUMERIC(10, 2) NOT NULL DEFAULT 350,
+    per_minute_rate_ngn NUMERIC(10, 2) NOT NULL DEFAULT 80,
+    lagos_mot_levy_ngn NUMERIC(10, 2) NOT NULL DEFAULT 50,
+    welcome_bonus_rides INT NOT NULL DEFAULT 5,
+    search_radius_km NUMERIC(5, 2) NOT NULL DEFAULT 7.0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

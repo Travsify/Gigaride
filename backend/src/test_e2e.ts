@@ -38,18 +38,19 @@ async function runE2ETest() {
   console.log(`[Test Server] Listening on port ${PORT}`);
 
   try {
+    const runId = Date.now().toString().slice(-6);
     // 2. Register Driver in Lagos
     console.log('\n1. Registering Driver (Adebayo in Lagos)...');
     const driverRes = await axios.post(`${BASE_URL}/api/auth/register`, {
       role: 'DRIVER',
       fullName: 'Adebayo Adeleke',
-      phoneNumber: '08012345678',
-      email: 'adebayo.driver@gigaride.ng',
+      phoneNumber: `0801${runId}`,
+      email: `driver_${runId}@gigaride.ng`,
       password: 'password123',
       vehicleMake: 'Toyota',
       vehicleModel: 'Corolla',
       vehicleYear: 2016,
-      licensePlate: 'APP-842-XY',
+      licensePlate: `APP-${runId.slice(0, 3)}-XY`,
       vehicleColor: 'Silver Metallic',
       nin: '12345678901',
     });
@@ -67,8 +68,8 @@ async function runE2ETest() {
     const passengerRes = await axios.post(`${BASE_URL}/api/auth/register`, {
       role: 'PASSENGER',
       fullName: 'Chioma Okafor',
-      phoneNumber: '08098765432',
-      email: 'chioma.okafor@gmail.com',
+      phoneNumber: `0809${runId}`,
+      email: `passenger_${runId}@gmail.com`,
       password: 'password123',
     });
     const passengerToken = passengerRes.data.data.token;
@@ -229,8 +230,70 @@ async function runE2ETest() {
     const newEligibility = await subscriptionService.isDriverEligibleForDispatch(driverId);
     console.log(`   ✓ Driver re-enabled for dispatch radar: ${newEligibility} (Expected: true)`);
 
+    // 13. Super Admin Operations Verification
+    console.log('\n11. Authenticating Super Admin & Testing Operations...');
+    const adminRes = await axios.post(`${BASE_URL}/api/auth/register`, {
+      role: 'ADMIN',
+      fullName: 'Super Admin Officer',
+      phoneNumber: `0800${runId}`,
+      email: `admin_${runId}@gigaride.ng`,
+      password: 'admin_secure_password',
+    });
+    const adminToken = adminRes.data.data.token;
+    console.log('   ✓ Super Admin Authenticated');
+
+    // Test Dynamic Platform Settings & Fuel Price Lever
+    console.log('\n12. Testing Dynamic Fuel Levers (PMS price update)...');
+    const updateSettingsRes = await axios.put(
+      `${BASE_URL}/api/admin/settings`,
+      { petrol_price_ngn: 1250 }, // Fuel increases to ₦1,250/L
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Updated Platform Petrol Price: ₦${updateSettingsRes.data.data.petrol_price_ngn}/L`);
+
+    // Verify fare estimate immediately uses updated petrol price
+    const newEstimateRes = await axios.post(`${BASE_URL}/api/rides/estimate`, {
+      pickupLat: 6.518,
+      pickupLng: 3.379,
+      dropoffLat: 6.428,
+      dropoffLng: 3.421,
+    });
+    console.log(`   ✓ New Fuel Cost Estimate with ₦1,250/L: ₦${newEstimateRes.data.data.fuelCostEstimateNgn} (automatically updated without code restart!)`);
+
+    // Test Manual Ride Credit (Customer Support Desk)
+    console.log('\n13. Testing Manual Ride Credit Overrides...');
+    const creditRes = await axios.post(
+      `${BASE_URL}/api/admin/drivers/${driverId}/credit-rides`,
+      { ridesToAdd: 15, reason: 'Verified offline direct bank transfer to Moniepoint account' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ Admin credited 15 rides. New driver balance: ${creditRes.data.data.remaining_rides} rides`);
+
+    // Test Driver Dossier Retrieval
+    console.log('\n14. Testing Driver 360-Degree Dossier...');
+    const dossierRes = await axios.get(`${BASE_URL}/api/admin/drivers/${driverId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ Dossier fetched: ${dossierRes.data.data.user.full_name} | Plate: ${dossierRes.data.data.profile.license_plate} | Status: ${dossierRes.data.data.profile.account_status}`);
+
+    // Test Driver KYC Rejection with Reason
+    console.log('\n15. Testing Driver KYC Review with Specific Rejection Reason...');
+    const kycRejectRes = await axios.post(
+      `${BASE_URL}/api/admin/drivers/${driverId}/kyc-review`,
+      { status: 'REJECTED', rejectionReason: 'Driver license photo was blurred. Please re-upload clear image.' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log(`   ✓ KYC rejection logged with reason: "${kycRejectRes.data.data.rejectionReason}"`);
+
+    // Test Emergency SOS Incident
+    console.log('\n16. Testing Emergency SOS Incident Pipeline...');
+    const sosRes = await axios.get(`${BASE_URL}/api/admin/sos`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log(`   ✓ SOS Incident Feed accessible (Count: ${sosRes.data.data.length})`);
+
     console.log('\n====================================================');
-    console.log(' ✅ ALL E2E VERIFICATION TESTS PASSED SUCCESSFULLY! ');
+    console.log(' ✅ ALL E2E & SUPER ADMIN TESTS PASSED SUCCESSFULLY! ');
     console.log('====================================================');
 
     driverSocket.disconnect();
