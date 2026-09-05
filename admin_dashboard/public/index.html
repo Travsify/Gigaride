@@ -2542,7 +2542,11 @@
   </div>
 
   <script>
-    const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:4000' : `${window.location.protocol}//${window.location.hostname}:4000`;
+    // API_BASE: always same-origin — server.js proxies /api/* → backend:4000
+    // This means port 4000 never needs to be publicly exposed on the VPS.
+    const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:3000'
+      : `${window.location.protocol}//${window.location.host}`;
     let adminToken = localStorage.getItem('giga_admin_token') || '';
     let currentAdminUser = null;
     try {
