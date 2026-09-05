@@ -6,6 +6,7 @@ import { ENV } from '../config/env';
 export interface UserRow {
   id: string;
   role: 'PASSENGER' | 'DRIVER' | 'ADMIN';
+  admin_role?: 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
   full_name: string;
   phone_number: string;
   email: string;
@@ -26,6 +27,11 @@ export interface DriverProfileRow {
   account_status: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   nin?: string;
   bvn?: string;
+  driver_license_expiry?: string | null;
+  insurance_expiry?: string | null;
+  road_worthiness_expiry?: string | null;
+  lasdri_card_number?: string | null;
+  lasdri_expiry?: string | null;
   rating_average: number;
   total_trips_completed: number;
   is_online: boolean;
@@ -63,6 +69,43 @@ export interface SubscriptionCreditAuditRow {
   new_rides: number;
   reason: string;
   created_at: string;
+}
+
+export interface AdminAuditLogRow {
+  id: string;
+  admin_id: string;
+  admin_email: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  details: any;
+  ip_address?: string;
+  created_at: string;
+}
+
+export interface DisputeRow {
+  id: string;
+  ride_id: string;
+  reporter_id: string;
+  reporter_role: 'PASSENGER' | 'DRIVER';
+  dispute_type: string;
+  description: string;
+  status: 'OPEN' | 'INVESTIGATING' | 'RESOLVED' | 'DISMISSED';
+  resolution_notes?: string;
+  driver_strike_applied: boolean;
+  compensation_rides: number;
+  created_at: string;
+  resolved_at?: string;
+}
+
+export interface RideGpsBreadcrumbRow {
+  id: string;
+  ride_id: string;
+  driver_id: string;
+  latitude: number;
+  longitude: number;
+  speed_kmh: number;
+  recorded_at: string;
 }
 
 export interface RideRow {
@@ -142,6 +185,9 @@ export class DatabaseService {
     subscription_plans: [] as SubscriptionPlanRow[],
     driver_subscriptions: [] as DriverSubscriptionRow[],
     subscription_credit_audits: [] as SubscriptionCreditAuditRow[],
+    admin_audit_logs: [] as AdminAuditLogRow[],
+    disputes: [] as DisputeRow[],
+    ride_gps_breadcrumbs: [] as RideGpsBreadcrumbRow[],
     rides: [] as RideRow[],
     ride_bids: [] as RideBidRow[],
     payment_transactions: [] as PaymentTransactionRow[],
@@ -190,6 +236,9 @@ export class DatabaseService {
         }
         if (!this.store.sos_incidents) this.store.sos_incidents = [];
         if (!this.store.subscription_credit_audits) this.store.subscription_credit_audits = [];
+        if (!this.store.admin_audit_logs) this.store.admin_audit_logs = [];
+        if (!this.store.disputes) this.store.disputes = [];
+        if (!this.store.ride_gps_breadcrumbs) this.store.ride_gps_breadcrumbs = [];
       } catch {
         this.saveStore();
       }
@@ -705,6 +754,213 @@ export class DatabaseService {
       openSosCount,
       platformSettings: this.store.platform_settings,
     };
+  }
+
+  // --- Dynamic Subscription Plan CRUD ---
+  public async createSubscriptionPlan(plan: SubscriptionPlanRow): Promise<SubscriptionPlanRow> {
+    const existing = this.store.subscription_plans.find((p) => p.id === plan.id);
+    if (existing) throw new Error(`Plan ID ${plan.id} already exists.`);
+    this.store.subscription_plans.push(plan);
+    this.saveStore();
+    return plan;
+  }
+
+  public async updateSubscriptionPlan(id: string, updates: Partial<SubscriptionPlanRow>): Promise<SubscriptionPlanRow> {
+    const plan = this.store.subscription_plans.find((p) => p.id === id);
+    if (!plan) throw new Error(`Plan ${id} not found.`);
+    Object.assign(plan, updates);
+    this.saveStore();
+    return plan;
+  }
+
+  public async deleteSubscriptionPlan(id: string): Promise<boolean> {
+    const idx = this.store.subscription_plans.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      this.store.subscription_plans.splice(idx, 1);
+      this.saveStore();
+      return true;
+    }
+    return false;
+  }
+
+  // --- Document Expiry & LASG Compliance ---
+  public async updateDriverDocuments(
+    driverId: string,
+    docs: {
+      driver_license_expiry?: string;
+      insurance_expiry?: string;
+      road_worthiness_expiry?: string;
+      lasdri_card_number?: string;
+      lasdri_expiry?: string;
+    }
+  ): Promise<DriverProfileRow> {
+    const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
+    if (!profile) throw new Error('Driver profile not found.');
+    Object.assign(profile, docs);
+    this.saveStore();
+    return profile;
+  }
+
+  public async getExpiringComplianceDrivers(daysAhead: number = 30): Promise<any[]> {
+    const now = new Date();
+    const threshold = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+
+    return this.store.driver_profiles
+      .map((p) => {
+        const user = this.store.users.find((u) => u.id === p.driver_id);
+        const isLicenseExpiring = !!(p.driver_license_expiry && new Date(p.driver_license_expiry) <= threshold);
+        const isInsuranceExpiring = !!(p.insurance_expiry && new Date(p.insurance_expiry) <= threshold);
+        const isRoadWorthinessExpiring = !!(p.road_worthiness_expiry && new Date(p.road_worthiness_expiry) <= threshold);
+        const isLasdriExpiring = !!(p.lasdri_expiry && new Date(p.lasdri_expiry) <= threshold);
+
+        const hasExpiredDoc = !!(
+          (p.driver_license_expiry && new Date(p.driver_license_expiry) < now) ||
+          (p.insurance_expiry && new Date(p.insurance_expiry) < now) ||
+          (p.road_worthiness_expiry && new Date(p.road_worthiness_expiry) < now) ||
+          (p.lasdri_expiry && new Date(p.lasdri_expiry) < now)
+        );
+
+        return {
+          ...p,
+          user,
+          complianceAlerts: {
+            isLicenseExpiring,
+            isInsuranceExpiring,
+            isRoadWorthinessExpiring,
+            isLasdriExpiring,
+            hasExpiredDoc,
+          },
+        };
+      })
+      .filter(
+        (d) =>
+          d.complianceAlerts.isLicenseExpiring ||
+          d.complianceAlerts.isInsuranceExpiring ||
+          d.complianceAlerts.isRoadWorthinessExpiring ||
+          d.complianceAlerts.isLasdriExpiring
+      );
+  }
+
+  // --- Immutable Admin Operations Audit Log ---
+  public async logAdminAudit(data: Omit<AdminAuditLogRow, 'id' | 'created_at'>): Promise<AdminAuditLogRow> {
+    const log: AdminAuditLogRow = {
+      id: `audit_log_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ...data,
+      created_at: new Date().toISOString(),
+    };
+    this.store.admin_audit_logs.unshift(log);
+    if (this.store.admin_audit_logs.length > 10000) {
+      this.store.admin_audit_logs.pop();
+    }
+    this.saveStore();
+    return log;
+  }
+
+  public async getAdminAuditLogs(limit: number = 100, action?: string): Promise<AdminAuditLogRow[]> {
+    let logs = [...this.store.admin_audit_logs];
+    if (action) {
+      logs = logs.filter((l) => l.action.toLowerCase().includes(action.toLowerCase()));
+    }
+    return logs.slice(0, limit);
+  }
+
+  // --- In-App Disputes Desk ---
+  public async createDispute(data: {
+    ride_id: string;
+    reporter_id: string;
+    reporter_role: 'PASSENGER' | 'DRIVER';
+    dispute_type: string;
+    description: string;
+  }): Promise<DisputeRow> {
+    const dispute: DisputeRow = {
+      id: `disp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ride_id: data.ride_id,
+      reporter_id: data.reporter_id,
+      reporter_role: data.reporter_role,
+      dispute_type: data.dispute_type,
+      description: data.description,
+      status: 'OPEN',
+      driver_strike_applied: false,
+      compensation_rides: 0,
+      created_at: new Date().toISOString(),
+    };
+    this.store.disputes.unshift(dispute);
+    this.saveStore();
+    return dispute;
+  }
+
+  public async getDisputes(status?: string): Promise<any[]> {
+    let list = [...this.store.disputes];
+    if (status && status !== 'ALL') {
+      list = list.filter((d) => d.status === status);
+    }
+    return list.map((d) => {
+      const ride = this.store.rides.find((r) => r.id === d.ride_id);
+      const reporter = this.store.users.find((u) => u.id === d.reporter_id);
+      const driver = ride?.driver_id ? this.store.users.find((u) => u.id === ride.driver_id) : null;
+      const passenger = ride?.rider_id ? this.store.users.find((u) => u.id === ride.rider_id) : null;
+      return { ...d, ride, reporter, driver, passenger };
+    });
+  }
+
+  public async resolveDispute(
+    id: string,
+    resolutionNotes: string,
+    driverStrikeApplied: boolean = false,
+    compensationRides: number = 0
+  ): Promise<DisputeRow> {
+    const dispute = this.store.disputes.find((d) => d.id === id);
+    if (!dispute) throw new Error(`Dispute ${id} not found.`);
+    dispute.status = 'RESOLVED';
+    dispute.resolution_notes = resolutionNotes;
+    dispute.driver_strike_applied = driverStrikeApplied;
+    dispute.compensation_rides = compensationRides;
+    dispute.resolved_at = new Date().toISOString();
+    this.saveStore();
+    return dispute;
+  }
+
+  // --- High-Resolution GPS Breadcrumbs ---
+  public async recordRideBreadcrumb(breadcrumb: Omit<RideGpsBreadcrumbRow, 'id' | 'recorded_at'>): Promise<RideGpsBreadcrumbRow> {
+    const entry: RideGpsBreadcrumbRow = {
+      id: `crumb_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      ...breadcrumb,
+      recorded_at: new Date().toISOString(),
+    };
+    this.store.ride_gps_breadcrumbs.push(entry);
+    this.saveStore();
+    return entry;
+  }
+
+  public async getRideBreadcrumbs(rideId: string): Promise<RideGpsBreadcrumbRow[]> {
+    return this.store.ride_gps_breadcrumbs
+      .filter((c) => c.ride_id === rideId)
+      .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
+  }
+
+  // --- LASG Ministry of Transportation ₦50 Levy Export Data ---
+  public async getCompletedRidesForMotExport(): Promise<any[]> {
+    const completed = this.store.rides.filter((r) => r.status === 'COMPLETED');
+    return completed.map((r) => {
+      const driverUser = r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : null;
+      const driverProfile = r.driver_id ? this.store.driver_profiles.find((d) => d.driver_id === r.driver_id) : null;
+      const passengerUser = this.store.users.find((u) => u.id === r.rider_id);
+
+      return {
+        ride_id: r.id,
+        completed_at: r.completed_at || r.created_at,
+        driver_name: driverUser?.full_name || 'Unknown',
+        driver_phone: driverUser?.phone_number || '',
+        driver_nin: driverProfile?.nin || 'N/A',
+        license_plate: driverProfile?.license_plate || 'N/A',
+        passenger_name: passengerUser?.full_name || 'Passenger',
+        pickup_address: r.pickup_address,
+        dropoff_address: r.dropoff_address,
+        distance_km: r.distance_km,
+        agreed_fare_ngn: r.agreed_fare_ngn || r.suggested_fare_ngn,
+        lagos_mot_levy_ngn: this.store.platform_settings.lagos_mot_levy_ngn,
+      };
+    });
   }
 }
 

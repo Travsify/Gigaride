@@ -40,16 +40,19 @@
       </div>
 
       <!-- Navigation Tabs -->
-      <nav class="hidden md:flex space-x-1">
-        <button onclick="switchTab('overview')" id="tabBtn_overview" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white">Overview</button>
-        <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Drivers & KYC</button>
-        <button onclick="switchTab('fleet')" id="tabBtn_fleet" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Live Fleet & Rides</button>
-        <button onclick="switchTab('sos')" id="tabBtn_sos" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white flex items-center gap-1.5">
-          <span>Emergency SOS</span>
+      <nav class="hidden lg:flex space-x-1">
+        <button onclick="switchTab('overview')" id="tabBtn_overview" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition bg-teal-600 text-white">Overview</button>
+        <button onclick="switchTab('drivers')" id="tabBtn_drivers" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Drivers & KYC</button>
+        <button onclick="switchTab('plans')" id="tabBtn_plans" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Plan Builder</button>
+        <button onclick="switchTab('disputes')" id="tabBtn_disputes" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Dispute Desk</button>
+        <button onclick="switchTab('fleet')" id="tabBtn_fleet" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Live Fleet</button>
+        <button onclick="switchTab('sos')" id="tabBtn_sos" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white flex items-center gap-1">
+          <span>SOS</span>
           <span id="sosBadgeHeader" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
         </button>
-        <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Finance & MOT Levy</button>
-        <button onclick="switchTab('settings')" id="tabBtn_settings" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Fuel & Levers</button>
+        <button onclick="switchTab('finance')" id="tabBtn_finance" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Finance & MOT</button>
+        <button onclick="switchTab('settings')" id="tabBtn_settings" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Fuel Levers</button>
+        <button onclick="switchTab('audit')" id="tabBtn_audit" class="tab-btn px-2.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">Audit Logs</button>
       </nav>
 
       <div class="flex items-center space-x-3">
@@ -66,13 +69,16 @@
   </header>
 
   <!-- Mobile Tab Bar -->
-  <div class="md:hidden flex overflow-x-auto bg-slate-900 border-b border-slate-800 px-4 py-2 space-x-2 text-xs">
+  <div class="lg:hidden flex overflow-x-auto bg-slate-900 border-b border-slate-800 px-4 py-2 space-x-2 text-xs">
     <button onclick="switchTab('overview')" class="px-3 py-1 bg-teal-600 rounded text-white font-bold whitespace-nowrap">Overview</button>
     <button onclick="switchTab('drivers')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Drivers</button>
+    <button onclick="switchTab('plans')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Plans</button>
+    <button onclick="switchTab('disputes')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Disputes</button>
     <button onclick="switchTab('fleet')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Fleet</button>
     <button onclick="switchTab('sos')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">SOS</button>
     <button onclick="switchTab('finance')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Finance</button>
-    <button onclick="switchTab('settings')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Settings</button>
+    <button onclick="switchTab('settings')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Levers</button>
+    <button onclick="switchTab('audit')" class="px-3 py-1 bg-slate-800 rounded text-slate-300 font-bold whitespace-nowrap">Audits</button>
   </div>
 
   <!-- Main Container -->
@@ -335,8 +341,8 @@
             <span class="text-xs text-slate-400">Total Levy Accrued to Date:</span>
             <span id="financeMotLevy" class="text-2xl font-bold text-amber-400">₦0</span>
           </div>
-          <button onclick="alert('Trip levy ledger exported to CSV format ready for LASG compliance filing.')" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs py-2.5 rounded-lg font-bold border border-slate-700 transition flex items-center justify-center gap-2">
-            <i class="fa-solid fa-file-export"></i> Export LASG MOT Audit Report
+          <button onclick="downloadLasgMotCsv()" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-2.5 rounded-lg font-bold border border-teal-500 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-csv text-base"></i> Download Official LASG MOT Tax CSV Audit Report
           </button>
         </div>
 
@@ -451,6 +457,90 @@
       </div>
     </div>
 
+    <!-- ==================== TAB 7: SUBSCRIPTION PLANS BUILDER ==================== -->
+    <div id="tab_plans" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-layer-group text-teal-400"></i>
+              <span>Subscription Plans Manager & Dynamic Pricing</span>
+            </h2>
+            <p class="text-xs text-slate-400">Create, edit, discount, or deactivate driver subscription tiers. Reflected instantly in mobile apps.</p>
+          </div>
+          <button onclick="openPlanModal()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-4 py-2 rounded-lg font-bold transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Create New Plan
+          </button>
+        </div>
+
+        <div id="plansGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 8: DISPUTES & SAFETY DESK ==================== -->
+    <div id="tab_disputes" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-scale-balanced text-amber-400"></i>
+              <span>Passenger & Driver Dispute Resolution Desk</span>
+            </h2>
+            <p class="text-xs text-slate-400">Triage AC refusal, extra cash extortion, off-route deviations, and fare disagreements with 1-click strikes or compensations.</p>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="loadDisputes('ALL')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold hover:bg-slate-700">All</button>
+            <button onclick="loadDisputes('OPEN')" class="text-xs px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 font-bold border border-amber-500/30">Open</button>
+            <button onclick="loadDisputes('RESOLVED')" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 font-bold border border-emerald-500/30">Resolved</button>
+          </div>
+        </div>
+
+        <div id="disputesContainer" class="space-y-4">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 9: IMMUTABLE AUDIT LOGS ==================== -->
+    <div id="tab_audit" class="tab-content hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+              <span>Administrative Operations Audit Trail</span>
+            </h2>
+            <p class="text-xs text-slate-400">Immutable chronological log of all KYC reviews, platform price edits, manual ride credits, and dispute settlements.</p>
+          </div>
+          <button onclick="loadAuditLogs()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate"></i> Refresh Logs
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-2.5 px-3">Timestamp</th>
+                <th class="py-2.5 px-3">Admin</th>
+                <th class="py-2.5 px-3">Action</th>
+                <th class="py-2.5 px-3">Target Resource</th>
+                <th class="py-2.5 px-3">IP Address</th>
+                <th class="py-2.5 px-3">Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogsTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="6" class="py-6 text-center text-slate-500">Loading audit trail...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- ==================== MODAL 1: DRIVER 360 DOSSIER ==================== -->
@@ -498,6 +588,155 @@
           <button type="submit" class="px-4 py-1.5 rounded bg-teal-600 hover:bg-teal-500 font-bold text-white">Confirm Credit</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: SUBSCRIPTION PLAN BUILDER ==================== -->
+  <div id="planModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="planModalTitle" class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-layer-group text-teal-400"></i> Create Subscription Plan
+        </h3>
+        <button onclick="closeModal('planModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="planForm" onsubmit="submitPlanForm(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="planIsEdit" value="false" />
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Plan Identifier (Unique ID):</label>
+          <input type="text" id="planId" required placeholder="e.g. plan_weekend_flash" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Plan Display Name:</label>
+          <input type="text" id="planName" required placeholder="e.g. 25-Ride Weekend Flash" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-bold" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Description:</label>
+          <textarea id="planDesc" required rows="2" placeholder="Value proposition for driver" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Plan Type:</label>
+            <select id="planType" onchange="togglePlanRidesInput()" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white">
+              <option value="RIDE_COUNT">Ride Count</option>
+              <option value="UNLIMITED">Unlimited</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Ride Count:</label>
+            <input type="number" id="planTotalRides" min="1" max="1000" value="25" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Duration (Days):</label>
+            <input type="number" id="planDuration" min="1" max="365" value="7" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+          </div>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Price (₦ Naira):</label>
+            <input type="number" id="planPriceNgn" min="500" step="100" value="3500" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-amber-400 font-bold" />
+          </div>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('planModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-teal-600 hover:bg-teal-500 font-bold text-white">Save Plan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4: DISPUTE RESOLUTION ==================== -->
+  <div id="disputeModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-scale-balanced text-amber-400"></i> Resolve Trip Dispute
+        </h3>
+        <button onclick="closeModal('disputeModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="disputeForm" onsubmit="submitResolveDispute(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="resolveDisputeId" />
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Dispute Context:</label>
+          <p id="disputeContextText" class="text-slate-300 bg-slate-950 p-2.5 rounded-lg border border-slate-800"></p>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Resolution Summary Note (Mandatory):</label>
+          <textarea id="disputeNotes" required rows="2" placeholder="e.g. Driver issued caution regarding AC policy; passenger awarded goodwill gesture." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"></textarea>
+        </div>
+        <div class="space-y-2 pt-1">
+          <label class="flex items-center space-x-2 text-white font-medium cursor-pointer">
+            <input type="checkbox" id="disputeStrike" class="rounded bg-slate-950 border-slate-700 text-red-600 focus:ring-0" />
+            <span class="text-red-400 font-bold">Apply Official Driver Warning Strike</span>
+          </label>
+          <div>
+            <label class="block text-slate-300 font-bold mb-1">Compensate Driver with Free Rides (Optional):</label>
+            <input type="number" id="disputeCompRides" min="0" max="50" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-teal-400 font-bold" />
+          </div>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('disputeModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 font-bold text-white">Resolve Dispute</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 5: DOCUMENT EXPIRATION MANAGEMENT ==================== -->
+  <div id="docsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-file-contract text-teal-400"></i> Update Driver Documents & Expiry
+        </h3>
+        <button onclick="closeModal('docsModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="docsForm" onsubmit="submitDocsForm(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="docsDriverId" />
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Driver License Expiry:</label>
+          <input type="date" id="docLicenseExp" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Vehicle Insurance Expiry:</label>
+          <input type="date" id="docInsuranceExp" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">Road Worthiness Expiry:</label>
+          <input type="date" id="docRoadWorthExp" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">LASDRI Card Number:</label>
+          <input type="text" id="docLasdriNum" placeholder="e.g. LASDRI/2026/0948" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+        </div>
+        <div>
+          <label class="block text-slate-300 font-bold mb-1">LASDRI Card Expiry:</label>
+          <input type="date" id="docLasdriExp" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white" />
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('docsModal')" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-teal-600 hover:bg-teal-500 font-bold text-white">Save Expirations</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 6: HIGH-RES GPS ROUTE PLAYBACK ==================== -->
+  <div id="breadcrumbsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-route text-teal-400"></i> Trip GPS Breadcrumb Route Timeline
+        </h3>
+        <button onclick="closeModal('breadcrumbsModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div id="breadcrumbsContent" class="space-y-3 text-xs">
+        <!-- Dynamically populated -->
+      </div>
     </div>
   </div>
 
@@ -550,10 +789,13 @@
       }
 
       if (tabId === 'drivers') loadDrivers(currentFilter);
+      if (tabId === 'plans') loadPlans();
+      if (tabId === 'disputes') loadDisputes('ALL');
       if (tabId === 'fleet') loadFleetAndRides();
       if (tabId === 'sos') loadSos();
       if (tabId === 'finance') loadFinance();
       if (tabId === 'settings') loadSettings();
+      if (tabId === 'audit') loadAuditLogs();
     }
 
     async function refreshAll() {
@@ -562,6 +804,9 @@
       loadDrivers(currentFilter);
       loadFleetAndRides();
       loadSos();
+      loadPlans();
+      loadDisputes('ALL');
+      loadAuditLogs();
     }
 
     async function fetchAnalytics() {
@@ -703,6 +948,24 @@
               <div>
                 <p class="text-slate-400">Account Governance</p>
                 <p class="font-bold text-sm ${d.profile.account_status === 'ACTIVE' ? 'text-emerald-400' : 'text-red-400'}">${d.profile.account_status}</p>
+              </div>
+            </div>
+
+            <!-- Regulatory Document Expiry Section -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-teal-400 font-bold flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-shield"></i> Regulatory Document Expirations (LASG/FRSC)
+                </span>
+                <button onclick="openDocsModal('${d.profile.driver_id}', '${d.profile.driver_license_expiry || ''}', '${d.profile.insurance_expiry || ''}', '${d.profile.road_worthiness_expiry || ''}', '${d.profile.lasdri_card_number || ''}', '${d.profile.lasdri_expiry || ''}')" class="px-2.5 py-1 rounded bg-teal-600/30 text-teal-300 font-bold border border-teal-500/40 hover:bg-teal-600 hover:text-white transition">
+                  <i class="fa-solid fa-pen-to-square mr-1"></i> Update Dates
+                </button>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-slate-300">
+                <div><span class="text-slate-500">License Exp:</span> <strong>${d.profile.driver_license_expiry ? new Date(d.profile.driver_license_expiry).toLocaleDateString() : '<span class="text-red-400">Not Uploaded</span>'}</strong></div>
+                <div><span class="text-slate-500">Insurance Exp:</span> <strong>${d.profile.insurance_expiry ? new Date(d.profile.insurance_expiry).toLocaleDateString() : '<span class="text-red-400">Not Uploaded</span>'}</strong></div>
+                <div><span class="text-slate-500">Road Worthiness:</span> <strong>${d.profile.road_worthiness_expiry ? new Date(d.profile.road_worthiness_expiry).toLocaleDateString() : '<span class="text-red-400">Not Uploaded</span>'}</strong></div>
+                <div><span class="text-slate-500">LASDRI Card:</span> <strong>${d.profile.lasdri_card_number ? (d.profile.lasdri_card_number + (d.profile.lasdri_expiry ? ' (Exp: ' + new Date(d.profile.lasdri_expiry).toLocaleDateString() + ')' : '')) : '<span class="text-red-400">Not Uploaded</span>'}</strong></div>
               </div>
             </div>
 
@@ -976,6 +1239,330 @@
         }
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    // ==================== TAB 7: PLANS CRUD ====================
+    async function loadPlans() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/plans`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const container = document.getElementById('plansGrid');
+        if (data.data && data.data.length > 0) {
+          container.innerHTML = data.data.map(p => `
+            <div class="bg-slate-950 p-5 rounded-xl border ${p.is_active ? 'border-slate-800' : 'border-red-900/50 opacity-70'} text-xs flex flex-col justify-between">
+              <div>
+                <div class="flex justify-between items-start mb-2">
+                  <h4 class="font-bold text-white text-sm">${p.name}</h4>
+                  <span class="px-2 py-0.5 rounded font-bold ${p.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${p.is_active ? 'ACTIVE' : 'DISABLED'}</span>
+                </div>
+                <p class="text-slate-400 mb-3">${p.description}</p>
+                <div class="space-y-1 mb-4 text-slate-300">
+                  <p><strong>Quota:</strong> ${p.plan_type === 'UNLIMITED' ? 'Unlimited Rides' : p.total_rides + ' Rides'}</p>
+                  <p><strong>Validity:</strong> ${p.duration_days} Days</p>
+                  <p><strong>Price:</strong> <span class="text-amber-400 font-bold text-sm">₦${(p.price_kobo / 100).toLocaleString()}</span></p>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-slate-900 flex justify-between gap-2">
+                <button onclick="togglePlanStatus('${p.id}', ${p.is_active})" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium">${p.is_active ? 'Deactivate' : 'Activate'}</button>
+                <button onclick="deletePlan('${p.id}')" class="px-2.5 py-1 rounded bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-medium">Delete</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center col-span-3">No plans configured.</p>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function togglePlanRidesInput() {
+      const type = document.getElementById('planType').value;
+      const input = document.getElementById('planTotalRides');
+      if (type === 'UNLIMITED') {
+        input.value = '';
+        input.disabled = true;
+      } else {
+        input.disabled = false;
+        if (!input.value) input.value = '25';
+      }
+    }
+
+    function openPlanModal() {
+      document.getElementById('planId').value = `plan_${Date.now()}`;
+      document.getElementById('planId').disabled = false;
+      document.getElementById('planName').value = '';
+      document.getElementById('planDesc').value = '';
+      document.getElementById('planType').value = 'RIDE_COUNT';
+      document.getElementById('planTotalRides').value = '25';
+      document.getElementById('planTotalRides').disabled = false;
+      document.getElementById('planDuration').value = '7';
+      document.getElementById('planPriceNgn').value = '3500';
+      document.getElementById('planModal').classList.remove('hidden');
+    }
+
+    async function submitPlanForm(e) {
+      e.preventDefault();
+      const planType = document.getElementById('planType').value;
+      const payload = {
+        id: document.getElementById('planId').value,
+        name: document.getElementById('planName').value,
+        description: document.getElementById('planDesc').value,
+        plan_type: planType,
+        total_rides: planType === 'UNLIMITED' ? null : parseInt(document.getElementById('planTotalRides').value, 10),
+        duration_days: parseInt(document.getElementById('planDuration').value, 10),
+        price_kobo: Math.round(parseFloat(document.getElementById('planPriceNgn').value) * 100),
+        is_active: true,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/plans`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('planModal');
+          alert('Subscription plan created successfully!');
+          loadPlans();
+          fetchAnalytics();
+        } else {
+          alert(data.message);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function togglePlanStatus(id, currentActive) {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/plans/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ is_active: !currentActive })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPlans();
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function deletePlan(id) {
+      if (!confirm(`Delete plan ${id}?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/plans/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPlans();
+          fetchAnalytics();
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    // ==================== TAB 8: DISPUTES DESK ====================
+    async function loadDisputes(status = 'ALL') {
+      try {
+        const url = status === 'ALL' ? `${API_BASE}/api/admin/disputes` : `${API_BASE}/api/admin/disputes?status=${status}`;
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const container = document.getElementById('disputesContainer');
+        if (data.data && data.data.length > 0) {
+          container.innerHTML = data.data.map(d => `
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-xs">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded font-bold ${d.status === 'OPEN' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}">${d.status}</span>
+                  <span class="font-bold text-white uppercase">${d.dispute_type.replace(/_/g, ' ')}</span>
+                  <span class="text-slate-500 font-mono">${new Date(d.created_at).toLocaleString()}</span>
+                </div>
+                ${d.status === 'OPEN' ? `
+                  <button onclick="openResolveDisputeModal('${d.id}', '${d.dispute_type}: ${d.description.replace(/'/g, "\\'")}')" class="px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold">Resolve Ticket</button>
+                ` : ''}
+              </div>
+              <p class="text-slate-300 mb-3 bg-slate-900 p-3 rounded-lg border border-slate-800/80">${d.description}</p>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-400">
+                <p><strong>Reporter:</strong> ${d.reporter ? d.reporter.full_name : 'User'} (${d.reporter_role})</p>
+                <p><strong>Driver:</strong> ${d.driver ? d.driver.full_name : 'N/A'}</p>
+                <p><strong>Passenger:</strong> ${d.passenger ? d.passenger.full_name : 'N/A'}</p>
+                <p><strong>Strike Applied:</strong> ${d.driver_strike_applied ? '<span class="text-red-400 font-bold">YES</span>' : 'NO'}</p>
+              </div>
+              ${d.resolution_notes ? `
+                <div class="mt-3 pt-2 border-t border-slate-900 text-emerald-400">
+                  <strong>Resolution:</strong> ${d.resolution_notes}
+                </div>
+              ` : ''}
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs"><i class="fa-solid fa-check-circle text-emerald-400 text-2xl block mb-2"></i>No unresolved tickets or disputes.</div>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function openResolveDisputeModal(id, context) {
+      document.getElementById('resolveDisputeId').value = id;
+      document.getElementById('disputeContextText').textContent = context;
+      document.getElementById('disputeNotes').value = '';
+      document.getElementById('disputeStrike').checked = false;
+      document.getElementById('disputeCompRides').value = '0';
+      document.getElementById('disputeModal').classList.remove('hidden');
+    }
+
+    async function submitResolveDispute(e) {
+      e.preventDefault();
+      const id = document.getElementById('resolveDisputeId').value;
+      const notes = document.getElementById('disputeNotes').value;
+      const driverStrikeApplied = document.getElementById('disputeStrike').checked;
+      const compensationRides = parseInt(document.getElementById('disputeCompRides').value, 10);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/disputes/${id}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ notes, driverStrikeApplied, compensationRides })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('disputeModal');
+          alert('Dispute marked resolved!');
+          loadDisputes('ALL');
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== TAB 9: IMMUTABLE AUDIT LOGS ====================
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/audit-logs`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('auditLogsTableBody');
+        if (data.data && data.data.length > 0) {
+          tbody.innerHTML = data.data.map(l => `
+            <tr>
+              <td class="py-2.5 px-3 font-mono text-slate-400">${new Date(l.created_at).toLocaleTimeString()} ${new Date(l.created_at).toLocaleDateString()}</td>
+              <td class="py-2.5 px-3 font-bold text-white">${l.admin_email}</td>
+              <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-xs font-bold bg-teal-500/20 text-teal-300 font-mono">${l.action}</span></td>
+              <td class="py-2.5 px-3 text-slate-300">${l.resource_type} ${l.resource_id ? '(' + l.resource_id.slice(0, 8) + '...)' : ''}</td>
+              <td class="py-2.5 px-3 font-mono text-slate-400">${l.ip_address || '127.0.0.1'}</td>
+              <td class="py-2.5 px-3 font-mono text-xs text-slate-400 max-w-xs truncate">${JSON.stringify(l.details)}</td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">No audit logs recorded yet.</td></tr>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // ==================== 1-CLICK LASG MOT CSV EXPORT ====================
+    async function downloadLasgMotCsv() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/finance/lasg-mot-export`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!res.ok) throw new Error('Failed to generate export');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LASG_MOT_Levy_Audit_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== DOCUMENT EXPIRATION MANAGEMENT ====================
+    function openDocsModal(driverId, licExp = '', insExp = '', roadExp = '', lasdriNum = '', lasdriExp = '') {
+      document.getElementById('docsDriverId').value = driverId;
+      document.getElementById('docLicenseExp').value = licExp ? licExp.slice(0, 10) : '';
+      document.getElementById('docInsuranceExp').value = insExp ? insExp.slice(0, 10) : '';
+      document.getElementById('docRoadWorthExp').value = roadExp ? roadExp.slice(0, 10) : '';
+      document.getElementById('docLasdriNum').value = lasdriNum;
+      document.getElementById('docLasdriExp').value = lasdriExp ? lasdriExp.slice(0, 10) : '';
+      document.getElementById('docsModal').classList.remove('hidden');
+    }
+
+    async function submitDocsForm(e) {
+      e.preventDefault();
+      const driverId = document.getElementById('docsDriverId').value;
+      const payload = {
+        driver_license_expiry: document.getElementById('docLicenseExp').value ? new Date(document.getElementById('docLicenseExp').value).toISOString() : undefined,
+        insurance_expiry: document.getElementById('docInsuranceExp').value ? new Date(document.getElementById('docInsuranceExp').value).toISOString() : undefined,
+        road_worthiness_expiry: document.getElementById('docRoadWorthExp').value ? new Date(document.getElementById('docRoadWorthExp').value).toISOString() : undefined,
+        lasdri_card_number: document.getElementById('docLasdriNum').value || undefined,
+        lasdri_expiry: document.getElementById('docLasdriExp').value ? new Date(document.getElementById('docLasdriExp').value).toISOString() : undefined,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/drivers/${driverId}/documents`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('docsModal');
+          closeModal('dossierModal');
+          alert('Driver compliance documents updated successfully!');
+          loadDrivers(currentFilter);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ==================== BREADCRUMBS GPS ROUTE INSPECTOR ====================
+    async function openBreadcrumbsModal(rideId) {
+      document.getElementById('breadcrumbsModal').classList.remove('hidden');
+      const container = document.getElementById('breadcrumbsContent');
+      container.innerHTML = '<p class="text-slate-400">Fetching high-resolution GPS trace...</p>';
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/rides/${rideId}/breadcrumbs`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          container.innerHTML = data.data.map((c, idx) => `
+            <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+              <div class="flex items-center space-x-2">
+                <span class="w-5 h-5 rounded-full bg-teal-500/20 text-teal-400 font-bold flex items-center justify-center text-xs">${idx + 1}</span>
+                <span class="font-mono text-white">${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-amber-400 font-bold">${c.speed_kmh} km/h</span>
+                <span class="text-slate-500 ml-2 font-mono">${new Date(c.recorded_at).toLocaleTimeString()}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="p-6 text-center text-slate-500">No breadcrumb GPS data streamed for this ride yet.</div>';
+        }
+      } catch (e) {
+        container.innerHTML = `<p class="text-red-400">${e.message}</p>`;
       }
     }
 

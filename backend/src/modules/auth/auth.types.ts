@@ -21,11 +21,14 @@ export interface LoginDto {
   password: string;
 }
 
+export type AdminRole = 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
+
 export interface AuthResponse {
   token: string;
   user: {
     id: string;
     role: UserRole;
+    adminRole?: AdminRole;
     fullName: string;
     phoneNumber: string;
     email: string;
@@ -36,6 +39,7 @@ export interface AuthResponse {
 export interface JwtPayload {
   userId: string;
   role: UserRole;
+  adminRole?: AdminRole;
   email: string;
   phoneNumber: string;
 }

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
-import { JwtPayload, UserRole } from './auth.types';
+import { JwtPayload, UserRole, AdminRole } from './auth.types';
 
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
@@ -39,5 +39,26 @@ export function requireRole(allowedRoles: UserRole[]) {
     }
 
     next();
+  };
+}
+
+export function requireAdminRole(allowedAdminRoles: AdminRole[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      res.status(403).json({ success: false, message: 'Admin privileges required.' });
+      return;
+    }
+
+    const currentRole = req.user.adminRole || 'SUPER_ADMIN';
+    // SUPER_ADMIN has access to everything
+    if (currentRole === 'SUPER_ADMIN' || allowedAdminRoles.includes(currentRole)) {
+      next();
+      return;
+    }
+
+    res.status(403).json({
+      success: false,
+      message: `Forbidden: This action requires [${allowedAdminRoles.join(', ')}] permissions. Current role: ${currentRole}`,
+    });
   };
 }

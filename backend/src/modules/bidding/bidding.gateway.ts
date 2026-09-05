@@ -51,8 +51,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
       socket.join('admin_room');
     }
 
-    // --- Driver Location Updates & Entitlement Refresh ---
-    socket.on('driver:location', async (data: { latitude: number; longitude: number; isOnline?: boolean }) => {
+    // --- Driver Location Updates, Entitlement Refresh & Breadcrumbs ---
+    socket.on('driver:location', async (data: { latitude: number; longitude: number; isOnline?: boolean; activeRideId?: string; speedKmh?: number }) => {
       if (user.role !== 'DRIVER') return;
 
       const subStatus = await subscriptionService.getDriverSubscriptionStatus(user.userId);
@@ -66,6 +66,17 @@ export function setupBiddingGateway(io: SocketIOServer) {
         remainingRides: subStatus.remainingRides,
         updatedAt: Date.now(),
       });
+
+      // Record high-resolution breadcrumb if driver is currently on an active ride
+      if (data.activeRideId) {
+        db.recordRideBreadcrumb({
+          ride_id: data.activeRideId,
+          driver_id: user.userId,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          speed_kmh: data.speedKmh || 0,
+        }).catch((err) => console.error('Failed to log GPS breadcrumb:', err));
+      }
     });
 
     // --- Passenger creates / broadcasts ride request ---

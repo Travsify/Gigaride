@@ -54,6 +54,23 @@ export class SubscriptionService {
    * If driver has 0 rides (or has exceeded grace limit), they are strictly ineligible.
    */
   public async isDriverEligibleForDispatch(driverId: string): Promise<boolean> {
+    const profile = await db.getDriverProfile(driverId);
+    if (!profile || profile.account_status !== 'ACTIVE' || profile.kyc_status === 'REJECTED') {
+      return false;
+    }
+
+    // Safety & Regulatory Gate: verify document expiration
+    const now = new Date();
+    if (profile.driver_license_expiry && new Date(profile.driver_license_expiry) < now) {
+      return false;
+    }
+    if (profile.insurance_expiry && new Date(profile.insurance_expiry) < now) {
+      return false;
+    }
+    if (profile.road_worthiness_expiry && new Date(profile.road_worthiness_expiry) < now) {
+      return false;
+    }
+
     const status = await this.getDriverSubscriptionStatus(driverId);
     return status.canReceiveRides;
   }
@@ -100,6 +117,7 @@ export class SubscriptionService {
 
   /**
    * Activates a purchased subscription plan for a driver.
+   * Automatically recovers any negative grace balance used during emergency grace trips.
    */
   public async activateSubscription(driverId: string, planId: string, paymentReference?: string): Promise<DriverSubscriptionRow> {
     const plan = await db.getPlanById(planId);
@@ -110,12 +128,22 @@ export class SubscriptionService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
 
+    // Negative grace balance debt carryover recovery
+    const existingSub = await db.getActiveDriverSubscription(driverId);
+    let finalRemainingRides = plan.total_rides !== null ? plan.total_rides : 999999;
+
+    if (existingSub && existingSub.remaining_rides < 0 && plan.total_rides !== null) {
+      const graceDebt = Math.abs(existingSub.remaining_rides);
+      finalRemainingRides = Math.max(0, finalRemainingRides - graceDebt);
+      console.log(`[Grace Debt Recovery] Deducted ${graceDebt} grace rides from Driver ${driverId}. Allocated net: ${finalRemainingRides}`);
+    }
+
     const newSub: DriverSubscriptionRow = {
       id: uuidv4(),
       driver_id: driverId,
       plan_id: plan.id,
       status: 'ACTIVE',
-      remaining_rides: plan.total_rides !== null ? plan.total_rides : 999999,
+      remaining_rides: finalRemainingRides,
       starts_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       created_at: now.toISOString(),

@@ -120,6 +120,7 @@ export class AuthService {
       user: {
         id: user.id,
         role: user.role,
+        adminRole: user.role === 'ADMIN' ? (user.admin_role || 'SUPER_ADMIN') : undefined,
         fullName: user.full_name,
         phoneNumber: user.phone_number,
         email: user.email,
@@ -132,6 +133,7 @@ export class AuthService {
     const payload: JwtPayload = {
       userId: user.id,
       role: user.role,
+      adminRole: user.role === 'ADMIN' ? (user.admin_role || 'SUPER_ADMIN') : undefined,
       email: user.email,
       phoneNumber: user.phone_number,
     };

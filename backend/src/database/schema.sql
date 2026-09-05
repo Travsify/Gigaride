@@ -7,6 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     role VARCHAR(20) NOT NULL CHECK (role IN ('PASSENGER', 'DRIVER', 'ADMIN')),
+    admin_role VARCHAR(30) DEFAULT 'SUPER_ADMIN' CHECK (admin_role IN ('SUPER_ADMIN', 'SUPPORT_AGENT', 'KYC_OFFICER', 'FINANCE_ADMIN')),
     full_name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(20) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -31,6 +32,11 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
     account_status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (account_status IN ('ACTIVE', 'SUSPENDED', 'BANNED')),
     nin VARCHAR(20),
     bvn VARCHAR(20),
+    driver_license_expiry TIMESTAMP WITH TIME ZONE,
+    insurance_expiry TIMESTAMP WITH TIME ZONE,
+    road_worthiness_expiry TIMESTAMP WITH TIME ZONE,
+    lasdri_card_number VARCHAR(50),
+    lasdri_expiry TIMESTAMP WITH TIME ZONE,
     rating_average NUMERIC(3, 2) DEFAULT 5.0,
     total_trips_completed INT DEFAULT 0,
     is_online BOOLEAN DEFAULT false,
@@ -41,6 +47,7 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
 CREATE INDEX IF NOT EXISTS idx_driver_kyc ON driver_profiles(kyc_status);
 CREATE INDEX IF NOT EXISTS idx_driver_online ON driver_profiles(is_online);
 CREATE INDEX IF NOT EXISTS idx_driver_status ON driver_profiles(account_status);
+CREATE INDEX IF NOT EXISTS idx_driver_license_exp ON driver_profiles(driver_license_expiry);
 
 -- 3. Subscription Plans
 CREATE TABLE IF NOT EXISTS subscription_plans (
@@ -165,3 +172,53 @@ CREATE TABLE IF NOT EXISTS platform_settings (
     search_radius_km NUMERIC(5, 2) NOT NULL DEFAULT 7.0,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 11. Immutable Admin Operations Audit Log
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id VARCHAR(50) PRIMARY KEY,
+    admin_id UUID NOT NULL REFERENCES users(id),
+    admin_email VARCHAR(100) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(100),
+    details JSONB NOT NULL,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_audit_logs(admin_id);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON admin_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_logs(created_at);
+
+-- 12. In-App Passenger & Driver Disputes Desk
+CREATE TABLE IF NOT EXISTS disputes (
+    id VARCHAR(50) PRIMARY KEY,
+    ride_id UUID NOT NULL REFERENCES rides(id),
+    reporter_id UUID NOT NULL REFERENCES users(id),
+    reporter_role VARCHAR(20) NOT NULL CHECK (reporter_role IN ('PASSENGER', 'DRIVER')),
+    dispute_type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED')),
+    resolution_notes TEXT,
+    driver_strike_applied BOOLEAN DEFAULT false,
+    compensation_rides INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_disputes_status ON disputes(status);
+CREATE INDEX IF NOT EXISTS idx_disputes_ride ON disputes(ride_id);
+
+-- 13. High-Resolution Trip GPS Breadcrumbs (Route Playback & Anti-Kidnap)
+CREATE TABLE IF NOT EXISTS ride_gps_breadcrumbs (
+    id VARCHAR(50) PRIMARY KEY,
+    ride_id UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
+    driver_id UUID NOT NULL REFERENCES users(id),
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    speed_kmh DOUBLE PRECISION DEFAULT 0,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_breadcrumbs_ride ON ride_gps_breadcrumbs(ride_id);
+
