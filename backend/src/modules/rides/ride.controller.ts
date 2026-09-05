@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { rideService } from './ride.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
+import { db } from '../../database';
 
 export const rideRouter = Router();
 
@@ -83,17 +84,58 @@ rideRouter.get(
   }
 );
 
-// Driver history
-rideRouter.get(
-  '/history/driver',
+// Passenger pays trip fare from Giga Wallet (Dedicated Virtual Account)
+rideRouter.post(
+  '/:id/pay-wallet',
   requireAuth,
-  requireRole(['DRIVER']),
+  requireRole(['PASSENGER']),
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const history = await rideService.getDriverHistory(req.user!.userId);
-      res.status(200).json({ success: true, data: history });
-    } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      const rideId = String(req.params.id);
+      const ride = await db.getRideById(rideId);
+      if (!ride) {
+        res.status(404).json({ success: false, message: 'Ride not found' });
+        return;
+      }
+
+      if (ride.rider_id !== req.user!.userId) {
+        res.status(403).json({ success: false, message: 'Unauthorized.' });
+        return;
+      }
+
+      if (!ride.driver_id) {
+        res.status(400).json({ success: false, message: 'No driver assigned to this ride.' });
+        return;
+      }
+
+      const fareNgn = ride.agreed_fare_ngn || ride.suggested_fare_ngn;
+      const passengerVba = await db.getVirtualAccountByUserId(req.user!.userId);
+      if (!passengerVba || passengerVba.balance_ngn < fareNgn) {
+        res.status(400).json({
+          success: false,
+          message: `Insufficient wallet balance (Current: ₦${passengerVba?.balance_ngn || 0}, Required: ₦${fareNgn}). Please fund your dedicated virtual bank account.`,
+        });
+        return;
+      }
+
+      const driverVba = await db.getVirtualAccountByUserId(ride.driver_id);
+      if (!driverVba) {
+        res.status(400).json({ success: false, message: 'Driver virtual account not found.' });
+        return;
+      }
+
+      // Deduct from passenger wallet & credit driver wallet
+      await db.debitVirtualAccountBalance(passengerVba.account_number, fareNgn);
+      await db.creditVirtualAccountBalance(driverVba.account_number, fareNgn);
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully paid ₦${fareNgn.toLocaleString()} from Giga Wallet to driver.`,
+        fareNgn,
+        newPassengerBalance: (passengerVba.balance_ngn - fareNgn),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 );

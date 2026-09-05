@@ -3,6 +3,7 @@ import { authService } from '../auth/auth.service';
 import { db } from '../../database';
 import { geoSessionManager } from '../../common/redis';
 import { subscriptionService } from '../subscriptions/subscription.service';
+import { autoTopupService } from '../subscriptions/autoTopup.service';
 import { calculateHaversineDistanceKm } from '../../common/geo';
 
 interface AuthenticatedSocket extends Socket {
@@ -253,6 +254,16 @@ export function setupBiddingGateway(io: SocketIOServer) {
               message: 'You have completed all your subscribed rides! Please recharge to get more passengers.',
               remainingRides: deduction.remainingRides,
             });
+          }
+
+          // Trigger Auto Top-Up & 2-Grace Period Evaluation
+          const topupResult = await autoTopupService.checkAndProcessDriverThreshold(user.userId);
+          if (topupResult.renewed) {
+            socket.emit('subscription:auto_renewed', { message: topupResult.message });
+          } else if (topupResult.lockedOut) {
+            socket.emit('subscription:lockout', { message: topupResult.message });
+          } else if (topupResult.inGracePeriod) {
+            socket.emit('subscription:grace_entered', { message: topupResult.message });
           }
 
           // Complete notification to passenger

@@ -93,6 +93,24 @@ export class AdminService {
     return { driverId, accountStatus };
   }
 
+  public async unlockDriver(
+    adminUser: { id: string; email: string },
+    driverId: string,
+    ipAddress?: string
+  ) {
+    await db.updateDriverLockout(driverId, false);
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'DRIVER_LOCKOUT_CLEARED',
+      resource_type: 'DRIVER_PROFILE',
+      resource_id: driverId,
+      details: { manual_override: true },
+      ip_address: ipAddress,
+    });
+    return { driverId, is_locked_out: false };
+  }
+
   public async manualCreditRides(
     adminUser: { id: string; email: string },
     driverId: string,
@@ -366,6 +384,89 @@ export class AdminService {
     });
 
     return updated;
+  }
+
+  public async getIntegrationSettings() {
+    const s = await db.getPlatformSettings();
+    const maskKey = (key?: string) => {
+      if (!key) return '';
+      if (key.length <= 6) return '******';
+      return `${key.slice(0, 4)}****${key.slice(-3)}`;
+    };
+
+    return {
+      prembly_api_key: maskKey(s.prembly_api_key),
+      prembly_app_id: s.prembly_app_id || '',
+      prembly_auto_approve: s.prembly_auto_approve !== false,
+      paystack_secret_key: maskKey(s.paystack_secret_key),
+      paystack_public_key: s.paystack_public_key || '',
+      paystack_webhook_secret: maskKey(s.paystack_webhook_secret),
+      korapay_secret_key: maskKey(s.korapay_secret_key),
+      korapay_public_key: s.korapay_public_key || '',
+      korapay_encryption_key: maskKey(s.korapay_encryption_key),
+      korapay_merchant_id: s.korapay_merchant_id || '',
+      resend_api_key: maskKey(s.resend_api_key),
+      resend_from_email: s.resend_from_email || 'notifications@gigaride.ng',
+      twilio_account_sid: s.twilio_account_sid || '',
+      twilio_auth_token: maskKey(s.twilio_auth_token),
+      twilio_phone_number: s.twilio_phone_number || '',
+      twilio_verify_sid: s.twilio_verify_sid || '',
+      auto_topup_enabled: s.auto_topup_enabled !== false,
+      auto_topup_threshold_rides: s.auto_topup_threshold_rides || 2,
+      default_auto_topup_plan_id: s.default_auto_topup_plan_id || 'plan_standard_50',
+      grace_rides_limit: s.grace_rides_limit || 2,
+      subscription_rollover_enabled: s.subscription_rollover_enabled !== false,
+    };
+  }
+
+  public async updateIntegrationSettings(
+    adminUser: { id: string; email: string },
+    payload: any,
+    ipAddress?: string
+  ) {
+    const current = await db.getPlatformSettings();
+    const cleanSetting = (newVal: any, oldVal?: string) => {
+      if (newVal === undefined) return oldVal;
+      if (typeof newVal === 'string' && newVal.includes('****')) return oldVal;
+      return newVal;
+    };
+
+    const updateData: Partial<PlatformSettingsRow> = {
+      prembly_api_key: cleanSetting(payload.prembly_api_key, current.prembly_api_key),
+      prembly_app_id: cleanSetting(payload.prembly_app_id, current.prembly_app_id),
+      prembly_auto_approve: payload.prembly_auto_approve !== undefined ? Boolean(payload.prembly_auto_approve) : current.prembly_auto_approve,
+      paystack_secret_key: cleanSetting(payload.paystack_secret_key, current.paystack_secret_key),
+      paystack_public_key: cleanSetting(payload.paystack_public_key, current.paystack_public_key),
+      paystack_webhook_secret: cleanSetting(payload.paystack_webhook_secret, current.paystack_webhook_secret),
+      korapay_secret_key: cleanSetting(payload.korapay_secret_key, current.korapay_secret_key),
+      korapay_public_key: cleanSetting(payload.korapay_public_key, current.korapay_public_key),
+      korapay_encryption_key: cleanSetting(payload.korapay_encryption_key, current.korapay_encryption_key),
+      korapay_merchant_id: cleanSetting(payload.korapay_merchant_id, current.korapay_merchant_id),
+      resend_api_key: cleanSetting(payload.resend_api_key, current.resend_api_key),
+      resend_from_email: cleanSetting(payload.resend_from_email, current.resend_from_email),
+      twilio_account_sid: cleanSetting(payload.twilio_account_sid, current.twilio_account_sid),
+      twilio_auth_token: cleanSetting(payload.twilio_auth_token, current.twilio_auth_token),
+      twilio_phone_number: cleanSetting(payload.twilio_phone_number, current.twilio_phone_number),
+      twilio_verify_sid: cleanSetting(payload.twilio_verify_sid, current.twilio_verify_sid),
+      auto_topup_enabled: payload.auto_topup_enabled !== undefined ? Boolean(payload.auto_topup_enabled) : current.auto_topup_enabled,
+      auto_topup_threshold_rides: payload.auto_topup_threshold_rides ? parseInt(payload.auto_topup_threshold_rides, 10) : current.auto_topup_threshold_rides,
+      default_auto_topup_plan_id: cleanSetting(payload.default_auto_topup_plan_id, current.default_auto_topup_plan_id),
+      grace_rides_limit: payload.grace_rides_limit ? parseInt(payload.grace_rides_limit, 10) : current.grace_rides_limit,
+      subscription_rollover_enabled: payload.subscription_rollover_enabled !== undefined ? Boolean(payload.subscription_rollover_enabled) : current.subscription_rollover_enabled,
+    };
+
+    await db.updatePlatformSettings(updateData);
+
+    await db.logAdminAudit({
+      admin_id: adminUser.id,
+      admin_email: adminUser.email,
+      action: 'INTEGRATION_SETTINGS_UPDATED',
+      resource_type: 'PLATFORM_SETTINGS',
+      details: { updatedKeys: Object.keys(payload) },
+      ip_address: ipAddress,
+    });
+
+    return this.getIntegrationSettings();
   }
 
   public async getPassengers() {

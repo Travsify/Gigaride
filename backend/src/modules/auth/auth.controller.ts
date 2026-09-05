@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authService } from './auth.service';
 import { AuthenticatedRequest, requireAuth } from './auth.middleware';
 import { db } from '../../database';
+import { twilioService } from '../notifications/twilio.service';
 
 export const authRouter = Router();
 
@@ -76,5 +77,33 @@ authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Respon
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      res.status(400).json({ success: false, message: 'phoneNumber is required.' });
+      return;
+    }
+    const result = await twilioService.sendOtp(phoneNumber);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+authRouter.post('/verify-otp', async (req, res: Response): Promise<void> => {
+  try {
+    const { phoneNumber, otpCode } = req.body;
+    if (!phoneNumber || !otpCode) {
+      res.status(400).json({ success: false, message: 'phoneNumber and otpCode are required.' });
+      return;
+    }
+    const result = await twilioService.verifyOtp(phoneNumber, otpCode);
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });

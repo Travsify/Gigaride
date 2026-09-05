@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 CREATE INDEX IF NOT EXISTS idx_tx_reference ON payment_transactions(reference);
 CREATE INDEX IF NOT EXISTS idx_tx_user ON payment_transactions(user_id);
 
--- 10. Dynamic Platform Settings (Fuel Levers)
+-- 10. Dynamic Platform Settings (Fuel Levers & FinTech Integrations)
 CREATE TABLE IF NOT EXISTS platform_settings (
     id INT PRIMARY KEY DEFAULT 1,
     petrol_price_ngn NUMERIC(10, 2) NOT NULL DEFAULT 1050,
@@ -170,8 +170,80 @@ CREATE TABLE IF NOT EXISTS platform_settings (
     lagos_mot_levy_ngn NUMERIC(10, 2) NOT NULL DEFAULT 50,
     welcome_bonus_rides INT NOT NULL DEFAULT 5,
     search_radius_km NUMERIC(5, 2) NOT NULL DEFAULT 7.0,
+    -- Prembly KYC & Identity Levers
+    prembly_api_key VARCHAR(255) DEFAULT '',
+    prembly_app_id VARCHAR(255) DEFAULT '',
+    prembly_auto_approve BOOLEAN DEFAULT true,
+    -- Paystack Card Payment Levers
+    paystack_secret_key VARCHAR(255) DEFAULT '',
+    paystack_public_key VARCHAR(255) DEFAULT '',
+    paystack_webhook_secret VARCHAR(255) DEFAULT '',
+    -- Korapay Dedicated Virtual Bank Accounts
+    korapay_secret_key VARCHAR(255) DEFAULT '',
+    korapay_public_key VARCHAR(255) DEFAULT '',
+    korapay_encryption_key VARCHAR(255) DEFAULT '',
+    korapay_merchant_id VARCHAR(255) DEFAULT '',
+    -- Resend Transactional Email Levers
+    resend_api_key VARCHAR(255) DEFAULT '',
+    resend_from_email VARCHAR(100) DEFAULT 'notifications@gigaride.ng',
+    -- Twilio Phone Verification Levers
+    twilio_account_sid VARCHAR(255) DEFAULT '',
+    twilio_auth_token VARCHAR(255) DEFAULT '',
+    twilio_phone_number VARCHAR(50) DEFAULT '',
+    twilio_verify_sid VARCHAR(255) DEFAULT '',
+    -- Automated Subscription Top-Up & 2-Grace Lockout Levers
+    auto_topup_enabled BOOLEAN DEFAULT true,
+    auto_topup_threshold_rides INT DEFAULT 2,
+    default_auto_topup_plan_id VARCHAR(50) DEFAULT 'plan_standard_50',
+    grace_rides_limit INT DEFAULT 2,
+    subscription_rollover_enabled BOOLEAN DEFAULT true,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 11. Dedicated Virtual Bank Accounts (Korapay DVA)
+CREATE TABLE IF NOT EXISTS virtual_bank_accounts (
+    id VARCHAR(50) PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id),
+    account_reference VARCHAR(100) UNIQUE NOT NULL,
+    account_number VARCHAR(20) NOT NULL,
+    bank_name VARCHAR(100) NOT NULL,
+    bank_code VARCHAR(20) NOT NULL,
+    account_name VARCHAR(150) NOT NULL,
+    provider VARCHAR(30) DEFAULT 'korapay',
+    balance_ngn NUMERIC(12, 2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_vba_user ON virtual_bank_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_vba_account_number ON virtual_bank_accounts(account_number);
+
+-- 12. Phone OTP Verifications (Twilio)
+CREATE TABLE IF NOT EXISTS phone_verifications (
+    id VARCHAR(50) PRIMARY KEY,
+    phone_number VARCHAR(20) NOT NULL,
+    otp_code VARCHAR(10) NOT NULL,
+    attempts INT DEFAULT 0,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_phone ON phone_verifications(phone_number);
+
+-- 13. Prembly Identity & Document KYC Verifications
+CREATE TABLE IF NOT EXISTS kyc_verifications (
+    id VARCHAR(50) PRIMARY KEY,
+    driver_id UUID NOT NULL REFERENCES users(id),
+    verification_type VARCHAR(50) NOT NULL,
+    id_number VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    confidence_score NUMERIC(5, 2),
+    response_payload JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_kyc_verifications_driver ON kyc_verifications(driver_id);
 
 -- 11. Immutable Admin Operations Audit Log
 CREATE TABLE IF NOT EXISTS admin_audit_logs (

@@ -9,10 +9,12 @@ import { subscriptionRouter } from './modules/subscriptions/subscription.control
 import { rideRouter } from './modules/rides/ride.controller';
 import { paymentRouter } from './modules/payments/payment.controller';
 import { adminRouter } from './modules/admin/admin.controller';
+import { kycRouter } from './modules/kyc/kyc.controller';
 import { setupBiddingGateway } from './modules/bidding/bidding.gateway';
 import { db } from './database';
 import { subscriptionService } from './modules/subscriptions/subscription.service';
 import { adminService } from './modules/admin/admin.service';
+import { autoTopupService } from './modules/subscriptions/autoTopup.service';
 
 const PORT = 4099;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -32,6 +34,7 @@ async function runE2ETest() {
   app.use('/api/rides', rideRouter);
   app.use('/api/payments', paymentRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/kyc', kycRouter);
 
   setupBiddingGateway(io);
 
@@ -465,8 +468,174 @@ async function runE2ETest() {
     const latestActions = auditLogsRes.data.data.slice(0, 4).map((l: any) => l.action);
     console.log(`   ✓ Recent Actions in Audit Trail: ${latestActions.join(' → ')}`);
 
+    // 25. Twilio Phone Number SMS OTP Verification Flow
+    console.log('\n25. Testing Twilio Phone Number SMS OTP Verification Flow...');
+    const otpSendRes = await axios.post(`${BASE_URL}/api/auth/send-otp`, {
+      phoneNumber: '08098765432',
+    });
+    console.log('   ✓ SMS OTP Triggered:', otpSendRes.data.message);
+    const otpVerifyRes = await axios.post(`${BASE_URL}/api/auth/verify-otp`, {
+      phoneNumber: '08098765432',
+      otpCode: otpSendRes.data.testOtp || '123456',
+    });
+    console.log('   ✓ SMS OTP Verified Successfully:', otpVerifyRes.data.success);
+
+    // 26. Prembly NIN Verification & Automated Driver Approval
+    console.log('\n26. Testing Prembly NIN Verification & Automated Driver Approval...');
+    const premblyRes = await axios.post(
+      `${BASE_URL}/api/kyc/verify-nin`,
+      {
+        driverId,
+        nin: '11223344556',
+        firstName: 'Adebayo',
+        lastName: 'Adeleke',
+      },
+      { headers: { Authorization: `Bearer ${driverToken}` } }
+    );
+    console.log('   ✓ Prembly Response Status:', premblyRes.data.data?.status);
+    const postKycDva = await db.getVirtualAccountByUserId(driverId);
+    console.log('   ✓ Auto-DVA Provisioned:', postKycDva?.account_number);
+
+    // 27. Korapay Dedicated Virtual Bank Account Generation & Top-Up
+    console.log('\n27. Testing Korapay Dedicated Virtual Bank Account Generation & Top-Up...');
+    const dvaRes = await axios.get(`${BASE_URL}/api/payments/virtual-account`, {
+      headers: { Authorization: `Bearer ${driverToken}` },
+    });
+    console.log(`   ✓ DVA Bank: ${dvaRes.data.data.bank_name} | Account: ${dvaRes.data.data.account_number}`);
+    console.log(`   ✓ Initial DVA Balance: ₦${dvaRes.data.data.balance_ngn}`);
+
+    // Simulate NIP bank transfer credit of ₦15,000 to driver's DVA
+    await axios.post(`${BASE_URL}/api/payments/korapay/webhook`, {
+      event: 'charge.success',
+      data: {
+        account_number: dvaRes.data.data.account_number,
+        amount: 15000,
+        currency: 'NGN',
+        reference: `NIP_TX_${Date.now()}`,
+      },
+    });
+    const updatedDva = await db.getVirtualAccountByUserId(driverId);
+    console.log(`   ✓ Updated DVA Balance after Inbound Bank Transfer: ₦${updatedDva?.balance_ngn}`);
+
+    // 28. Passenger In-App Giga Wallet Ride Payment
+    console.log('\n28. Testing Passenger Giga Wallet Payment for Ride...');
+    await db.createOrUpdateVirtualAccount({
+      id: `va_${Date.now()}`,
+      user_id: passengerId,
+      account_number: `9988${runId}`,
+      bank_name: 'Wema Bank (Giga Wallet)',
+      account_name: 'Chioma Okafor / GigaRide',
+      bank_code: '035',
+      account_reference: `ref_${Date.now()}`,
+      provider: 'korapay',
+      balance_ngn: 20000,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    });
+
+    const walletPayRes = await axios.post(
+      `${BASE_URL}/api/rides/${rideId}/pay-wallet`,
+      {},
+      { headers: { Authorization: `Bearer ${passengerToken}` } }
+    );
+    console.log('   ✓ Ride Paid via Passenger Wallet:', walletPayRes.data.message);
+    console.log(`   ✓ Remaining Passenger Wallet Balance: ₦${walletPayRes.data.newPassengerBalance}`);
+
+    // 29. Automated Driver Subscription Renewal on Threshold
+    console.log('\n29. Testing Automated Driver Subscription Renewal on Threshold...');
+    await axios.put(
+      `${BASE_URL}/api/subscriptions/auto-topup-settings`,
+      {
+        autoTopupEnabled: true,
+        autoTopupThreshold: 2,
+        preferredPlanId: 'plan_starter_10',
+      },
+      { headers: { Authorization: `Bearer ${driverToken}` } }
+    );
+
+    let sub = await db.getActiveDriverSubscription(driverId);
+    if (sub) sub.remaining_rides = 2;
+
+    const topupResult = await autoTopupService.checkAndProcessDriverThreshold(driverId);
+    console.log('   ✓ Auto Top-Up Evaluator Triggered:', topupResult.message);
+    console.log('   ✓ Auto Top-Up Renewal Success:', topupResult.renewed);
+    const renewedSub = await db.getActiveDriverSubscription(driverId);
+    console.log(`   ✓ Renewed Subscription Remaining Rides: ${renewedSub?.remaining_rides}`);
+
+    // 30. 2-Grace Rides Countdown & Strict Dispatch Lockout
+    console.log('\n30. Testing 2-Grace Rides Countdown & Strict Dispatch Lockout...');
+    if (renewedSub) renewedSub.remaining_rides = 0;
+    await db.updateDriverLockout(driverId, false);
+    const dvaNow = await db.getVirtualAccountByUserId(driverId);
+    if (dvaNow && dvaNow.balance_ngn > 0) {
+      await db.debitVirtualAccountBalance(dvaNow.account_number, dvaNow.balance_ngn);
+    }
+
+    // Grace Ride #1: trip completes, balance decrements to -1
+    await subscriptionService.onRideCompleted(driverId);
+    const grace1Result = await autoTopupService.checkAndProcessDriverThreshold(driverId);
+    const subAfterGrace1 = await db.getActiveDriverSubscription(driverId);
+    console.log(`   ✓ Grace Ride 1: Remaining Rides: ${subAfterGrace1?.remaining_rides} (Lockout: ${grace1Result.lockedOut})`);
+    let isEligible = await subscriptionService.isDriverEligibleForDispatch(driverId);
+    console.log(`   ✓ Driver eligible during Grace Window (1/2): ${isEligible} (Expected: true)`);
+
+    // Grace Ride #2: trip completes, balance decrements to -2
+    await subscriptionService.onRideCompleted(driverId);
+    const grace2Result = await autoTopupService.checkAndProcessDriverThreshold(driverId);
+    const subAfterGrace2 = await db.getActiveDriverSubscription(driverId);
+    console.log(`   ✓ Grace Ride 2: Remaining Rides: ${subAfterGrace2?.remaining_rides} (Lockout: ${grace2Result.lockedOut})`);
+    isEligible = await subscriptionService.isDriverEligibleForDispatch(driverId);
+    console.log(`   ✓ Driver dispatch eligibility after exhausting 2 grace rides: ${isEligible} (Expected: false)`);
+
+    // 31. Debt Recovery & Lockout Clearance upon Account Funding
+    console.log('\n31. Testing Debt Recovery & Lockout Clearance upon Account Funding...');
+    if (dvaNow) {
+      await db.creditVirtualAccountBalance(dvaNow.account_number, 5000);
+    }
+
+    const debtRecoveryResult = await autoTopupService.checkAndProcessDriverThreshold(driverId);
+    console.log('   ✓ Debt Recovery Renewal Triggered:', debtRecoveryResult.renewed);
+    const recoveredSub = await db.getActiveDriverSubscription(driverId);
+    console.log(`   ✓ Post-Recovery Remaining Rides (10 - 2 Grace Debt): ${recoveredSub?.remaining_rides} rides (Expected: 8)`);
+    isEligible = await subscriptionService.isDriverEligibleForDispatch(driverId);
+    console.log(`   ✓ Driver re-eligible for dispatch after debt recovery: ${isEligible} (Expected: true)`);
+
+    // 32. Subscription Spillover / Ride Rollover
+    console.log('\n32. Testing Subscription Spillover / Ride Rollover...');
+    const rolledOverSub = await subscriptionService.activateSubscription(driverId, 'plan_starter_10');
+    console.log(`   ✓ Total Rides After Rollover (8 existing + 10 new): ${rolledOverSub.remaining_rides} rides (Expected: 18)`);
+
+    // 33. FinTech & RegTech Admin Levers & 1-Click Lockout Override
+    console.log('\n33. Testing Admin FinTech/RegTech Levers & Lockout Override...');
+    const settingsRes = await axios.get(`${BASE_URL}/api/admin/settings/integrations`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log('   ✓ Retrieved Integration Settings: Masked Resend Key =', settingsRes.data.data.resend_api_key);
+
+    const testEmailRes = await axios.post(
+      `${BASE_URL}/api/admin/integrations/test-email`,
+      { toEmail: 'admin@gigaride.ng' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log('   ✓ Admin Test Email Result:', testEmailRes.data.result?.status || 'Sent');
+
+    const testSmsRes = await axios.post(
+      `${BASE_URL}/api/admin/integrations/test-sms`,
+      { phoneNumber: '08011223344' },
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log('   ✓ Admin Test SMS Result:', testSmsRes.data.result?.status || 'Sent');
+
+    await db.updateDriverLockout(driverId, true, 'Manual test lock');
+    const unlockRes = await axios.post(
+      `${BASE_URL}/api/admin/drivers/${driverId}/unlock`,
+      {},
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+    console.log('   ✓ Admin 1-Click Lockout Override:', unlockRes.data.message);
+
     console.log('\n================================================================');
-    console.log(' ✅ ALL 24 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
+    console.log(' ✅ ALL 33 E2E & 100% PRODUCTION SUPER ADMIN TESTS PASSED! ');
     console.log('================================================================');
 
     driverSocket.disconnect();

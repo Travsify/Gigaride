@@ -5,11 +5,15 @@ import { db } from '../../database';
 import { subscriptionService } from '../subscriptions/subscription.service';
 
 export class PaystackService {
-  private secretKey = ENV.PAYSTACK_SECRET_KEY;
   private baseUrl = 'https://api.paystack.co';
 
+  private async getSecretKey(): Promise<string> {
+    const settings = await db.getPlatformSettings();
+    return settings.paystack_secret_key || ENV.PAYSTACK_SECRET_KEY || 'sk_test_paystack_secret_key';
+  }
+
   /**
-   * Initializes a Paystack transaction for buying a driver subscription pack.
+   * Initializes a Paystack transaction for buying a driver subscription pack via Card or Transfer.
    */
   public async initializeSubscriptionPayment(driverId: string, planId: string, email: string) {
     const plan = await db.getPlanById(planId);
@@ -17,10 +21,11 @@ export class PaystackService {
       throw new Error(`Plan with ID ${planId} not found.`);
     }
 
+    const secretKey = await this.getSecretKey();
     const reference = `sub_${Date.now()}_${driverId.slice(0, 6)}`;
 
     // If using live Paystack API key
-    if (this.secretKey && !this.secretKey.includes('mock')) {
+    if (secretKey && !secretKey.includes('mock') && secretKey.startsWith('sk_')) {
       try {
         const response = await axios.post(
           `${this.baseUrl}/transaction/initialize`,
@@ -28,6 +33,7 @@ export class PaystackService {
             email,
             amount: plan.price_kobo,
             reference,
+            channels: ['card', 'bank', 'ussd', 'qr'],
             metadata: {
               driverId,
               planId,
@@ -37,7 +43,7 @@ export class PaystackService {
           },
           {
             headers: {
-              Authorization: `Bearer ${this.secretKey}`,
+              Authorization: `Bearer ${secretKey}`,
               'Content-Type': 'application/json',
             },
           }
@@ -51,7 +57,7 @@ export class PaystackService {
           amount_kobo: plan.price_kobo,
           status: 'PENDING',
           payment_type: 'SUBSCRIPTION_PURCHASE',
-          channel: 'paystack',
+          channel: 'paystack_card',
           meta_data: { planId, planName: plan.name },
           created_at: new Date().toISOString(),
         });
@@ -91,12 +97,52 @@ export class PaystackService {
   }
 
   /**
+   * Charges a saved card authorization for recurring card debits.
+   */
+  public async chargeCardAuthorization(authorizationCode: string, email: string, amountKobo: number, metadata: any) {
+    const secretKey = await this.getSecretKey();
+    if (secretKey && !secretKey.includes('mock') && secretKey.startsWith('sk_')) {
+      try {
+        const response = await axios.post(
+          `${this.baseUrl}/transaction/charge_authorization`,
+          {
+            authorization_code: authorizationCode,
+            email,
+            amount: amountKobo,
+            metadata,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${secretKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        return response.data;
+      } catch (err: any) {
+        console.error('[Paystack Charge Authorization Error]', err.response?.data || err.message);
+        throw new Error(err.response?.data?.message || 'Card authorization charge failed.');
+      }
+    }
+
+    return {
+      status: true,
+      data: {
+        status: 'success',
+        reference: `sim_card_${Date.now()}`,
+        amount: amountKobo,
+      },
+    };
+  }
+
+  /**
    * Verifies Paystack webhook signature using HMAC SHA512.
    */
-  public verifyWebhookSignature(payload: string, signature: string): boolean {
-    if (this.secretKey.includes('mock')) return true;
+  public async verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
+    const secretKey = await this.getSecretKey();
+    if (secretKey.includes('mock')) return true;
     const hash = crypto
-      .createHmac('sha512', this.secretKey)
+      .createHmac('sha512', secretKey)
       .update(payload)
       .digest('hex');
     return hash === signature;
@@ -126,9 +172,10 @@ export class PaystackService {
     // Update transaction
     await db.updateTransactionStatus(reference, 'SUCCESS');
 
-    // Activate driver subscription
+    // Activate driver subscription & clear any lockout
     await subscriptionService.activateSubscription(driverId, planId, reference);
-    console.log(`[Payment Webhook] Successfully credited subscription for driver ${driverId} on plan ${planId}`);
+    await db.updateDriverLockout(driverId, false, null);
+    console.log(`[Paystack Webhook] Successfully credited subscription for driver ${driverId} on plan ${planId}`);
   }
 }
 

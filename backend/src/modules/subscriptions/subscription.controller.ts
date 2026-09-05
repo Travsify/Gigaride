@@ -58,3 +58,24 @@ subscriptionRouter.post(
     }
   }
 );
+
+// Driver: Update personal auto top-up preference and preferred plan
+subscriptionRouter.put(
+  '/auto-topup-settings',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { autoTopupEnabled, preferredPlanId } = req.body;
+      const { db } = await import('../../database');
+      await db.updateDriverAutoTopup(req.user!.userId, Boolean(autoTopupEnabled), preferredPlanId);
+      res.json({
+        success: true,
+        message: 'Driver auto top-up preference saved.',
+        data: { autoTopupEnabled, preferredPlanId },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);

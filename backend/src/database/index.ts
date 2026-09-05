@@ -11,6 +11,7 @@ export interface UserRow {
   phone_number: string;
   email: string;
   password_hash: string;
+  is_phone_verified?: boolean;
   created_at: string;
 }
 
@@ -35,6 +36,10 @@ export interface DriverProfileRow {
   rating_average: number;
   total_trips_completed: number;
   is_online: boolean;
+  is_locked_out?: boolean;
+  lockout_reason?: string | null;
+  auto_topup_enabled?: boolean;
+  preferred_plan_id?: string | null;
   created_at: string;
 }
 
@@ -162,6 +167,41 @@ export interface SosIncidentRow {
   resolved_at?: string;
 }
 
+export interface VirtualBankAccountRow {
+  id: string;
+  user_id: string;
+  account_reference: string;
+  account_number: string;
+  bank_name: string;
+  bank_code: string;
+  account_name: string;
+  provider: 'korapay';
+  balance_ngn: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PhoneVerificationRow {
+  id: string;
+  phone_number: string;
+  otp_code: string;
+  attempts: number;
+  expires_at: string;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface KycVerificationRow {
+  id: string;
+  driver_id: string;
+  verification_type: 'NIN' | 'DRIVERS_LICENSE' | 'BVN' | 'VEHICLE_PLATE';
+  id_number: string;
+  status: 'VERIFIED' | 'FAILED' | 'PENDING';
+  confidence_score: number;
+  response_payload: any;
+  created_at: string;
+}
+
 export interface PlatformSettingsRow {
   petrol_price_ngn: number;
   base_flag_fall_ngn: number;
@@ -170,6 +210,33 @@ export interface PlatformSettingsRow {
   lagos_mot_levy_ngn: number;
   welcome_bonus_rides: number;
   search_radius_km: number;
+  // Prembly Identity & KYC
+  prembly_api_key?: string;
+  prembly_app_id?: string;
+  prembly_auto_approve?: boolean;
+  // Paystack Card Payments
+  paystack_secret_key?: string;
+  paystack_public_key?: string;
+  paystack_webhook_secret?: string;
+  // Korapay Virtual Accounts
+  korapay_secret_key?: string;
+  korapay_public_key?: string;
+  korapay_encryption_key?: string;
+  korapay_merchant_id?: string;
+  // Resend Transactional Email
+  resend_api_key?: string;
+  resend_from_email?: string;
+  // Twilio Phone Verification
+  twilio_account_sid?: string;
+  twilio_auth_token?: string;
+  twilio_phone_number?: string;
+  twilio_verify_sid?: string;
+  // Automated Subscription Top-Up & 2-Grace Lockout
+  auto_topup_enabled?: boolean;
+  auto_topup_threshold_rides?: number;
+  default_auto_topup_plan_id?: string;
+  grace_rides_limit?: number;
+  subscription_rollover_enabled?: boolean;
   updated_at: string;
 }
 
@@ -192,6 +259,9 @@ export class DatabaseService {
     ride_bids: [] as RideBidRow[],
     payment_transactions: [] as PaymentTransactionRow[],
     sos_incidents: [] as SosIncidentRow[],
+    virtual_bank_accounts: [] as VirtualBankAccountRow[],
+    phone_verifications: [] as PhoneVerificationRow[],
+    kyc_verifications: [] as KycVerificationRow[],
     platform_settings: {
       petrol_price_ngn: 1050,
       base_flag_fall_ngn: 1500,
@@ -200,6 +270,27 @@ export class DatabaseService {
       lagos_mot_levy_ngn: 50,
       welcome_bonus_rides: 5,
       search_radius_km: 7.0,
+      prembly_api_key: '',
+      prembly_app_id: '',
+      prembly_auto_approve: true,
+      paystack_secret_key: '',
+      paystack_public_key: '',
+      paystack_webhook_secret: '',
+      korapay_secret_key: '',
+      korapay_public_key: '',
+      korapay_encryption_key: '',
+      korapay_merchant_id: '',
+      resend_api_key: '',
+      resend_from_email: 'notifications@gigaride.ng',
+      twilio_account_sid: '',
+      twilio_auth_token: '',
+      twilio_phone_number: '',
+      twilio_verify_sid: '',
+      auto_topup_enabled: true,
+      auto_topup_threshold_rides: 2,
+      default_auto_topup_plan_id: 'plan_standard_50',
+      grace_rides_limit: 2,
+      subscription_rollover_enabled: true,
       updated_at: new Date().toISOString(),
     } as PlatformSettingsRow,
   };
@@ -410,12 +501,16 @@ export class DatabaseService {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     const creditAudits = this.store.subscription_credit_audits.filter((c) => c.driver_id === driverId);
     const trips = this.store.rides.filter((r) => r.driver_id === driverId);
+    const virtualAccount = this.store.virtual_bank_accounts.find((v) => v.user_id === driverId);
+    const kycVerifications = this.store.kyc_verifications.filter((k) => k.driver_id === driverId);
 
     return {
       profile,
       user,
       subscriptions,
       creditAudits,
+      virtualAccount: virtualAccount || null,
+      kycVerifications,
       totalTrips: trips.length,
       completedTrips: trips.filter((t) => t.status === 'COMPLETED').length,
     };
@@ -486,6 +581,9 @@ export class DatabaseService {
       activeSub.remaining_rides += ridesToAdd;
       activeSub.status = 'ACTIVE';
     }
+
+    // Automatically clear lockout if driver was locked out
+    await this.updateDriverLockout(driverId, false);
 
     // Log the audit trail
     this.store.subscription_credit_audits.push({
@@ -961,6 +1059,126 @@ export class DatabaseService {
         lagos_mot_levy_ngn: this.store.platform_settings.lagos_mot_levy_ngn,
       };
     });
+  }
+
+  // --- Dedicated Virtual Bank Accounts (Korapay DVA) ---
+  public async getVirtualAccountByUserId(userId: string): Promise<VirtualBankAccountRow | undefined> {
+    return this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
+  }
+
+  public async getVirtualAccountByNumber(accountNumber: string): Promise<VirtualBankAccountRow | undefined> {
+    return this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumber);
+  }
+
+  public async createOrUpdateVirtualAccount(acc: VirtualBankAccountRow): Promise<VirtualBankAccountRow> {
+    const existingIndex = this.store.virtual_bank_accounts.findIndex((v) => v.user_id === acc.user_id);
+    if (existingIndex >= 0) {
+      this.store.virtual_bank_accounts[existingIndex] = { ...this.store.virtual_bank_accounts[existingIndex], ...acc };
+    } else {
+      this.store.virtual_bank_accounts.push(acc);
+    }
+    this.saveStore();
+    return acc;
+  }
+
+  public async creditVirtualAccountBalance(accountNumberOrUserId: string, amountNgn: number): Promise<VirtualBankAccountRow | undefined> {
+    const acc = this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumberOrUserId || v.user_id === accountNumberOrUserId);
+    if (acc) {
+      acc.balance_ngn = Number((acc.balance_ngn + amountNgn).toFixed(2));
+      this.saveStore();
+      return acc;
+    }
+    return undefined;
+  }
+
+  public async debitVirtualAccountBalance(accountNumberOrUserId: string, amountNgn: number): Promise<VirtualBankAccountRow | undefined> {
+    const acc = this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumberOrUserId || v.user_id === accountNumberOrUserId);
+    if (acc) {
+      if (acc.balance_ngn < amountNgn) throw new Error('Insufficient virtual account funds.');
+      acc.balance_ngn = Number((acc.balance_ngn - amountNgn).toFixed(2));
+      this.saveStore();
+      return acc;
+    }
+    return undefined;
+  }
+
+  // --- Phone OTP Verifications (Twilio) ---
+  public async savePhoneOtp(phoneNumber: string, otpCode: string, expiryMinutes = 10): Promise<PhoneVerificationRow> {
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60000).toISOString();
+    let record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber);
+    if (record) {
+      record.otp_code = otpCode;
+      record.expires_at = expiresAt;
+      record.is_verified = false;
+      record.attempts = 0;
+    } else {
+      record = {
+        id: `pv_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        phone_number: phoneNumber,
+        otp_code: otpCode,
+        attempts: 0,
+        expires_at: expiresAt,
+        is_verified: false,
+        created_at: new Date().toISOString(),
+      };
+      this.store.phone_verifications.push(record);
+    }
+    this.saveStore();
+    return record;
+  }
+
+  public async verifyPhoneOtp(phoneNumber: string, otpCode: string): Promise<boolean> {
+    const record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber);
+    if (!record) return false;
+    if (new Date(record.expires_at).getTime() < Date.now()) return false;
+    if (record.otp_code !== otpCode) {
+      record.attempts += 1;
+      this.saveStore();
+      return false;
+    }
+    record.is_verified = true;
+    const user = this.store.users.find((u) => u.phone_number === phoneNumber);
+    if (user) user.is_phone_verified = true;
+    this.saveStore();
+    return true;
+  }
+
+  // --- Prembly KYC Verifications ---
+  public async recordKycVerification(data: Omit<KycVerificationRow, 'id' | 'created_at'>): Promise<KycVerificationRow> {
+    const entry: KycVerificationRow = {
+      id: `kyc_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ...data,
+      created_at: new Date().toISOString(),
+    };
+    this.store.kyc_verifications.unshift(entry);
+    this.saveStore();
+    return entry;
+  }
+
+  public async getKycVerificationsByDriver(driverId: string): Promise<KycVerificationRow[]> {
+    return this.store.kyc_verifications.filter((k) => k.driver_id === driverId);
+  }
+
+  // --- Driver Lockout & Auto Topup Levers ---
+  public async updateDriverLockout(driverId: string, isLockedOut: boolean, reason?: string | null): Promise<void> {
+    const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
+    if (profile) {
+      profile.is_locked_out = isLockedOut;
+      profile.lockout_reason = reason;
+      if (isLockedOut) {
+        profile.is_online = false;
+      }
+      this.saveStore();
+    }
+  }
+
+  public async updateDriverAutoTopup(driverId: string, autoTopupEnabled: boolean, preferredPlanId?: string): Promise<void> {
+    const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
+    if (profile) {
+      profile.auto_topup_enabled = autoTopupEnabled;
+      if (preferredPlanId) profile.preferred_plan_id = preferredPlanId;
+      this.saveStore();
+    }
   }
 }
 

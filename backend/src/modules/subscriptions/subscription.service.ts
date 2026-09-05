@@ -55,7 +55,7 @@ export class SubscriptionService {
    */
   public async isDriverEligibleForDispatch(driverId: string): Promise<boolean> {
     const profile = await db.getDriverProfile(driverId);
-    if (!profile || profile.account_status !== 'ACTIVE' || profile.kyc_status === 'REJECTED') {
+    if (!profile || profile.account_status !== 'ACTIVE' || profile.kyc_status === 'REJECTED' || profile.is_locked_out) {
       return false;
     }
 
@@ -128,14 +128,23 @@ export class SubscriptionService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
 
-    // Negative grace balance debt carryover recovery
+    // Check settings for ride rollover and grace debt recovery
+    const settings = await db.getPlatformSettings();
     const existingSub = await db.getActiveDriverSubscription(driverId);
     let finalRemainingRides = plan.total_rides !== null ? plan.total_rides : 999999;
 
-    if (existingSub && existingSub.remaining_rides < 0 && plan.total_rides !== null) {
-      const graceDebt = Math.abs(existingSub.remaining_rides);
-      finalRemainingRides = Math.max(0, finalRemainingRides - graceDebt);
-      console.log(`[Grace Debt Recovery] Deducted ${graceDebt} grace rides from Driver ${driverId}. Allocated net: ${finalRemainingRides}`);
+    if (existingSub && plan.total_rides !== null) {
+      if (existingSub.remaining_rides < 0) {
+        // Negative grace balance debt carryover recovery
+        const graceDebt = Math.abs(existingSub.remaining_rides);
+        finalRemainingRides = Math.max(0, finalRemainingRides - graceDebt);
+        console.log(`[Grace Debt Recovery] Deducted ${graceDebt} grace rides from Driver ${driverId}. Allocated net: ${finalRemainingRides}`);
+      } else if (existingSub.remaining_rides > 0 && settings.subscription_rollover_enabled !== false) {
+        // Unused rides spillover / rollover into new pack!
+        const rolledOverRides = existingSub.remaining_rides;
+        finalRemainingRides += rolledOverRides;
+        console.log(`[Ride Rollover] Rolled over ${rolledOverRides} unused rides for Driver ${driverId}. Total balance: ${finalRemainingRides}`);
+      }
     }
 
     const newSub: DriverSubscriptionRow = {
@@ -150,6 +159,7 @@ export class SubscriptionService {
     };
 
     const saved = await db.createDriverSubscription(newSub);
+    await db.updateDriverLockout(driverId, false, null);
 
     // Re-enable driver on live geo dispatch
     const loc = geoSessionManager.getDriverLocation(driverId);

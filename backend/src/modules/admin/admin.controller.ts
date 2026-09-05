@@ -152,6 +152,28 @@ adminRouter.post(
   }
 );
 
+// 8b. Driver Management: Emergency Dispatch Unlock / Clear Lockout (RBAC: SUPPORT_AGENT, SUPER_ADMIN)
+adminRouter.post(
+  '/drivers/:id/unlock',
+  requireAdminRole(['SUPER_ADMIN', 'SUPPORT_AGENT']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const driverId = String(req.params.id);
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+
+      const result = await adminService.unlockDriver(adminUser, driverId, ip);
+      res.status(200).json({
+        success: true,
+        message: 'Driver lockout cleared successfully. Driver can now receive dispatches.',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
 const manualCreditSchema = z.object({
   ridesToAdd: z.number().int().positive(),
   reason: z.string().min(3),
@@ -475,3 +497,71 @@ adminRouter.get('/transactions', async (_req: AuthenticatedRequest, res: Respons
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// 25. FinTech & RegTech Integration Settings (Masked)
+adminRouter.get(
+  '/settings/integrations',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const settings = await adminService.getIntegrationSettings();
+      res.status(200).json({ success: true, data: settings });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 26. Update FinTech & RegTech Integration Settings
+adminRouter.put(
+  '/settings/integrations',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const adminUser = { id: req.user!.userId, email: req.user!.email };
+      const ip = req.ip || req.socket.remoteAddress;
+      const updated = await adminService.updateIntegrationSettings(adminUser, req.body, ip);
+      res.status(200).json({ success: true, message: 'Integration settings updated successfully.', data: updated });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 27. Test Resend Email Dispatch
+adminRouter.post(
+  '/integrations/test-email',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { toEmail } = req.body;
+      const { resendService } = await import('../notifications/resend.service');
+      const target = toEmail || req.user!.email;
+      const result = await resendService.sendEmail({
+        to: target,
+        subject: 'Giga Ride - Resend Integration Test',
+        html: '<div style="font-family: Arial; padding: 20px; background: #0F172A; color: #FFF; border-radius: 12px;"><h2 style="color: #10B981;">✓ Resend API Integration Verified</h2><p>Your Giga Ride transactional email gateway is operating with 100% fidelity.</p></div>',
+      });
+      res.json({ success: true, message: `Test email dispatched to ${target}`, result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 28. Test Twilio SMS Dispatch
+adminRouter.post(
+  '/integrations/test-sms',
+  requireAdminRole(['SUPER_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { phoneNumber } = req.body;
+      const { twilioService } = await import('../notifications/twilio.service');
+      const target = phoneNumber || '08012345678';
+      const result = await twilioService.sendOtp(target);
+      res.json({ success: true, message: `Test SMS dispatched to ${target}`, result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
