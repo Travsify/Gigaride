@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Passenger App</string>
+	<string>Giga Ride</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Giga Ride uses your location to identify your pickup point, search for nearby drivers, and calculate fair route estimates.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Giga Ride uses your location to provide real-time trip tracking and emergency safety monitoring during your ride.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Giga Ride needs camera access if you choose to take a profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Giga Ride needs photo library access to set your profile avatar.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

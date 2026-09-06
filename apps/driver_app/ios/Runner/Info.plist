@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Driver App</string>
+	<string>Giga Driver</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,21 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Giga Driver uses your location to discover nearby passenger ride requests, navigate to pickup spots, and calculate route fares accurately.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Giga Driver requires continuous location access while online to enable passenger GPS tracking and continuous dispatch even when the app is minimized.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Giga Driver requires continuous background location to allow passengers to track their trip progress and dispatch nearby rides.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Giga Driver needs camera access to capture your driver license, vehicle documents, and profile photo for verification.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Giga Driver needs photo library access to upload documents and certificates for hub inspection.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
