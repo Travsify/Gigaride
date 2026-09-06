@@ -309,21 +309,20 @@ class _WalletScreenState extends State<WalletScreen> {
                             backgroundColor: AppConstants.darkBg,
                             label: Text(_currencyFormat.format(amt), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                             onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
                               Navigator.pop(ctx);
                               try {
                                 await _api.addMoney(amt);
+                                if (!mounted) return;
                                 _loadWalletData();
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Successfully deposited ${_currencyFormat.format(amt)}!'), backgroundColor: AppConstants.successColor),
-                                  );
-                                }
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('Successfully deposited ${_currencyFormat.format(amt)}!'), backgroundColor: AppConstants.successColor),
+                                );
                               } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(e.toString()), backgroundColor: AppConstants.dangerColor),
-                                  );
-                                }
+                                if (!mounted) return;
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text(e.toString()), backgroundColor: AppConstants.dangerColor),
+                                );
                               }
                             },
                           );
@@ -476,9 +475,9 @@ class _WalletScreenState extends State<WalletScreen> {
                                   icon: const Icon(Icons.delete_outline, color: AppConstants.dangerColor, size: 18),
                                   onPressed: () async {
                                     final confirmed = await _api.deleteSavedCard(c['id']);
-                                    if (confirmed) {
+                                    if (confirmed && ctx.mounted) {
                                       Navigator.pop(ctx);
-                                      _loadWalletData();
+                                      if (mounted) _loadWalletData();
                                     }
                                   },
                                 ),

@@ -326,7 +326,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     final authenticated = await BiometricService.authenticate(
       reason: 'Scan fingerprint or face to sign in to Giga Driver',
     );
-    if (!authenticated) return;
+    if (!authenticated || !mounted) return;
 
     final id = credentials['identifier'];
     final pass = credentials['password'];
