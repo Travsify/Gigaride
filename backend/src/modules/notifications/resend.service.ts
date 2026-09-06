@@ -18,7 +18,10 @@ export class ResendService {
   public async sendEmail(payload: SendEmailPayload): Promise<{ success: boolean; messageId: string; simulated?: boolean }> {
     const settings = await db.getPlatformSettings();
     const apiKey = settings.resend_api_key || ENV.RESEND_API_KEY;
-    const fromEmail = settings.resend_from_email || ENV.RESEND_FROM_EMAIL || 'notifications@gigaride.ng';
+    let fromEmail = settings.resend_from_email || ENV.RESEND_FROM_EMAIL || 'info@getgigaride.com';
+    if (!fromEmail || fromEmail.includes('gigaride.ng')) {
+      fromEmail = 'info@getgigaride.com';
+    }
 
     if (apiKey && !apiKey.includes('mock') && apiKey.startsWith('re_')) {
       try {

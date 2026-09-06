@@ -31,7 +31,7 @@ export const ENV = {
 
   // Resend Transactional Emails
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'notifications@gigaride.ng',
+  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'info@getgigaride.com',
 
   // Twilio SMS & OTP Verification
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',

@@ -435,7 +435,7 @@ export class DatabaseService {
       korapay_encryption_key: '',
       korapay_merchant_id: '',
       resend_api_key: process.env.RESEND_API_KEY || '',
-      resend_from_email: 'notifications@gigaride.ng',
+      resend_from_email: 'info@getgigaride.com',
       twilio_account_sid: process.env.TWILIO_ACCOUNT_SID || '',
       twilio_auth_token: process.env.TWILIO_AUTH_TOKEN || '',
       twilio_phone_number: process.env.TWILIO_PHONE_NUMBER || '',

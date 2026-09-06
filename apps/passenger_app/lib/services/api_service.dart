@@ -60,6 +60,32 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to reset password');
   }
 
+  Future<Map<String, dynamic>> sendEmailOtp(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/send-email-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to dispatch email verification code');
+  }
+
+  Future<Map<String, dynamic>> verifyEmailOtp(String email, String otpCode) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/verify-email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'otpCode': otpCode}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Invalid or expired email verification code');
+  }
+
   Future<Map<String, dynamic>> verifyPhoneOtp(String phoneNumber, String otpCode) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/verify-otp'),
