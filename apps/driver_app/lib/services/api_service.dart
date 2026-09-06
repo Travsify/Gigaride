@@ -102,6 +102,10 @@ class ApiService {
       await saveToken(data['data']['token']);
       return data['data'];
     }
+    if (data['requiresPhoneVerification'] == true) {
+      final p = data['phoneNumber'] ?? identifier;
+      throw Exception('PHONE_UNVERIFIED:$p');
+    }
     throw Exception(data['message'] ?? 'Login failed');
   }
 

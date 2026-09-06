@@ -1816,6 +1816,13 @@ export class DatabaseService {
     return record;
   }
 
+  public async isPhoneVerified(phoneNumber: string): Promise<boolean> {
+    const user = this.store.users.find((u) => u.phone_number === phoneNumber);
+    if (user && user.is_phone_verified) return true;
+    const record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber && p.is_verified);
+    return !!record;
+  }
+
   public async verifyPhoneOtp(phoneNumber: string, otpCode: string): Promise<boolean> {
     const record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber);
     if (!record) return false;

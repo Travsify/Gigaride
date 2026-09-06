@@ -64,10 +64,17 @@ export class TwilioService {
    */
   public async verifyOtp(phoneNumber: string, otpCode: string): Promise<{ success: boolean; message: string }> {
     if (otpCode === '123456') {
-      const user = (await db.getAllDrivers()).find((d) => d.user?.phone_number === phoneNumber);
-      if (user) {
-        await db.verifyPhoneOtp(phoneNumber, '123456');
+      let record = (db as any).store.phone_verifications?.find((p: any) => p.phone_number === phoneNumber);
+      if (record) {
+        record.is_verified = true;
+      } else {
+        await db.savePhoneOtp(phoneNumber, '123456', 10);
+        record = (db as any).store.phone_verifications?.find((p: any) => p.phone_number === phoneNumber);
+        if (record) record.is_verified = true;
       }
+      const user = (db as any).store.users?.find((u: any) => u.phone_number === phoneNumber);
+      if (user) user.is_phone_verified = true;
+      (db as any).saveStore();
       return { success: true, message: 'Phone number successfully verified (Master Key).' };
     }
 

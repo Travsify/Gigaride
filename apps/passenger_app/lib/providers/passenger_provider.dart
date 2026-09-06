@@ -48,6 +48,33 @@ class PassengerProvider with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendPhoneOtp(phoneNumber);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyPhoneOtp(String phoneNumber, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.verifyPhoneOtp(phoneNumber, otpCode);
+      if (res['token'] != null && res['user'] != null) {
+        user = res['user'];
+        connectSocket(res['token']);
+      }
+      return res;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> login(String identifier, String password) async {
     isLoading = true;
     notifyListeners();

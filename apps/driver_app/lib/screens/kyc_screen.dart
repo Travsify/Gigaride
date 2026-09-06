@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
@@ -16,7 +17,47 @@ class _KycScreenState extends State<KycScreen> {
   final _licenseCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
-  final _dobCtrl = TextEditingController(text: '1990-05-15');
+  final _dobCtrl = TextEditingController(text: '1992-05-15');
+  DateTime _selectedDob = DateTime(1992, 5, 15);
+
+  Future<void> _selectDateOfBirth(BuildContext context) async {
+    final now = DateTime.now();
+    final maxDate = DateTime(now.year - 18, now.month, now.day);
+    final minDate = DateTime(1940, 1, 1);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDob,
+      firstDate: minDate,
+      lastDate: maxDate,
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'SELECT YOUR DATE OF BIRTH',
+      cancelText: 'CANCEL',
+      confirmText: 'CONFIRM DATE',
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppConstants.primaryColor,
+              onPrimary: Colors.white,
+              surface: AppConstants.cardBg,
+              onSurface: AppConstants.textLight,
+            ),
+            dialogBackgroundColor: AppConstants.cardBg,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDob = picked;
+        _dobCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
 
   @override
   void initState() {
@@ -282,10 +323,19 @@ class _KycScreenState extends State<KycScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _dobCtrl,
-                style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
-                decoration: _inputDeco(hint: 'Date of Birth (YYYY-MM-DD)', icon: Icons.calendar_today_outlined),
+              GestureDetector(
+                onTap: () => _selectDateOfBirth(context),
+                child: AbsorbPointer(
+                  child: TextField(
+                    controller: _dobCtrl,
+                    readOnly: true,
+                    style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+                    decoration: _inputDeco(
+                      hint: 'Date of Birth (Click to select from calendar)',
+                      icon: Icons.calendar_month_rounded,
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 24),

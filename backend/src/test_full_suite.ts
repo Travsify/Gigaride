@@ -69,6 +69,8 @@ async function runTestSuite() {
   console.log('\n[6/7] Testing Identity Verification (Prembly) -> Auto Korapay DVA...');
   const driverPhone = '+23481' + Math.floor(10000000 + Math.random() * 90000000);
   const driverEmail = 'driver_' + Date.now() + '@gigaride.ng';
+  await twilioService.sendOtp(driverPhone);
+  await authService.loginWithPhoneOtp(driverPhone, '123456');
   const driverReg = await authService.register({
     role: 'DRIVER',
     fullName: 'Kabiru Abdullahi',

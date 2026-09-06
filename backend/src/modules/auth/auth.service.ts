@@ -6,9 +6,16 @@ import { ENV } from '../../config/env';
 import { AuthResponse, JwtPayload, LoginDto, RegisterUserDto } from './auth.types';
 import { resendService } from '../notifications/resend.service';
 import { twilioService } from '../notifications/twilio.service';
+import { oneSignalService } from '../notifications/onesignal.service';
 
 export class AuthService {
   public async register(dto: RegisterUserDto): Promise<AuthResponse> {
+    // 0. Mandatory Phone Verification Check
+    const phoneVerified = await db.isPhoneVerified(dto.phoneNumber);
+    if (!phoneVerified) {
+      throw new Error('Phone number must be verified via SMS OTP before registration. Please verify your phone number first.');
+    }
+
     // 1. Check if user already exists
     const existingPhone = await db.findUserByPhone(dto.phoneNumber);
     if (existingPhone) {
@@ -32,6 +39,7 @@ export class AuthService {
       phone_number: dto.phoneNumber,
       email: dto.email,
       password_hash: passwordHash,
+      is_phone_verified: true,
       created_at: new Date().toISOString(),
     };
     await db.createUser(newUser);
@@ -102,13 +110,26 @@ export class AuthService {
         `,
       });
 
+      // 5a. In-App Notification Center
       await db.createNotification({
         user_id: userId,
-        title: 'Welcome to Giga Ride!',
+        title: 'Welcome to Giga Ride! 🎉',
         message: 'Your account is active. Experience fair pricing with 0% platform commission on every trip.',
         type: 'SYSTEM',
         meta_data: { role: dto.role },
       });
+
+      // 5b. Mobile Push Notification via OneSignal
+      try {
+        await oneSignalService.sendPush({
+          userIds: [userId],
+          heading: 'Welcome to Giga Ride! 🎉',
+          content: 'Your account is active. Experience fair pricing with 0% platform commission on every trip.',
+          data: { type: 'WELCOME', role: dto.role },
+        });
+      } catch (pushErr: any) {
+        console.warn('[Welcome Push Notification Warning]', pushErr.message);
+      }
     } catch (e: any) {
       console.warn('[Welcome Notification Warning]', e.message);
     }
@@ -152,6 +173,18 @@ export class AuthService {
     const isMatch = await bcrypt.compare(dto.password, user.password_hash);
     if (!isMatch) {
       throw new Error('Invalid phone/email or password.');
+    }
+
+    // 2b. Check Phone Verification
+    if (!user.is_phone_verified) {
+      // Auto-dispatch OTP so user can verify immediately
+      try {
+        await twilioService.sendOtp(user.phone_number);
+      } catch (_) {}
+      const err: any = new Error('Phone number not verified. A 6-digit verification code has been sent to your phone via SMS.');
+      err.requiresPhoneVerification = true;
+      err.phoneNumber = user.phone_number;
+      throw err;
     }
 
     // 3. Load driver profile if driver

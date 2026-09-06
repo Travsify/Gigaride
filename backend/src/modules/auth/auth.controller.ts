@@ -43,7 +43,12 @@ authRouter.post('/login', async (req, res: Response): Promise<void> => {
     const result = await authService.login(validated);
     res.status(200).json({ success: true, data: result });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message || 'Login failed' });
+    res.status(error.requiresPhoneVerification ? 403 : 400).json({
+      success: false,
+      message: error.message || 'Login failed',
+      requiresPhoneVerification: !!error.requiresPhoneVerification,
+      phoneNumber: error.phoneNumber,
+    });
   }
 });
 

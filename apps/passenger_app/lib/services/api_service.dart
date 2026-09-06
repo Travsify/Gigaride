@@ -21,6 +21,35 @@ class ApiService {
     await prefs.remove('auth_token');
   }
 
+  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/send-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phoneNumber': phoneNumber}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to dispatch verification code');
+  }
+
+  Future<Map<String, dynamic>> verifyPhoneOtp(String phoneNumber, String otpCode) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phoneNumber': phoneNumber, 'otpCode': otpCode}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && (data['success'] == true || data['token'] != null)) {
+      if (data['token'] != null) {
+        await saveToken(data['token']);
+      }
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Invalid or expired verification code');
+  }
+
   Future<Map<String, dynamic>> registerPassenger({
     required String fullName,
     required String phoneNumber,
@@ -58,6 +87,10 @@ class ApiService {
     if (response.statusCode == 200 && data['success'] == true) {
       await saveToken(data['data']['token']);
       return data['data'];
+    }
+    if (data['requiresPhoneVerification'] == true) {
+      final p = data['phoneNumber'] ?? identifier;
+      throw Exception('PHONE_UNVERIFIED:$p');
     }
     throw Exception(data['message'] ?? 'Login failed');
   }
