@@ -5,6 +5,9 @@ import '../providers/driver_provider.dart';
 import 'active_trip_screen.dart';
 import 'kyc_screen.dart';
 import 'subscription_screen.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/location_service.dart';
+import '../widgets/driver_interactive_map.dart';
 
 class RadarScreen extends StatefulWidget {
   const RadarScreen({super.key});
@@ -14,6 +17,7 @@ class RadarScreen extends StatefulWidget {
 }
 
 class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStateMixin {
+  LatLng _driverLocation = LocationService.defaultLagosLocation;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -28,6 +32,15 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _initDriverLocation();
+  }
+
+
+  void _initDriverLocation() async {
+    final pos = await LocationService.getCurrentLocation();
+    if (mounted) {
+      setState(() => _driverLocation = pos);
+    }
   }
 
   @override
@@ -299,6 +312,23 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            // Interactive Live Driver GPS Radar Map
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              child: DriverInteractiveMap(
+                driverLocation: _driverLocation,
+                isOnline: isOnline,
+                incomingRequests: requests,
+                activeTrip: activeTrip,
+                height: 240,
+                onRequestSelected: (req) => _showCustomBidDialog(req),
+                onRecenter: () async {
+                  final pos = await LocationService.getCurrentLocation();
+                  if (mounted) setState(() => _driverLocation = pos);
+                },
               ),
             ),
 

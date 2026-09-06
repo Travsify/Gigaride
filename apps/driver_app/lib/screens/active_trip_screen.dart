@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/location_service.dart';
+import '../services/routing_service.dart';
+import '../services/navigation_helper.dart';
+import '../widgets/driver_interactive_map.dart';
 
 class ActiveTripScreen extends StatefulWidget {
   final Map<String, dynamic> trip;
@@ -12,6 +17,10 @@ class ActiveTripScreen extends StatefulWidget {
 }
 
 class _ActiveTripScreenState extends State<ActiveTripScreen> {
+  LatLng _driverLocation = LocationService.defaultLagosLocation;
+  List<LatLng> _routePoints = [];
+  double _distanceKm = 0.0;
+  int _durationMins = 0;
   // Step state: 'ACCEPTED' -> 'ARRIVED' -> 'IN_TRANSIT' -> 'COMPLETED'
   String _currentStep = 'ACCEPTED';
   int _passengerRating = 5;
@@ -21,6 +30,31 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     super.initState();
     final provider = context.read<DriverProvider>();
     _currentStep = provider.tripStep ?? 'ACCEPTED';
+    _fetchDriverLocationAndRoute();
+  }
+
+
+  void _fetchDriverLocationAndRoute() async {
+    final pos = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    setState(() => _driverLocation = pos);
+
+    final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;
+    final pLng = (widget.trip['pickupLng'] as num?)?.toDouble() ?? 3.3792;
+    final dLat = (widget.trip['dropoffLat'] as num?)?.toDouble() ?? 6.4281;
+    final dLng = (widget.trip['dropoffLng'] as num?)?.toDouble() ?? 3.4219;
+
+    final targetStart = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED') ? pos : LatLng(pLat, pLng);
+    final targetEnd = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED') ? LatLng(pLat, pLng) : LatLng(dLat, dLng);
+
+    final route = await RoutingService.getDrivingRoute(targetStart, targetEnd);
+    if (route != null && mounted) {
+      setState(() {
+        _routePoints = route.polyline;
+        _distanceKm = route.distanceKm;
+        _durationMins = route.durationMinutes;
+      });
+    }
   }
 
   void _progressStep() {
@@ -255,6 +289,69 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                           style: const TextStyle(color: AppConstants.accentColor, fontSize: 24, fontWeight: FontWeight.w900),
                         ),
                       ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Real-Time Road Navigation Map
+                  DriverInteractiveMap(
+                    driverLocation: _driverLocation,
+                    isOnline: true,
+                    activeTrip: widget.trip,
+                    routePoints: _routePoints,
+                    height: 230,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 1-Tap Google Maps Turn-by-Turn Navigation Launcher
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.navigation_rounded, color: Colors.blueAccent, size: 22),
+                      label: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED'
+                                ? 'Navigate to Pickup Point'
+                                : 'Navigate to Destination',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          if (_distanceKm > 0)
+                            Text(
+                              ' (${_distanceKm.toStringAsFixed(1)} km • ~$_durationMins mins)',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueAccent),
+                            ),
+                        ],
+                      ),
+                      onPressed: () {
+                        final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;
+                        final pLng = (widget.trip['pickupLng'] as num?)?.toDouble() ?? 3.3792;
+                        final dLat = (widget.trip['dropoffLat'] as num?)?.toDouble() ?? 6.4281;
+                        final dLng = (widget.trip['dropoffLng'] as num?)?.toDouble() ?? 3.4219;
+
+                        final target = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED')
+                            ? LatLng(pLat, pLng)
+                            : LatLng(dLat, dLng);
+
+                        final label = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED')
+                            ? (widget.trip['pickupAddress'] ?? 'Pickup')
+                            : (widget.trip['dropoffAddress'] ?? 'Destination');
+
+                        NavigationHelper.launchExternalNavigation(
+                          destination: target,
+                          destinationLabel: label,
+                        );
+                      },
                     ),
                   ),
 

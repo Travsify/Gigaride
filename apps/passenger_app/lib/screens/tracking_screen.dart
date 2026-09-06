@@ -7,6 +7,8 @@ import '../providers/passenger_provider.dart';
 import 'home_screen.dart';
 import 'in_app_call_screen.dart';
 import 'ride_chat_sheet.dart';
+import 'package:latlong2/latlong.dart';
+import '../widgets/interactive_ride_map.dart';
 
 class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({super.key});
@@ -458,7 +460,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
         title: const Text('Live Ride Tracking', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,7 +541,35 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Real-Time Ride Tracking Map
+              InteractiveRideMap(
+                currentLocation: LatLng(
+                  (driver?['driverLat'] as num?)?.toDouble() ?? 6.5244,
+                  (driver?['driverLng'] as num?)?.toDouble() ?? 3.3792,
+                ),
+                pickupLocation: LatLng(
+                  (provider.currentRide?['pickupLat'] as num?)?.toDouble() ?? 6.5244,
+                  (provider.currentRide?['pickupLng'] as num?)?.toDouble() ?? 3.3792,
+                ),
+                dropoffLocation: LatLng(
+                  (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 6.4281,
+                  (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.4219,
+                ),
+                routePoints: [
+                  LatLng(
+                    (driver?['driverLat'] as num?)?.toDouble() ?? 6.5244,
+                    (driver?['driverLng'] as num?)?.toDouble() ?? 3.3792,
+                  ),
+                  LatLng(
+                    (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 6.4281,
+                    (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.4219,
+                  ),
+                ],
+                height: 220,
+              ),
+              const SizedBox(height: 16),
 
               // Driver & Vehicle Details Card
               Container(

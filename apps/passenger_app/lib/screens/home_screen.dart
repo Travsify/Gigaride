@@ -8,6 +8,12 @@ import 'offer_room_screen.dart';
 import 'wallet_screen.dart';
 import 'activity_screen.dart';
 import 'profile_screen.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/location_service.dart';
+import '../services/routing_service.dart';
+import '../widgets/interactive_ride_map.dart';
+import '../widgets/places_search_modal.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,13 +26,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
   final currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
 
-  // Radar Animation Controller for pulsating effect
-  late AnimationController _radarAnimCtrl;
-  late Animation<double> _pulseWave1;
-  late Animation<double> _pulseWave2;
-  late Animation<double> _pulseWave3;
-  late Animation<double> _pulseOpacity;
-  late Animation<double> _driverBlink;
+
 
   // Controllers
   final _pickupCtrl = TextEditingController(text: 'Current Location');
@@ -38,11 +38,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _gatePassCtrl = TextEditingController();
   final _corporateTagCtrl = TextEditingController();
 
-  // Coordinates
-  final double _pickupLat = 6.5244;
-  final double _pickupLng = 3.3792;
-  double _dropoffLat = 6.4281;
-  double _dropoffLng = 3.4219;
+  // Coordinates & Map State
+  LatLng _currentLocation = LocationService.defaultLagosLocation;
+  LatLng _pickupLocation = LocationService.defaultLagosLocation;
+  LatLng? _dropoffLocation;
+  List<LatLng> _routePoints = [];
+  List<LatLng> _nearbyDrivers = [];
+  double _distanceKm = 0.0;
+  int _durationMins = 0;
+  bool _isMapExpanded = false;
+
+  double get _pickupLat => _pickupLocation.latitude;
+  double get _pickupLng => _pickupLocation.longitude;
+  double get _dropoffLat => _dropoffLocation?.latitude ?? 6.4281;
+  double get _dropoffLng => _dropoffLocation?.longitude ?? 3.4219;
 
   String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
   String _selectedVehicleTier = 'ECONOMY'; // 'ECONOMY', 'COMFORT', 'XL_SUV'
@@ -86,37 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    // Setup pulsating radar animations
-    _radarAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
 
-    _pulseWave1 = Tween<double>(begin: 0.5, end: 1.6).animate(
-      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeOutQuad),
-    );
-
-    _pulseWave2 = Tween<double>(begin: 0.2, end: 1.2).animate(
-      CurvedAnimation(
-        parent: _radarAnimCtrl,
-        curve: const Interval(0.25, 1.0, curve: Curves.easeOutQuad),
-      ),
-    );
-
-    _pulseWave3 = Tween<double>(begin: 0.1, end: 0.8).animate(
-      CurvedAnimation(
-        parent: _radarAnimCtrl,
-        curve: const Interval(0.5, 1.0, curve: Curves.easeOutQuad),
-      ),
-    );
-
-    _pulseOpacity = Tween<double>(begin: 0.7, end: 0.0).animate(
-      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeOut),
-    );
-
-    _driverBlink = Tween<double>(begin: 0.4, end: 1.0).animate(
-      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeInOut),
-    );
 
     _dropoffCtrl.addListener(() {
       setState(() {});
@@ -129,12 +108,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final p = context.read<PassengerProvider>();
       p.loadSavedPlaces();
       p.loadPreferences();
+      _initLocationAndDrivers();
     });
+  }
+
+
+  void _initLocationAndDrivers() async {
+    final pos = await LocationService.getCurrentLocation();
+    if (mounted) {
+      setState(() {
+        _currentLocation = pos;
+        _pickupLocation = pos;
+        _nearbyDrivers = [
+          LatLng(pos.latitude + 0.0042, pos.longitude + 0.0035),
+          LatLng(pos.latitude - 0.0031, pos.longitude + 0.0051),
+          LatLng(pos.latitude + 0.0055, pos.longitude - 0.0028),
+          LatLng(pos.latitude - 0.0048, pos.longitude - 0.0039),
+        ];
+      });
+    }
+  }
+
+  Future<void> _openDestinationSearch() async {
+    final place = await PlacesSearchModal.show(
+      context,
+      userLocation: _currentLocation,
+      initialQuery: _dropoffCtrl.text,
+      title: 'Where to?',
+    );
+
+    if (place != null && mounted) {
+      setState(() {
+        _dropoffCtrl.text = place.title;
+        _dropoffLocation = place.location;
+      });
+      _fetchRouteAndCalculateFare();
+    }
+  }
+
+  Future<void> _openPickupSearch() async {
+    final place = await PlacesSearchModal.show(
+      context,
+      userLocation: _currentLocation,
+      initialQuery: _pickupCtrl.text == 'Current Location' ? '' : _pickupCtrl.text,
+      title: 'Set Pickup Location',
+    );
+
+    if (place != null && mounted) {
+      setState(() {
+        _pickupCtrl.text = place.title;
+        _pickupLocation = place.location;
+      });
+      if (_dropoffLocation != null) {
+        _fetchRouteAndCalculateFare();
+      }
+    }
+  }
+
+  Future<void> _fetchRouteAndCalculateFare() async {
+    if (_dropoffLocation == null) return;
+
+    final route = await RoutingService.getDrivingRoute(_pickupLocation, _dropoffLocation!);
+    if (route != null && mounted) {
+      setState(() {
+        _routePoints = route.polyline;
+        _distanceKm = route.distanceKm;
+        _durationMins = route.durationMinutes;
+      });
+    }
+
+    _calculateFareEstimate();
   }
 
   @override
   void dispose() {
-    _radarAnimCtrl.dispose();
     _pickupCtrl.dispose();
     _dropoffCtrl.dispose();
     _stopCtrl.dispose();
@@ -284,11 +331,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _selectQuickDestination(Map<String, dynamic> dest) {
     setState(() {
-      _dropoffCtrl.text = dest['address'];
-      _dropoffLat = dest['lat'];
-      _dropoffLng = dest['lng'];
+      _dropoffCtrl.text = dest['address'] ?? dest['name'];
+      _dropoffLocation = LatLng((dest['lat'] as num).toDouble(), (dest['lng'] as num).toDouble());
     });
-    _calculateFareEstimate();
+    _fetchRouteAndCalculateFare();
   }
 
   void _handleSavedPlaceTap(String label) {
@@ -791,7 +837,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Pulsating Live Geo-Radar Canvas
-                  _buildPulsatingRadarCanvas(),
+                  _buildMapSection(),
 
                   const SizedBox(height: 14),
 
@@ -873,6 +919,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Expanded(
                                 child: TextField(
                                   controller: _pickupCtrl,
+                                  readOnly: true,
+                                  onTap: _openPickupSearch,
                                   style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
                                   decoration: const InputDecoration(
                                     labelText: 'Pickup Location',
@@ -947,6 +995,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Expanded(
                                 child: TextField(
                                   controller: _dropoffCtrl,
+                                  readOnly: true,
+                                  onTap: _openDestinationSearch,
                                   style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
                                   decoration: const InputDecoration(
                                     labelText: 'Destination',
@@ -1523,210 +1573,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ==========================================
   // PULSATING RADAR CANVAS
   // ==========================================
-  Widget _buildPulsatingRadarCanvas() {
-    return AnimatedBuilder(
-      animation: _radarAnimCtrl,
-      builder: (context, child) {
-        return Container(
-          height: 150,
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF0D2826),
-                AppConstants.darkBg,
-              ],
-            ),
+
+  Widget _buildMapSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          InteractiveRideMap(
+            currentLocation: _currentLocation,
+            pickupLocation: _pickupLocation,
+            dropoffLocation: _dropoffLocation,
+            routePoints: _routePoints,
+            nearbyDrivers: _nearbyDrivers,
+            height: 250,
+            isExpanded: _isMapExpanded,
+            onToggleExpand: () => setState(() => _isMapExpanded = !_isMapExpanded),
+            onRecenter: () async {
+              final pos = await LocationService.getCurrentLocation();
+              if (mounted) {
+                setState(() {
+                  _currentLocation = pos;
+                  _pickupLocation = pos;
+                });
+              }
+            },
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Wave Ring 1 (Pulsating & Expanding outwards)
-              Transform.scale(
-                scale: _pulseWave1.value,
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppConstants.primaryLight.withOpacity(_pulseOpacity.value * 0.6),
-                      width: 1.5,
-                    ),
-                  ),
-                ),
+          if (_distanceKm > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppConstants.cardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
               ),
-
-              // Wave Ring 2 (Pulsating & Expanding)
-              Transform.scale(
-                scale: _pulseWave2.value,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppConstants.accentColor.withOpacity(_pulseOpacity.value * 0.7),
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Wave Ring 3
-              Transform.scale(
-                scale: _pulseWave3.value,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppConstants.primaryLight.withOpacity(_pulseOpacity.value * 0.15),
-                  ),
-                ),
-              ),
-
-              // Center Passenger Pin with pulsing glow
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppConstants.primaryLight,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppConstants.primaryLight.withOpacity(0.4 + (_driverBlink.value * 0.4)),
-                      blurRadius: 16 * _driverBlink.value,
-                      spreadRadius: 4 * _driverBlink.value,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
-              ),
-
-              // Active Nearby Driver 1 (Northwest)
-              Positioned(
-                left: 70,
-                top: 30,
-                child: Opacity(
-                  opacity: _driverBlink.value,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppConstants.accentColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppConstants.accentColor.withOpacity(0.6),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
-                  ),
-                ),
-              ),
-
-              // Active Nearby Driver 2 (Southeast)
-              Positioned(
-                right: 80,
-                bottom: 40,
-                child: Opacity(
-                  opacity: (1.4 - _driverBlink.value).clamp(0.3, 1.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppConstants.primaryLight,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppConstants.primaryLight.withOpacity(0.6),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
-                  ),
-                ),
-              ),
-
-              // Active Nearby Driver 3 (Northeast)
-              Positioned(
-                right: 65,
-                top: 25,
-                child: Opacity(
-                  opacity: _driverBlink.value,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppConstants.successColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppConstants.successColor.withOpacity(0.6),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
-                  ),
-                ),
-              ),
-
-              // Pulsating Status Chip: Verified Drivers Active
-              Positioned(
-                bottom: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppConstants.cardBg.withOpacity(0.92),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppConstants.primaryLight.withOpacity(0.4)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppConstants.primaryLight.withOpacity(0.25 * _driverBlink.value),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppConstants.accentColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppConstants.accentColor.withOpacity(_driverBlink.value),
-                              blurRadius: 6,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '8 Verified Drivers Active Nearby',
-                        style: TextStyle(
-                          color: AppConstants.textLight,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
-                        ),
+                      const Icon(Icons.route_rounded, color: AppConstants.primaryLight, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Route: ${_distanceKm.toStringAsFixed(1)} km (~$_durationMins mins)',
+                        style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-                ),
+                  const Text('OSRM Zero-Cost Routing', style: TextStyle(color: AppConstants.accentColor, fontSize: 10, fontWeight: FontWeight.w600)),
+                ],
               ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ],
+      ),
     );
   }
 
