@@ -65,7 +65,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               _buildPolicySection(
                 '3. Bank-Grade Financial Security',
-                'All card payments, subscription purchases, and dedicated NUBAN virtual accounts are securely processed through Paystack (PCI-DSS Level 1 certified) and Bridgecard API infrastructure. Giga Ride never stores full card PANs or CVVs on platform servers.',
+                'Dedicated NUBAN virtual bank accounts are powered exclusively by Korapay for direct bank transfers, while card funding and dynamic payment checkouts are powered directly by Paystack (PCI-DSS Level 1 certified). Giga Ride never stores full card PANs or CVVs on platform servers.',
               ),
               _buildPolicySection(
                 '4. Real-Time Telemetry & Safety Auditing',

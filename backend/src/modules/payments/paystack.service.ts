@@ -6,6 +6,70 @@ import { subscriptionService } from '../subscriptions/subscription.service';
 
 export class PaystackService {
   /**
+   * Initializes dynamic virtual bank account / card funding options via Paystack.
+   */
+  public async initializeCardFunding(userId: string, amountNgn: number, email: string) {
+    const secretKey = await this.getSecretKey();
+    const reference = `fund_${Date.now()}_${userId.slice(0, 6)}`;
+    const amountKobo = Math.round(amountNgn * 100);
+
+    if (secretKey && !secretKey.includes('mock') && secretKey.startsWith('sk_')) {
+      try {
+        const response = await axios.post(
+          `${this.baseUrl}/transaction/initialize`,
+          {
+            email,
+            amount: amountKobo,
+            reference,
+            channels: ['card', 'bank', 'ussd', 'qr', 'bank_transfer'],
+            metadata: {
+              userId,
+              type: 'WALLET_FUNDING',
+              amountNgn,
+            },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${secretKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          }
+        );
+
+        await db.createTransaction({
+          id: reference,
+          reference,
+          user_id: userId,
+          amount_kobo: amountKobo,
+          status: 'PENDING',
+          payment_type: 'WALLET_FUNDING',
+          channel: 'paystack_card',
+          meta_data: { userId, amountNgn },
+          created_at: new Date().toISOString(),
+        });
+
+        return {
+          reference,
+          authorizationUrl: response.data.data.authorization_url,
+          accessCode: response.data.data.access_code,
+          amountNgn,
+        };
+      } catch (err: any) {
+        console.error('Paystack card funding error:', err.response?.data || err.message);
+        throw new Error('Failed to initialize Paystack funding gateway.');
+      }
+    }
+
+    return {
+      reference,
+      authorizationUrl: `https://checkout.paystack.com/${reference}`,
+      accessCode: reference,
+      amountNgn,
+    };
+  }
+
+  /**
    * Generates or fetches a Dedicated Virtual NUBAN Account (Wema / Titan Trust) via Paystack API.
    * Real endpoint: POST https://api.paystack.co/dedicated_account
    */

@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { paystackService } from './paystack.service';
-import { bridgecardService } from './bridgecard.service';
 import { korapayService } from './korapay.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
@@ -69,23 +68,13 @@ paymentRouter.get(
         return;
       }
 
-      // Generate real dedicated NUBAN account via Paystack & Bridgecard APIs
-      let vba: any;
-      try {
-        vba = await paystackService.generateDedicatedVirtualAccount(
-          user.id,
-          user.full_name,
-          user.email,
-          user.phone_number
-        );
-      } catch (_) {
-        vba = await bridgecardService.generateDedicatedVirtualAccount(
-          user.id,
-          user.full_name,
-          user.email,
-          user.phone_number
-        );
-      }
+      // Dedicated NUBAN Virtual Account generated strictly via Korapay API
+      const vba = await korapayService.generateDedicatedVirtualAccount(
+        user.id,
+        user.full_name,
+        user.email,
+        user.phone_number
+      );
 
       res.status(200).json({ success: true, data: vba });
     } catch (err: any) {

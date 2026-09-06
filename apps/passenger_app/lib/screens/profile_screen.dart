@@ -63,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildPolicySection(
                 '3. Bank-Grade Financial Security',
-                'Card details and dedicated NUBAN virtual bank accounts are powered directly by Paystack (PCI-DSS Level 1 certified) and Bridgecard API. Giga Ride never stores or handles raw payment card PANs or security codes.',
+                'Dedicated NUBAN virtual bank accounts are powered exclusively by Korapay for direct bank transfers, while card funding and dynamic payment checkouts are powered directly by Paystack (PCI-DSS Level 1 certified). Giga Ride never stores or handles raw payment card PANs or security codes.',
               ),
               _buildPolicySection(
                 '4. Location Telemetry & SOS Broadcasting',

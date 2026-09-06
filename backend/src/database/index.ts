@@ -194,7 +194,7 @@ export interface PaymentTransactionRow {
   user_id: string;
   amount_kobo: number;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
-  payment_type: 'SUBSCRIPTION_PURCHASE';
+  payment_type: 'SUBSCRIPTION_PURCHASE' | 'WALLET_FUNDING' | 'RIDE_PAYMENT';
   channel: string;
   meta_data: any;
   refunded_at?: string;
@@ -295,7 +295,7 @@ export interface VirtualBankAccountRow {
   bank_name: string;
   bank_code: string;
   account_name: string;
-  provider: 'korapay' | 'paystack' | 'bridgecard';
+  provider: 'korapay' | 'paystack';
   balance_ngn: number;
   vault_balance_ngn?: number;
   is_active: boolean;
