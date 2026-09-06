@@ -754,9 +754,14 @@ export class DatabaseService {
           email: staff.email,
           phone_number: staff.phone_number,
           password_hash: bcrypt.hashSync(staff.password, 10),
+          is_phone_verified: true,
+          is_email_verified: true,
           account_status: 'ACTIVE',
           created_at: new Date().toISOString(),
         });
+      } else {
+        existing.is_phone_verified = true;
+        existing.is_email_verified = true;
       }
     }
   }

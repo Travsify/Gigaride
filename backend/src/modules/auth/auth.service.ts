@@ -182,8 +182,8 @@ export class AuthService {
       throw new Error('Invalid phone/email or password.');
     }
 
-    // 2b. Check Phone Verification
-    if (!user.is_phone_verified) {
+    // 2b. Check Phone Verification (Admin operations console bypasses client phone OTP)
+    if (user.role !== 'ADMIN' && !user.is_phone_verified) {
       // Auto-dispatch OTP so user can verify immediately
       try {
         await twilioService.sendOtp(user.phone_number);
