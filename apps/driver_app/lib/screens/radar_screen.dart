@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import 'active_trip_screen.dart';
+import 'kyc_screen.dart';
 import 'subscription_screen.dart';
 
 class RadarScreen extends StatefulWidget {
@@ -111,6 +112,75 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     );
   }
 
+  void _handleToggleOnline(DriverProvider provider) {
+    final kyc = provider.driverProfile?['kyc_status'];
+    if (kyc != 'APPROVED') {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppConstants.cardBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: AppConstants.accentColor, size: 24),
+              SizedBox(width: 10),
+              Expanded(child: Text('Prembly KYC Required', style: TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'In compliance with Federal Ministry of Transport regulations, drivers must be thoroughly verified and approved by Prembly (Government NIN & FRSC Driver License) before going live on the radar cockpit.',
+                style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Text('Current Status: ', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                    Text(
+                      kyc ?? 'PENDING',
+                      style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: AppConstants.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const KycScreen()),
+                );
+              },
+              child: const Text('Verify with Prembly Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    provider.toggleOnline();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DriverProvider>();
@@ -134,7 +204,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                     children: [
                       // Online / Offline Switch
                       GestureDetector(
-                        onTap: () => provider.toggleOnline(),
+                        onTap: () => _handleToggleOnline(provider),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(

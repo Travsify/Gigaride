@@ -259,6 +259,50 @@ export class AuthService {
   }
 
   // 1-Tap Passwordless Login / Verification via Phone OTP
+  // Forgot Password: send OTP via Twilio SMS
+  public async forgotPassword(identifier: string): Promise<{ success: boolean; message: string; phoneNumber: string }> {
+    let user = await db.findUserByPhone(identifier);
+    if (!user) {
+      user = await db.findUserByEmail(identifier);
+    }
+    if (!user) {
+      throw new Error('No user account found with this phone number or email.');
+    }
+
+    await twilioService.sendOtp(user.phone_number);
+    return {
+      success: true,
+      message: 'A 6-digit password reset code has been sent via SMS to your verified phone number.',
+      phoneNumber: user.phone_number,
+    };
+  }
+
+  // Reset Password using verified SMS OTP
+  public async resetPassword(phoneNumber: string, otpCode: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+
+    const verifyResult = await twilioService.verifyOtp(phoneNumber, otpCode);
+    if (!verifyResult.success) {
+      throw new Error(verifyResult.message || 'Invalid or expired OTP code.');
+    }
+
+    const user = await db.findUserByPhone(phoneNumber);
+    if (!user) {
+      throw new Error('No user found with this phone number.');
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    user.password_hash = newHash;
+    (db as any).saveStore();
+
+    return {
+      success: true,
+      message: 'Your password has been reset successfully. Please log in with your new password.',
+    };
+  }
+
   public async loginWithPhoneOtp(phoneNumber: string, otpCode: string): Promise<any> {
     const verifyResult = await twilioService.verifyOtp(phoneNumber, otpCode);
     if (!verifyResult.success) {

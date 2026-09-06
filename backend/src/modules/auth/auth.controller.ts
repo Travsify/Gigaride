@@ -85,6 +85,35 @@ authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Respon
   }
 });
 
+// Password Recovery Routes
+authRouter.post('/forgot-password', async (req, res: Response): Promise<void> => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) {
+      res.status(400).json({ success: false, message: 'Phone number or email is required.' });
+      return;
+    }
+    const result = await authService.forgotPassword(identifier);
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+authRouter.post('/reset-password', async (req, res: Response): Promise<void> => {
+  try {
+    const { phoneNumber, otpCode, newPassword } = req.body;
+    if (!phoneNumber || !otpCode || !newPassword) {
+      res.status(400).json({ success: false, message: 'phoneNumber, otpCode, and newPassword are required.' });
+      return;
+    }
+    const result = await authService.resetPassword(phoneNumber, otpCode, newPassword);
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
   try {
     const { phoneNumber } = req.body;

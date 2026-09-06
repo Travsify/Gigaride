@@ -250,7 +250,13 @@ class DriverProvider with ChangeNotifier {
     socket.updateLocation(latitude: 6.518, longitude: 3.379, isOnline: true);
   }
 
-  void toggleOnline() {
+  bool toggleOnline() {
+    final kyc = driverProfile?['kyc_status'];
+    if (kyc != 'APPROVED') {
+      isOnline = false;
+      notifyListeners();
+      return false;
+    }
     isOnline = !isOnline;
     socket.updateLocation(
       latitude: 6.518,
@@ -261,6 +267,7 @@ class DriverProvider with ChangeNotifier {
       incomingRequests.clear();
     }
     notifyListeners();
+    return true;
   }
 
   void submitCounterOffer(String rideId, int counterFareNgn, int etaMinutes) {

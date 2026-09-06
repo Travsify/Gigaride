@@ -57,11 +57,18 @@ export function setupBiddingGateway(io: SocketIOServer) {
     socket.join(`user:${user.userId}`);
 
     if (user.role === 'DRIVER') {
-      socket.join('drivers_pool');
-      // Mark driver online in DB and load subscription state
-      await db.updateDriverOnlineStatus(user.userId, true);
-      const subStatus = await subscriptionService.getDriverSubscriptionStatus(user.userId);
-      socket.emit('subscription:status', subStatus);
+      const driverProfile = await db.getDriverProfile(user.userId);
+      if (driverProfile?.kyc_status !== 'APPROVED') {
+        socket.emit('kyc:required', {
+          kycStatus: driverProfile?.kyc_status || 'PENDING',
+          message: 'Drivers must be thoroughly verified and approved by Prembly before going live on the radar.',
+        });
+      } else {
+        socket.join('drivers_pool');
+        await db.updateDriverOnlineStatus(user.userId, true);
+        const subStatus = await subscriptionService.getDriverSubscriptionStatus(user.userId);
+        socket.emit('subscription:status', subStatus);
+      }
     } else if (user.role === 'PASSENGER') {
       socket.join('passengers_pool');
     } else if (user.role === 'ADMIN') {

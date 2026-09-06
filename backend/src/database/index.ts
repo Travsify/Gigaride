@@ -295,7 +295,7 @@ export interface VirtualBankAccountRow {
   bank_name: string;
   bank_code: string;
   account_name: string;
-  provider: 'korapay';
+  provider: 'korapay' | 'paystack' | 'bridgecard';
   balance_ngn: number;
   vault_balance_ngn?: number;
   is_active: boolean;
@@ -968,6 +968,9 @@ export class DatabaseService {
   public async updateDriverOnlineStatus(driverId: string, isOnline: boolean): Promise<void> {
     const profile = this.store.driver_profiles.find((d) => d.driver_id === driverId);
     if (profile) {
+      if (isOnline && profile.kyc_status !== 'APPROVED') {
+        throw new Error('Drivers must be thoroughly verified and approved by Prembly before going live.');
+      }
       profile.is_online = isOnline;
       this.saveStore();
     }
