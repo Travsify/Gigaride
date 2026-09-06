@@ -1,0 +1,89 @@
+name: iOS App Store & TestFlight Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_app:
+        description: 'Target Application to Build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - passenger
+          - driver
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - '.github/workflows/build_ios.yml'
+
+jobs:
+  build-ios:
+    name: Build iOS Applications
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter & Xcode Environment
+        run: |
+          flutter --version
+          xcodebuild -version
+
+      # ==========================================
+      # 1. BUILD PASSENGER APP (iOS)
+      # ==========================================
+      - name: Build Passenger iOS App
+        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'passenger' || github.event_name == 'push' }}
+        working-directory: apps/passenger_app
+        run: |
+          echo "Installing dependencies..."
+          flutter pub get
+          echo "Building iOS framework without codesign..."
+          flutter build ios --release --no-codesign
+          echo "Packaging payload into downloadable .ipa..."
+          mkdir -p build/ios/iphoneos/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          cd build/ios/iphoneos && zip -r GigaRide-Passenger-unsigned.ipa Payload
+
+      - name: Upload Passenger iOS IPA Artifact
+        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'passenger' || github.event_name == 'push' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: GigaRide-Passenger-iOS
+          path: apps/passenger_app/build/ios/iphoneos/GigaRide-Passenger-unsigned.ipa
+          retention-days: 14
+
+      # ==========================================
+      # 2. BUILD DRIVER APP (iOS)
+      # ==========================================
+      - name: Build Driver iOS App
+        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'driver' || github.event_name == 'push' }}
+        working-directory: apps/driver_app
+        run: |
+          echo "Installing dependencies..."
+          flutter pub get
+          echo "Building iOS framework without codesign..."
+          flutter build ios --release --no-codesign
+          echo "Packaging payload into downloadable .ipa..."
+          mkdir -p build/ios/iphoneos/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          cd build/ios/iphoneos && zip -r GigaDriver-unsigned.ipa Payload
+
+      - name: Upload Driver iOS IPA Artifact
+        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'driver' || github.event_name == 'push' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: GigaDriver-iOS
+          path: apps/driver_app/build/ios/iphoneos/GigaDriver-unsigned.ipa
+          retention-days: 14
