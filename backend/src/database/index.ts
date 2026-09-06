@@ -1561,14 +1561,28 @@ export class DatabaseService {
     return acc;
   }
 
-  public async creditVirtualAccountBalance(accountNumberOrUserId: string, amountNgn: number): Promise<VirtualBankAccountRow | undefined> {
-    const acc = this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumberOrUserId || v.user_id === accountNumberOrUserId);
-    if (acc) {
-      acc.balance_ngn = Number((acc.balance_ngn + amountNgn).toFixed(2));
-      this.saveStore();
-      return acc;
+  public async creditVirtualAccountBalance(accountNumberOrUserId: string, amountNgn: number): Promise<VirtualBankAccountRow> {
+    let acc = this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumberOrUserId || v.user_id === accountNumberOrUserId);
+    if (!acc) {
+      const user = this.store.users.find((u) => u.id === accountNumberOrUserId);
+      acc = {
+        id: `vba_${Date.now()}`,
+        user_id: accountNumberOrUserId,
+        account_reference: `dva_${Date.now()}`,
+        account_number: `99${Math.floor(10000000 + Math.random() * 90000000).toString().slice(0, 8)}`,
+        bank_name: 'Wema Bank (Giga Dedicated)',
+        bank_code: '035',
+        account_name: user?.full_name || 'Giga Passenger',
+        provider: 'korapay',
+        balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(acc);
     }
-    return undefined;
+    acc.balance_ngn = Number((acc.balance_ngn + amountNgn).toFixed(2));
+    this.saveStore();
+    return acc;
   }
 
   public async debitVirtualAccountBalance(accountNumberOrUserId: string, amountNgn: number): Promise<VirtualBankAccountRow | undefined> {

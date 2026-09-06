@@ -40,6 +40,31 @@ export class ResendService {
         );
         return { success: true, messageId: response.data.id, simulated: false };
       } catch (err: any) {
+        const errMsg = err.response?.data?.message || err.message;
+        // If custom domain is pending DNS verification, auto-fallback to Resend verified sender
+        if (errMsg && errMsg.includes('domain is not verified')) {
+          try {
+            const fallbackResponse = await axios.post(
+              this.baseUrl,
+              {
+                from: 'Giga Ride <onboarding@resend.dev>',
+                to: Array.isArray(payload.to) ? payload.to : [payload.to],
+                subject: payload.subject,
+                html: payload.html,
+                text: payload.text || payload.subject,
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${apiKey}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+            return { success: true, messageId: fallbackResponse.data.id, simulated: false };
+          } catch (e2: any) {
+            console.warn('[Resend Onboarding Domain]', e2.response?.data || e2.message);
+          }
+        }
         console.error('[Resend API Error]', err.response?.data || err.message);
         return { success: true, messageId: `fallback_resend_${Date.now()}`, simulated: true };
       }

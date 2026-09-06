@@ -23,7 +23,7 @@ export class PremblyService {
       try {
         const response = await axios.post(
           `${this.baseUrl}/nin`,
-          { number: nin, first_name: firstName, last_name: lastName, dob },
+          { number_nin: nin, number: nin, firstname: firstName, surname: lastName, dob },
           { headers: { 'x-api-key': apiKey, 'app-id': appId, 'Content-Type': 'application/json' } }
         );
         payload = response.data;
@@ -89,7 +89,7 @@ export class PremblyService {
       try {
         const response = await axios.post(
           `${this.baseUrl}/frsc`,
-          { number: licenseNumber, first_name: firstName, last_name: lastName, dob },
+          { number: licenseNumber, frsc_number: licenseNumber, firstname: firstName, surname: lastName, dob },
           { headers: { 'x-api-key': apiKey, 'app-id': appId, 'Content-Type': 'application/json' } }
         );
         payload = response.data;
