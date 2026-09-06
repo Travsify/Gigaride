@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // Production Hostinger VPS Server
-  static const String defaultApiUrl = 'http://69.62.127.50';
-  static const String defaultSocketUrl = 'http://69.62.127.50';
+  // Production Hostinger VPS Server & Custom Domain
+  static const String defaultApiUrl = 'https://engine.getgigaride.com';
+  static const String defaultSocketUrl = 'https://engine.getgigaride.com';
 
   // Brand Palette: Kinetic Emerald, Cyan & Obsidian
   static const Color primaryColor = Color(0xFF0D9488); // Teal 600

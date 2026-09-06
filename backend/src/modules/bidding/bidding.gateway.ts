@@ -7,6 +7,7 @@ import { autoTopupService } from '../subscriptions/autoTopup.service';
 import { calculateHaversineDistanceKm } from '../../common/geo';
 import { oneSignalService } from '../notifications/onesignal.service';
 import { twilioService } from '../notifications/twilio.service';
+import { ENV } from '../../config/env';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -401,7 +402,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
         });
 
         // 🚨 High Priority OneSignal Broadcast & SMS Dispatch
-        const trackingUrl = `http://69.62.127.50/track/${data.rideId}`;
+        const trackingUrl = `${ENV.API_BASE_URL}/track/${data.rideId}`;
         const triggerUser = await db.findUserById(user.userId);
         oneSignalService.sendSosAlert(
           triggerUser?.full_name || 'Rider',

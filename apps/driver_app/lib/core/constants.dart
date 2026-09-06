@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // Production Hostinger VPS Server
-  static const String defaultApiUrl = 'http://69.62.127.50';
-  static const String defaultSocketUrl = 'http://69.62.127.50';
+  // Production Hostinger VPS Server & Custom Domain
+  static const String defaultApiUrl = 'https://engine.getgigaride.com';
+  static const String defaultSocketUrl = 'https://engine.getgigaride.com';
 
   // Live Production API Credentials
   static const String paystackPublicKey = 'pk_live_7ff0154fc1e7081a7281f6f0cec0ec48eaa89c41';

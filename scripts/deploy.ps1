@@ -1,4 +1,4 @@
-﻿param (
+param (
     [string]$Message = "chore: automated deployment sync"
 )
 
@@ -22,7 +22,7 @@ Write-Host "✓ GitHub repository updated." -ForegroundColor Green
 
 # 2. Remote VPS deployment over SSH
 Write-Host "`n[2/3] Deploying on VPS (69.62.127.50)..." -ForegroundColor Yellow
-$remoteCommands = "cd /var/www/giga && git pull origin main && cd backend && npm run build && pm2 reload all"
+$remoteCommands = "cd /var/www/giga && git pull origin main && cp -f nginx/engine.getgigaride.com.conf /etc/nginx/sites-available/engine.getgigaride.com && ln -sf /etc/nginx/sites-available/engine.getgigaride.com /etc/nginx/sites-enabled/ && nginx -t && systemctl reload nginx && cd backend && npm run build && pm2 reload all"
 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@69.62.127.50 "$remoteCommands"
 
 if ($LASTEXITCODE -eq 0) {
@@ -32,12 +32,19 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # 3. Health check verification
-Write-Host "`n[3/3] Verifying live VPS health..." -ForegroundColor Yellow
+Write-Host "`n[3/3] Verifying live health..." -ForegroundColor Yellow
 try {
-    $health = Invoke-RestMethod -Uri "http://69.62.127.50/health" -TimeoutSec 5
-    Write-Host "✓ VPS Health Check Confirmed: $($health.status) ($($health.platform))" -ForegroundColor Green
+    $ipHealth = Invoke-RestMethod -Uri "http://69.62.127.50/health" -TimeoutSec 5
+    Write-Host "✓ VPS IP Health Check: $($ipHealth.status) ($($ipHealth.platform))" -ForegroundColor Green
 } catch {
-    Write-Host "⚠️ Could not reach http://69.62.127.50/health yet: $_" -ForegroundColor Red
+    Write-Host "⚠️ Could not reach http://69.62.127.50/health: $_" -ForegroundColor Yellow
+}
+
+try {
+    $domainHealth = Invoke-RestMethod -Uri "https://engine.getgigaride.com/health" -TimeoutSec 5
+    Write-Host "✓ Domain Health Check (engine.getgigaride.com): $($domainHealth.status)" -ForegroundColor Green
+} catch {
+    Write-Host "ℹ️ Domain https://engine.getgigaride.com/health awaiting DNS propagation / SSL." -ForegroundColor Cyan
 }
 
 Write-Host "`n=============================================" -ForegroundColor Cyan

@@ -4,6 +4,7 @@ dotenv.config();
 export const ENV = {
   PORT: parseInt(process.env.PORT || '4000', 10),
   NODE_ENV: process.env.NODE_ENV || 'production',
+  API_BASE_URL: process.env.API_BASE_URL || 'https://engine.getgigaride.com',
   JWT_SECRET: process.env.JWT_SECRET || 'giga_production_jwt_secret_key_nigeria_2026',
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/giga_ride',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
