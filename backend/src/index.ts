@@ -9,6 +9,7 @@ import { rideRouter } from './modules/rides/ride.controller';
 import { paymentRouter } from './modules/payments/payment.controller';
 import { adminRouter } from './modules/admin/admin.controller';
 import { kycRouter } from './modules/kyc/kyc.controller';
+import { notificationRouter } from './modules/notifications/notification.controller';
 import { setupBiddingGateway } from './modules/bidding/bidding.gateway';
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/rides', rideRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/kyc', kycRouter);
+app.use('/api/notifications', notificationRouter);
 
 // Initialize Socket.io Real-Time Bidding Gateway
 setupBiddingGateway(io);

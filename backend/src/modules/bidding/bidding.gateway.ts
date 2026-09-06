@@ -5,6 +5,8 @@ import { geoSessionManager } from '../../common/redis';
 import { subscriptionService } from '../subscriptions/subscription.service';
 import { autoTopupService } from '../subscriptions/autoTopup.service';
 import { calculateHaversineDistanceKm } from '../../common/geo';
+import { oneSignalService } from '../notifications/onesignal.service';
+import { twilioService } from '../notifications/twilio.service';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -187,6 +189,22 @@ export function setupBiddingGateway(io: SocketIOServer) {
           etaMinutes: bid.eta_minutes,
         });
 
+        // 🚖 Push & In-App Notification to Passenger
+        oneSignalService.sendBidAlertToPassenger(
+          ride.rider_id,
+          driverUser?.full_name || 'Verified Driver',
+          bid.counter_fare_ngn,
+          ride.id
+        ).catch(() => {});
+
+        db.createNotification({
+          user_id: ride.rider_id,
+          title: 'New Driver Offer Received',
+          message: `${driverUser?.full_name || 'A verified driver'} offered ₦${bid.counter_fare_ngn.toLocaleString()} for your trip.`,
+          type: 'BID',
+          meta_data: { rideId: ride.id, bidId: bid.id, fareNgn: bid.counter_fare_ngn },
+        }).catch(() => {});
+
         socket.emit('bid:sent', { success: true, bidId: bid.id });
       } catch (err: any) {
         socket.emit('error', { message: err.message });
@@ -221,6 +239,24 @@ export function setupBiddingGateway(io: SocketIOServer) {
           riderId: ride.rider_id,
         });
 
+        const riderUser = await db.findUserById(ride.rider_id);
+
+        // 🎉 Push & In-App Notification to Driver
+        oneSignalService.sendMatchAlertToDriver(
+          data.driverId,
+          riderUser?.full_name || 'Passenger',
+          ride.pickup_address,
+          ride.id
+        ).catch(() => {});
+
+        db.createNotification({
+          user_id: data.driverId,
+          title: 'Offer Accepted! Head to Pickup',
+          message: `${riderUser?.full_name || 'Passenger'} accepted your offer of ₦${data.agreedFareNgn.toLocaleString()}. Pickup: ${ride.pickup_address}`,
+          type: 'BID',
+          meta_data: { rideId: ride.id, agreedFareNgn: data.agreedFareNgn },
+        }).catch(() => {});
+
         // Notify passenger with confirmation
         socket.emit('ride:confirmed', {
           rideId: ride.id,
@@ -250,6 +286,47 @@ export function setupBiddingGateway(io: SocketIOServer) {
           rideId: ride.id,
           status: data.status,
         });
+
+        // 📲 Lifecycle Push & In-App Alerts to Passenger
+        if (data.status === 'ARRIVED') {
+          oneSignalService.sendPush({
+            userIds: [ride.rider_id],
+            heading: 'Driver Arrived at Pickup!',
+            content: 'Your driver has arrived at your pickup spot. Please step outside.',
+            data: { rideId: ride.id, status: 'ARRIVED' },
+          }).catch(() => {});
+
+          db.createNotification({
+            user_id: ride.rider_id,
+            title: 'Driver Arrived',
+            message: 'Your driver has arrived and is waiting at your pickup point.',
+            type: 'RIDE',
+            meta_data: { rideId: ride.id },
+          }).catch(() => {});
+        } else if (data.status === 'IN_TRANSIT') {
+          oneSignalService.sendPush({
+            userIds: [ride.rider_id],
+            heading: 'Trip Started 🚗',
+            content: `You are en route to ${ride.dropoff_address}.`,
+            data: { rideId: ride.id, status: 'IN_TRANSIT' },
+          }).catch(() => {});
+        } else if (data.status === 'COMPLETED') {
+          const fare = ride.agreed_fare_ngn || ride.rider_offer_ngn;
+          oneSignalService.sendPush({
+            userIds: [ride.rider_id],
+            heading: 'Trip Completed! Receipt Ready',
+            content: `You arrived at ${ride.dropoff_address}. Total: ₦${fare.toLocaleString()}`,
+            data: { rideId: ride.id, status: 'COMPLETED' },
+          }).catch(() => {});
+
+          db.createNotification({
+            user_id: ride.rider_id,
+            title: 'Trip Completed',
+            message: `You arrived safely at ${ride.dropoff_address}. ₦${fare.toLocaleString()} settled.`,
+            type: 'RIDE',
+            meta_data: { rideId: ride.id, fareNgn: fare },
+          }).catch(() => {});
+        }
 
         // When ride is COMPLETED, deduct driver subscription credit atomically!
         if (data.status === 'COMPLETED') {
@@ -315,6 +392,23 @@ export function setupBiddingGateway(io: SocketIOServer) {
           ride,
           triggeredByRole: user.role,
         });
+
+        // 🚨 High Priority OneSignal Broadcast & SMS Dispatch
+        const trackingUrl = `http://69.62.127.50/track/${data.rideId}`;
+        const triggerUser = await db.findUserById(user.userId);
+        oneSignalService.sendSosAlert(
+          triggerUser?.full_name || 'Rider',
+          'GPS Live Tracking Active',
+          trackingUrl
+        ).catch(() => {});
+
+        db.createNotification({
+          user_id: user.userId,
+          title: '🚨 SOS Alert Dispatched',
+          message: 'Security response team and emergency dispatchers have been alerted with your live GPS location.',
+          type: 'SOS',
+          meta_data: { incidentId: incident.id, rideId: data.rideId },
+        }).catch(() => {});
 
         socket.emit('sos:acknowledged', { success: true, incidentId: incident.id });
       } catch (err: any) {

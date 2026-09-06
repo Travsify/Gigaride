@@ -101,9 +101,56 @@ authRouter.post('/verify-otp', async (req, res: Response): Promise<void> => {
       res.status(400).json({ success: false, message: 'phoneNumber and otpCode are required.' });
       return;
     }
-    const result = await twilioService.verifyOtp(phoneNumber, otpCode);
+    // Authenticates user directly if they already exist, or validates phone for registration
+    const result = await authService.loginWithPhoneOtp(phoneNumber, otpCode);
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+
+// Dispatches 6-digit Email Verification OTP via Resend
+authRouter.post('/send-email-otp', async (req, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      res.status(400).json({ success: false, message: 'A valid email address is required.' });
+      return;
+    }
+    const result = await authService.sendEmailVerificationOtp(email);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Verifies Email OTP
+authRouter.post('/verify-email', async (req, res: Response): Promise<void> => {
+  try {
+    const { email, otpCode } = req.body;
+    if (!email || !otpCode) {
+      res.status(400).json({ success: false, message: 'email and otpCode are required.' });
+      return;
+    }
+    const result = await authService.verifyEmailOtp(email, otpCode);
     res.status(result.success ? 200 : 400).json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 1-Tap Passwordless Login via Phone OTP
+authRouter.post('/login-otp', async (req, res: Response): Promise<void> => {
+  try {
+    const { phoneNumber, otpCode } = req.body;
+    if (!phoneNumber || !otpCode) {
+      res.status(400).json({ success: false, message: 'phoneNumber and otpCode are required.' });
+      return;
+    }
+    const result = await authService.loginWithPhoneOtp(phoneNumber, otpCode);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
   }
 });

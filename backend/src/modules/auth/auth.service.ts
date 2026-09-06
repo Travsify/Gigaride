@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { db, UserRow } from '../../database';
 import { ENV } from '../../config/env';
 import { AuthResponse, JwtPayload, LoginDto, RegisterUserDto } from './auth.types';
+import { resendService } from '../notifications/resend.service';
+import { twilioService } from '../notifications/twilio.service';
 
 export class AuthService {
   public async register(dto: RegisterUserDto): Promise<AuthResponse> {
@@ -73,7 +75,45 @@ export class AuthService {
       });
     }
 
-    // 5. Generate token
+    // 5. Dispatch Welcome Email & In-App Notification
+    try {
+      await resendService.sendEmail({
+        to: newUser.email,
+        subject: 'Welcome to Giga Ride Nigeria — Zero Commission Mobility',
+        html: `
+          <div style="font-family: Arial, sans-serif; background: #0A0F1D; color: #F8FAFC; padding: 28px; border-radius: 16px; max-width: 540px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #14B8A6; margin: 0; font-size: 24px;">🚖 Giga Ride Nigeria</h1>
+              <p style="color: #94A3B8; font-size: 13px; margin-top: 4px;">Decacorn Zero-Commission Mobility</p>
+            </div>
+            <p style="font-size: 15px;">Hello <strong>${newUser.full_name}</strong>,</p>
+            <p style="color: #CBD5E1; font-size: 14px; line-height: 1.5;">
+              Welcome aboard Nigeria's fairest mobility ecosystem. Whether you're commuting across Lagos, Abuja, or Port Harcourt, you get 100% fair pricing, live auction bidding, and our NDPR asymmetric privacy shield.
+            </p>
+            <div style="background: #131C31; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; color: #10B981; font-weight: bold; font-size: 13px;">✓ Zero Driver Exploitation (0% Trip Commission)</p>
+              <p style="margin: 0 0 8px 0; color: #10B981; font-weight: bold; font-size: 13px;">✓ Dedicated Virtual Bank Accounts (Providus / Wema)</p>
+              <p style="margin: 0; color: #10B981; font-weight: bold; font-size: 13px;">✓ 256-Bit TLS & NDPR Regulated Privacy Shield</p>
+            </div>
+            <p style="color: #64748B; font-size: 12px; text-align: center; margin-top: 24px;">
+              © 2026 Giga Ride Nigeria Ltd. Lagos, Nigeria.
+            </p>
+          </div>
+        `,
+      });
+
+      await db.createNotification({
+        user_id: userId,
+        title: 'Welcome to Giga Ride!',
+        message: 'Your account is active. Experience fair pricing with 0% platform commission on every trip.',
+        type: 'SYSTEM',
+        meta_data: { role: dto.role },
+      });
+    } catch (e: any) {
+      console.warn('[Welcome Notification Warning]', e.message);
+    }
+
+    // 6. Generate token
     const token = this.generateToken(newUser);
 
     return {
@@ -151,6 +191,86 @@ export class AuthService {
 
   public verifyToken(token: string): JwtPayload {
     return jwt.verify(token, ENV.JWT_SECRET) as JwtPayload;
+  }
+
+  // Dispatches 6-digit Email Verification OTP
+  public async sendEmailVerificationOtp(email: string): Promise<{ success: boolean; message: string }> {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await db.saveEmailOtp(email, otp, 15);
+
+    await resendService.sendEmail({
+      to: email,
+      subject: `Your Giga Ride Verification Code: ${otp}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #0A0F1D; color: #F8FAFC; padding: 28px; border-radius: 16px; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #14B8A6; text-align: center; margin-bottom: 8px;">Email Verification</h2>
+          <p style="color: #94A3B8; text-align: center; font-size: 13px;">Enter the code below to verify your email address on Giga Ride.</p>
+          <div style="background: #131C31; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; text-align: center; padding: 20px; margin: 24px 0;">
+            <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #10B981; font-family: monospace;">${otp}</span>
+          </div>
+          <p style="color: #64748B; font-size: 12px; text-align: center;">This code expires in 15 minutes. If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    return { success: true, message: 'Verification code sent to your email.' };
+  }
+
+  // Validates submitted Email Verification code
+  public async verifyEmailOtp(email: string, otp: string): Promise<{ success: boolean; message: string }> {
+    const isValid = await db.verifyEmailOtp(email, otp);
+    if (!isValid) {
+      return { success: false, message: 'Invalid or expired verification code.' };
+    }
+    return { success: true, message: 'Email address successfully verified.' };
+  }
+
+  // 1-Tap Passwordless Login / Verification via Phone OTP
+  public async loginWithPhoneOtp(phoneNumber: string, otpCode: string): Promise<any> {
+    const verifyResult = await twilioService.verifyOtp(phoneNumber, otpCode);
+    if (!verifyResult.success) {
+      throw new Error(verifyResult.message || 'Invalid or expired OTP code.');
+    }
+
+    // Check if user exists with this phone number
+    const user = await db.findUserByPhone(phoneNumber);
+    if (!user) {
+      return {
+        success: true,
+        isNewUser: true,
+        phoneNumber,
+        message: 'Phone number verified. Please proceed to complete profile registration.',
+      };
+    }
+
+    await db.markUserPhoneVerified(user.id);
+
+    let driverProfile = undefined;
+    let subscription = undefined;
+
+    if (user.role === 'DRIVER') {
+      driverProfile = await db.getDriverProfile(user.id);
+      subscription = await db.getActiveDriverSubscription(user.id);
+    }
+
+    const token = this.generateToken(user);
+
+    return {
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        role: user.role,
+        fullName: user.full_name,
+        phoneNumber: user.phone_number,
+        email: user.email,
+        isPhoneVerified: true,
+        isEmailVerified: !!user.is_email_verified,
+      },
+      driverProfile,
+      subscription,
+      message: 'Logged in successfully via Phone OTP.',
+    };
   }
 }
 

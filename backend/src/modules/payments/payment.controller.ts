@@ -4,6 +4,7 @@ import { paystackService } from './paystack.service';
 import { korapayService } from './korapay.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
+import { oneSignalService } from '../notifications/onesignal.service';
 
 export const paymentRouter = Router();
 
@@ -158,6 +159,22 @@ paymentRouter.post(
         meta_data: { type: 'WALLET_TOPUP', method: req.body.method || 'BANK_TRANSFER' },
         created_at: new Date().toISOString(),
       });
+
+      // Push & In-App Notification on Wallet Credit
+      oneSignalService.sendPush({
+        userIds: [req.user!.userId],
+        heading: 'Living Wallet Credited 💰',
+        content: `₦${amountNgn.toLocaleString()} has been added to your Giga Wallet.`,
+        data: { type: 'WALLET_CREDIT', amountNgn },
+      }).catch(() => {});
+
+      db.createNotification({
+        user_id: req.user!.userId,
+        title: 'Wallet Funded',
+        message: `₦${amountNgn.toLocaleString()} was successfully added to your Living Wallet.`,
+        type: 'WALLET',
+        meta_data: { amountNgn },
+      }).catch(() => {});
 
       res.json({
         success: true,

@@ -6,6 +6,23 @@ import { ENV } from '../config/env';
 
 export type AdminRole = 'SUPER_ADMIN' | 'SUPPORT_AGENT' | 'KYC_OFFICER' | 'FINANCE_ADMIN';
 
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'BID' | 'RIDE' | 'WALLET' | 'KYC' | 'SOS' | 'SYSTEM';
+  is_read: boolean;
+  meta_data?: Record<string, any>;
+  created_at: string;
+}
+
+export interface EmailVerificationRow {
+  email: string;
+  otp: string;
+  expires_at: string;
+}
+
 export interface UserRow {
   id: string;
   role: 'PASSENGER' | 'DRIVER' | 'ADMIN';
@@ -15,6 +32,7 @@ export interface UserRow {
   email: string;
   password_hash: string;
   is_phone_verified?: boolean;
+  is_email_verified?: boolean;
   account_status?: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   created_at: string;
 }
@@ -391,6 +409,8 @@ export class DatabaseService {
     backup_snapshots: [] as BackupSnapshotRow[],
     rider_subscriptions: [] as RiderSubscriptionRow[],
     beneficiaries: [] as BeneficiaryRow[],
+    notifications: [] as NotificationRow[],
+    email_verifications: [] as EmailVerificationRow[],
     platform_settings: {
       petrol_price_ngn: 1050,
       base_flag_fall_ngn: 1500,
@@ -2372,6 +2392,104 @@ export class DatabaseService {
       cityZonesCount: this.store.city_zones.length,
       platformSettings: this.store.platform_settings,
     };
+  }
+
+  // ==========================================
+  // IN-APP NOTIFICATION METHODS
+  // ==========================================
+  public async createNotification(data: Omit<NotificationRow, 'id' | 'created_at' | 'is_read'> & { is_read?: boolean }): Promise<NotificationRow> {
+    const row: NotificationRow = {
+      id: `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      user_id: data.user_id,
+      title: data.title,
+      message: data.message,
+      type: data.type,
+      is_read: false,
+      meta_data: data.meta_data,
+      created_at: new Date().toISOString(),
+    };
+    this.store.notifications.unshift(row);
+    this.saveStore();
+    return row;
+  }
+
+  public async getUserNotifications(userId: string, limit: number = 30): Promise<NotificationRow[]> {
+    return this.store.notifications
+      .filter((n) => n.user_id === userId)
+      .slice(0, limit);
+  }
+
+  public async getUnreadNotificationsCount(userId: string): Promise<number> {
+    return this.store.notifications.filter((n) => n.user_id === userId && !n.is_read).length;
+  }
+
+  public async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
+    const notif = this.store.notifications.find((n) => n.id === notificationId && n.user_id === userId);
+    if (!notif) return false;
+    notif.is_read = true;
+    this.saveStore();
+    return true;
+  }
+
+  public async markAllNotificationsAsRead(userId: string): Promise<number> {
+    let count = 0;
+    this.store.notifications.forEach((n) => {
+      if (n.user_id === userId && !n.is_read) {
+        n.is_read = true;
+        count++;
+      }
+    });
+    if (count > 0) this.saveStore();
+    return count;
+  }
+
+  // ==========================================
+  // EMAIL OTP & USER VERIFICATION METHODS
+  // ==========================================
+  public async saveEmailOtp(email: string, otp: string, expiryMinutes: number = 15): Promise<void> {
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000).toISOString();
+    const existingIdx = this.store.email_verifications.findIndex((e) => e.email.toLowerCase() === email.toLowerCase());
+    if (existingIdx >= 0) {
+      this.store.email_verifications[existingIdx] = { email: email.toLowerCase(), otp, expires_at: expiresAt };
+    } else {
+      this.store.email_verifications.push({ email: email.toLowerCase(), otp, expires_at: expiresAt });
+    }
+    this.saveStore();
+  }
+
+  public async verifyEmailOtp(email: string, otp: string): Promise<boolean> {
+    const record = this.store.email_verifications.find(
+      (e) => e.email.toLowerCase() === email.toLowerCase() && e.otp === otp
+    );
+    if (!record) return false;
+    if (new Date(record.expires_at).getTime() < Date.now()) return false;
+
+    // Remove OTP after successful use
+    this.store.email_verifications = this.store.email_verifications.filter((e) => e.email.toLowerCase() !== email.toLowerCase());
+
+    // Mark user email verified
+    const user = this.store.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (user) {
+      user.is_email_verified = true;
+    }
+    this.saveStore();
+    return true;
+  }
+
+  public async markUserPhoneVerified(userId: string): Promise<void> {
+    const user = this.store.users.find((u) => u.id === userId);
+    if (user) {
+      user.is_phone_verified = true;
+      this.saveStore();
+    }
+  }
+
+  public async markUserEmailVerified(userId: string): Promise<void> {
+    const user = this.store.users.find((u) => u.id === userId);
+    if (user) {
+      user.is_email_verified = true;
+      this.saveStore();
+    }
   }
 }
 
