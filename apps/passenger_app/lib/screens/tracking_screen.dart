@@ -182,6 +182,23 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     );
   }
 
+  void _shareLiveTrackingLink(BuildContext context, String rideId, Map<String, dynamic>? driver) {
+    final driverName = driver?['driverName'] ?? 'Driver';
+    final vehicle = '${driver?['vehicleModel'] ?? 'Vehicle'} (${driver?['licensePlate'] ?? ''})';
+    final link = 'https://gigaride.ng/track/$rideId';
+    final shareMsg = "I'm riding with Giga Ride! Track my trip live: $link\nDriver: $driverName ($vehicle)\n256-bit encrypted & NDPR protected.";
+
+    Clipboard.setData(ClipboardData(text: shareMsg));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Live Tracking link copied to clipboard! Share with family on WhatsApp/SMS.'),
+        backgroundColor: AppConstants.primaryColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _triggerEmergencySosDialog(BuildContext context, PassengerProvider provider) {
     showDialog(
       context: context,
@@ -579,6 +596,23 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           style: const TextStyle(color: AppConstants.accentColor, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: AppConstants.primaryLight.withOpacity(0.4)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        icon: const Icon(Icons.share_location_rounded, color: AppConstants.primaryLight, size: 16),
+                        label: const Text(
+                          'Share Live Trip Link (Family WhatsApp)',
+                          style: TextStyle(color: AppConstants.primaryLight, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        onPressed: () => _shareLiveTrackingLink(context, rideId, driver),
+                      ),
                     ),
                   ],
                 ),

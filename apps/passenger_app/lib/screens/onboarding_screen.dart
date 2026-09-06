@@ -39,6 +39,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.flight_takeoff_rounded,
       accentColor: Color(0xFF38BDF8), // Sky Blue
     ),
+    OnboardingItem(
+      badge: 'NDPR DATA SHIELD',
+      title: 'Your Phone Number Is\nNever Shared With Drivers.',
+      description:
+          'Complete peace of mind under NDPR compliance. All in-app VoIP audio calls and estate gate chat are encrypted with zero personal phone leaks.',
+      icon: Icons.verified_user_rounded,
+      accentColor: Color(0xFF10B981), // Emerald
+    ),
   ];
 
   void _onFinish() async {

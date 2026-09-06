@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 
@@ -16,6 +18,22 @@ class PassengerProvider with ChangeNotifier {
   Map<String, dynamic>? selectedDriverBid;
   String? tripStatus; // 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT', 'COMPLETED'
   int? finalFarePaid;
+
+  // Real Ride History & Scheduled Trips from backend
+  List<dynamic> pastRides = [];
+  List<dynamic> scheduledTrips = [];
+  bool isLoadingHistory = false;
+
+  // Saved Places (Persistent Home & Work Bookmarks)
+  Map<String, String> savedPlaces = {'Home': '', 'Work': ''};
+
+  // Emergency SOS Contacts
+  List<Map<String, String>> emergencyContacts = [];
+
+  // Ride Comfort Preferences
+  bool preferQuiet = false;
+  bool alwaysAcOn = true;
+  bool luggageAssistance = false;
 
   Future<bool> checkAuth() async {
     final token = await api.getToken();
@@ -223,6 +241,98 @@ class PassengerProvider with ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Load real ride history & scheduled trips from backend API
+  Future<void> loadRiderHistory() async {
+    isLoadingHistory = true;
+    notifyListeners();
+    try {
+      final list = await api.getRiderHistory();
+      pastRides = list.where((r) => r['is_scheduled'] != true && r['status'] == 'COMPLETED').toList();
+      scheduledTrips = list.where((r) => r['is_scheduled'] == true || r['scheduled_for'] != null).toList();
+    } catch (_) {
+      // Graceful fallback to avoid app interruption
+    } finally {
+      isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  // Load Saved Places from persistent local storage
+  Future<void> loadSavedPlaces() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      savedPlaces = {
+        'Home': prefs.getString('saved_place_home') ?? '',
+        'Work': prefs.getString('saved_place_work') ?? '',
+      };
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> savePlace(String label, String address) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_place_${label.toLowerCase()}', address);
+      savedPlaces[label] = address;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  // Load Emergency SOS Contacts
+  Future<void> loadEmergencyContacts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('emergency_contacts_json');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        emergencyContacts = decoded.map((e) => Map<String, String>.from(e as Map)).toList();
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> addEmergencyContact(String name, String phone) async {
+    try {
+      emergencyContacts.add({'name': name, 'phone': phone});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('emergency_contacts_json', jsonEncode(emergencyContacts));
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> removeEmergencyContact(int index) async {
+    try {
+      if (index >= 0 && index < emergencyContacts.length) {
+        emergencyContacts.removeAt(index);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('emergency_contacts_json', jsonEncode(emergencyContacts));
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  // Load Rider Comfort Preferences
+  Future<void> loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      preferQuiet = prefs.getBool('pref_prefer_quiet') ?? false;
+      alwaysAcOn = prefs.getBool('pref_always_ac_on') ?? true;
+      luggageAssistance = prefs.getBool('pref_luggage_assistance') ?? false;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> setPreference(String key, bool val) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('pref_$key', val);
+      if (key == 'prefer_quiet') preferQuiet = val;
+      if (key == 'always_ac_on') alwaysAcOn = val;
+      if (key == 'luggage_assistance') luggageAssistance = val;
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> logout() async {

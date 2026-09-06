@@ -225,16 +225,25 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 16),
 
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryLight),
-                ),
+              // Security & Gateway Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.shield_outlined, color: AppConstants.primaryLight, size: 12),
+                  SizedBox(width: 6),
+                  Text(
+                    '256-Bit TLS • NDPR Compliant • Lagos Gateway',
+                    style: TextStyle(
+                      color: AppConstants.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 36),
+              const SizedBox(height: 24),
             ],
           ),
         ),

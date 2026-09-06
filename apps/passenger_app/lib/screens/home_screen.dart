@@ -31,9 +31,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Controllers
   final _pickupCtrl = TextEditingController(text: 'Current Location');
   final _dropoffCtrl = TextEditingController();
+  final _stopCtrl = TextEditingController();
   final _offerCtrl = TextEditingController();
   final _flightCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _gatePassCtrl = TextEditingController();
   final _corporateTagCtrl = TextEditingController();
 
   // Coordinates
@@ -43,9 +45,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double _dropoffLng = 3.4219;
 
   String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
+  String _selectedVehicleTier = 'ECONOMY'; // 'ECONOMY', 'COMFORT', 'XL_SUV'
   DateTime? _scheduledDateTime;
   final bool _isCorporateMode = false;
   bool _showNotesField = false;
+  bool _showStopField = false;
+  bool _showGatePassField = false;
 
   final List<Map<String, dynamic>> _quickDestinations = [
     {
@@ -119,6 +124,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pickupCtrl.addListener(() {
       setState(() {});
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final p = context.read<PassengerProvider>();
+      p.loadSavedPlaces();
+      p.loadPreferences();
+    });
   }
 
   @override
@@ -126,9 +137,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _radarAnimCtrl.dispose();
     _pickupCtrl.dispose();
     _dropoffCtrl.dispose();
+    _stopCtrl.dispose();
     _offerCtrl.dispose();
     _flightCtrl.dispose();
     _notesCtrl.dispose();
+    _gatePassCtrl.dispose();
     _corporateTagCtrl.dispose();
     super.dispose();
   }
@@ -278,6 +291,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _calculateFareEstimate();
   }
 
+  void _handleSavedPlaceTap(String label) {
+    final provider = context.read<PassengerProvider>();
+    final currentAddress = provider.savedPlaces[label];
+
+    if (currentAddress != null && currentAddress.trim().isNotEmpty) {
+      setState(() {
+        _dropoffCtrl.text = currentAddress.trim();
+      });
+      _calculateFareEstimate();
+    } else {
+      // Prompt user to set their saved address
+      final editCtrl = TextEditingController();
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppConstants.cardBg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(label == 'Home' ? Icons.home_rounded : Icons.work_rounded, color: AppConstants.primaryLight, size: 24),
+              const SizedBox(width: 10),
+              Text('Set $label Address', style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Enter your regular $label address in Lagos for 1-tap booking.', style: const TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+              const SizedBox(height: 14),
+              TextField(
+                controller: editCtrl,
+                style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'e.g. 14 Admiralty Way, Lekki',
+                  hintStyle: const TextStyle(color: AppConstants.textMuted),
+                  filled: true,
+                  fillColor: AppConstants.surfaceBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: AppConstants.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+              onPressed: () {
+                final addr = editCtrl.text.trim();
+                if (addr.isNotEmpty) {
+                  provider.savePlace(label, addr);
+                  setState(() => _dropoffCtrl.text = addr);
+                  _calculateFareEstimate();
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save & Apply', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Future<void> _pickScheduleDateTime() async {
     final now = DateTime.now();
     final pickedDate = await showDatePicker(
@@ -340,9 +420,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (!mounted) return;
       final estimate = provider.currentEstimate;
       if (estimate != null) {
-        final rec = estimate['recommendedFareNgn'] ?? estimate['estimatedFareNgn'] ?? 2500;
+        num baseRec = estimate['recommendedFareNgn'] ?? estimate['estimatedFareNgn'] ?? 2500;
+        // Apply vehicle tier multiplier
+        if (_selectedVehicleTier == 'COMFORT') {
+          baseRec = (baseRec * 1.25).round();
+        } else if (_selectedVehicleTier == 'XL_SUV') {
+          baseRec = (baseRec * 1.70).round();
+        }
         setState(() {
-          _offerCtrl.text = rec.toString();
+          _offerCtrl.text = baseRec.toString();
         });
       }
     });
@@ -373,6 +459,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
       return;
     }
+
+    // Assemble comprehensive driver notes
+    final List<String> notesList = [];
+    if (_stopCtrl.text.trim().isNotEmpty) {
+      notesList.add('[Intermediate Stop: ${_stopCtrl.text.trim()}]');
+    }
+    if (_gatePassCtrl.text.trim().isNotEmpty) {
+      notesList.add('[Estate Gate Pass: ${_gatePassCtrl.text.trim()}]');
+    }
+    if (_notesCtrl.text.trim().isNotEmpty) {
+      notesList.add(_notesCtrl.text.trim());
+    }
+    final combinedNotes = notesList.isNotEmpty ? notesList.join(' • ') : null;
 
     // Advance Booking Handling (Airport / Interstate)
     if (_selectedCategory == 'AIRPORT' || _selectedCategory == 'INTERSTATE') {
@@ -468,12 +567,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // On-Demand City Ride Handling
     try {
-      final noteText = _notesCtrl.text.trim();
-      final corpTag = _corporateTagCtrl.text.trim();
-      final fullNotes = _isCorporateMode && corpTag.isNotEmpty
-          ? '[Corporate: $corpTag] $noteText'.trim()
-          : (noteText.isNotEmpty ? noteText : null);
-
       await provider.submitRideRequest(
         pickupLat: _pickupLat,
         pickupLng: _pickupLng,
@@ -482,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         dropoffLng: _dropoffLng,
         dropoffAddress: dropoffText,
         riderOfferNgn: offer > 0 ? offer : 2500,
-        notes: fullNotes,
+        notes: combinedNotes,
         isBusiness: _isCorporateMode,
       );
 
@@ -603,6 +696,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final provider = context.watch<PassengerProvider>();
     final estimate = provider.currentEstimate;
     final hasRoute = _pickupCtrl.text.trim().isNotEmpty && _dropoffCtrl.text.trim().isNotEmpty;
+    final homeAddress = provider.savedPlaces['Home'];
+    final workAddress = provider.savedPlaces['Work'];
 
     return SafeArea(
       child: Column(
@@ -743,7 +838,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                   const SizedBox(height: 16),
 
-                  // 4. Address Input Card (Pickup & Where to)
+                  // 4. Address Input Card (Pickup, Multi-Stop & Where to)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -792,6 +887,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ],
                           ),
 
+                          // Intermediate Stop (Multi-Stop Route)
+                          if (_showStopField) ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 24),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.add_location_alt_rounded, color: Colors.orangeAccent, size: 14),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _stopCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Intermediate Stop (Drop colleague / errand)',
+                                      labelStyle: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                                      hintText: 'e.g. Yaba Tech, Surulere',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 16, color: AppConstants.textMuted),
+                                  onPressed: () {
+                                    setState(() {
+                                      _stopCtrl.clear();
+                                      _showStopField = false;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+
                           const Divider(color: AppConstants.surfaceBg, height: 24),
 
                           // Destination ("Where to?")
@@ -835,7 +972,128 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ],
                           ),
 
-                          // Advance Booking Fields (Airport / Interstate)
+                          // Extra actions under inputs: Add Stop, Gate Pass, Driver Notes
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (!_showStopField)
+                                GestureDetector(
+                                  onTap: () => setState(() => _showStopField = true),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.add, color: AppConstants.accentColor, size: 14),
+                                        SizedBox(width: 3),
+                                        Text('Add Stop', style: TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 14),
+                              if (!_showGatePassField)
+                                GestureDetector(
+                                  onTap: () => setState(() => _showGatePassField = true),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.vpn_key_rounded, color: AppConstants.primaryLight, size: 13),
+                                        SizedBox(width: 3),
+                                        Text('Estate Pass', style: TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 14),
+                              if (!_showNotesField)
+                                GestureDetector(
+                                  onTap: () => setState(() => _showNotesField = true),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.notes_rounded, color: AppConstants.textMuted, size: 13),
+                                        SizedBox(width: 3),
+                                        Text('Instructions', style: TextStyle(color: AppConstants.textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+
+                          // Expandable Estate Gate Pass Field
+                          if (_showGatePassField) ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 20),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.primaryLight.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.vpn_key_rounded, color: AppConstants.primaryLight, size: 12),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _gatePassCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Estate Gate Access Code (e.g. VGC-8891, Chevron-92)',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 16, color: AppConstants.textMuted),
+                                  onPressed: () => setState(() => _showGatePassField = false),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          // Expandable Driver Notes Field
+                          if (_showNotesField) ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 20),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.accentColor.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.notes_rounded, color: AppConstants.accentColor, size: 12),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _notesCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Driver note (e.g. Call at gate, 2 travel bags)',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 16, color: AppConstants.textMuted),
+                                  onPressed: () => setState(() => _showNotesField = false),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          // Advance Booking Schedule for Airport / Interstate
                           if (_selectedCategory != 'CITY') ...[
                             const Divider(color: AppConstants.surfaceBg, height: 24),
                             GestureDetector(
@@ -908,96 +1166,92 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ],
-
-                          // Corporate Billing Department Code
-                          if (_isCorporateMode) ...[
-                            const Divider(color: AppConstants.surfaceBg, height: 20),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: BoxDecoration(
-                                    color: Colors.cyan.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.corporate_fare_rounded, color: Colors.cyanAccent, size: 14),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _corporateTagCtrl,
-                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Cost Center / Dept Tag (e.g. Audit, Sales)',
-                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-
-                          // Driver Instructions / Gate Notes
-                          if (_showNotesField) ...[
-                            const Divider(color: AppConstants.surfaceBg, height: 20),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.accentColor.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.notes_rounded, color: AppConstants.accentColor, size: 14),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _notesCtrl,
-                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Note for driver (e.g. Call at gate, 2 bags)',
-                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 16, color: AppConstants.textMuted),
-                                  onPressed: () => setState(() => _showNotesField = false),
-                                ),
-                              ],
-                            ),
-                          ] else ...[
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: GestureDetector(
-                                onTap: () => setState(() => _showNotesField = true),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.add_circle_outline_rounded, color: AppConstants.primaryLight, size: 14),
-                                    SizedBox(width: 6),
-                                    Text('Add Gate Note / Driver Instructions', style: TextStyle(color: AppConstants.primaryLight, fontSize: 12, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  // 5. Popular Lagos Destinations Chips
+                  // 5. Saved Places (1-Tap Home & Work Bookmarks)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _handleSavedPlaceTap('Home'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppConstants.cardBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppConstants.surfaceBg),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.home_rounded, color: AppConstants.primaryLight, size: 18),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Home', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(
+                                          (homeAddress != null && homeAddress.isNotEmpty) ? homeAddress : 'Tap to set address',
+                                          style: const TextStyle(color: AppConstants.textMuted, fontSize: 10),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _handleSavedPlaceTap('Work'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppConstants.cardBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppConstants.surfaceBg),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.work_rounded, color: AppConstants.accentColor, size: 18),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Work / Office', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(
+                                          (workAddress != null && workAddress.isNotEmpty) ? workAddress : 'Tap to set address',
+                                          style: const TextStyle(color: AppConstants.textMuted, fontSize: 10),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 6. Popular Lagos Destinations Chips
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -1048,10 +1302,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 20),
 
                   // =========================================================================
-                  // 6. PROPOSED FARE TAB (ONLY VISIBLE WHEN PICKUP & DESTINATION ARE ENTERED)
+                  // 7. PROPOSED FARE TAB (ONLY VISIBLE WHEN PICKUP & DESTINATION ARE ENTERED)
                   // =========================================================================
                   if (!hasRoute) ...[
-                    // Elegant placeholder guiding the user to enter destination
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
@@ -1094,7 +1347,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ] else ...[
-                    // ACTIVE PROPOSED FARE CARD (Clean, well-spaced, production-grade)
+                    // ACTIVE PROPOSED FARE CARD
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
@@ -1134,6 +1387,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
+
+                            const SizedBox(height: 14),
+
+                            // Vehicle Tier Selector (Economy, Comfort AC, XL SUV)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildVehicleTierPill('ECONOMY', 'Economy', Icons.directions_car_rounded),
+                                  _buildVehicleTierPill('COMFORT', 'Comfort AC', Icons.airline_seat_recline_extra_rounded),
+                                  _buildVehicleTierPill('XL_SUV', 'XL SUV (6)', Icons.airport_shuttle_rounded),
+                                ],
+                              ),
+                            ),
+
                             const SizedBox(height: 16),
 
                             // Offer Stepper Row
@@ -1189,7 +1461,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             if (estimate != null) ...[
                               const SizedBox(height: 12),
                               Text(
-                                'Recommended: ${currencyFormat.format(estimate['recommendedFareNgn'] ?? 2500)} • Minimum Bid: ${currencyFormat.format(estimate['minimumBidFloorNgn'] ?? 1200)}',
+                                'Recommended: ${currencyFormat.format(estimate['recommendedFareNgn'] ?? 2500)} • Minimum Floor: ${currencyFormat.format(estimate['minimumBidFloorNgn'] ?? 1200)}',
                                 style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
                               ),
                             ],
@@ -1220,7 +1492,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         children: [
                                           Text(
                                             _selectedCategory == 'CITY'
-                                                ? 'Find Nearby Drivers'
+                                                ? 'Broadcast Offer to Drivers'
                                                 : _selectedCategory == 'AIRPORT'
                                                     ? 'Schedule Airport VIP Transfer'
                                                     : 'Book Advance Interstate Ride',
@@ -1489,6 +1761,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleTierPill(String id, String label, IconData icon) {
+    final isSelected = _selectedVehicleTier == id;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _selectedVehicleTier = id);
+          _calculateFareEstimate();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppConstants.primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: isSelected ? Colors.white : AppConstants.textMuted),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppConstants.textMuted,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
