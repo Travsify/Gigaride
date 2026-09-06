@@ -414,6 +414,40 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to verify transaction');
   }
 
+  Future<Map<String, dynamic>> generateDynamicBankTransfer(int amountNgn) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/dynamic-transfer'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'amountNgn': amountNgn}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to generate dynamic bank account');
+  }
+
+  Future<Map<String, dynamic>> verifyDynamicBankTransfer(String reference) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/verify-transfer'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'reference': reference}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? data;
+    }
+    throw Exception(data['message'] ?? 'Failed to verify bank transfer');
+  }
+
   Future<Map<String, dynamic>> transferP2P({
     required String recipientSearch,
     required int amountNgn,

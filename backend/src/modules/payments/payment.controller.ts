@@ -188,6 +188,64 @@ paymentRouter.post(
   }
 );
 
+// 2b. Passenger generates dynamic one-time Paystack bank transfer details for wallet funding
+paymentRouter.post(
+  '/wallet/dynamic-transfer',
+  requireAuth,
+  requireRole(['PASSENGER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      if (!amountNgn || amountNgn < 100) {
+        res.status(400).json({ success: false, message: 'Minimum deposit amount is ₦100.' });
+        return;
+      }
+
+      const user = await db.findUserById(req.user!.userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      const dynamicTransfer = await paystackService.generateDynamicBankTransfer(
+        user.id,
+        amountNgn,
+        user.email,
+        user.full_name
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Dynamic Paystack bank account generated successfully.',
+        data: dynamicTransfer,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 2c. Passenger verifies if dynamic transfer was received and updates wallet balance
+paymentRouter.post(
+  '/wallet/verify-transfer',
+  requireAuth,
+  requireRole(['PASSENGER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        res.status(400).json({ success: false, message: 'Transaction reference is required.' });
+        return;
+      }
+
+      const result = await paystackService.verifyDynamicBankTransfer(req.user!.userId, String(reference));
+      res.status(200).json({ success: result.success, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
 // 3. Swap: Move funds between Main Ride Balance and SafeLock Vault
 paymentRouter.post(
   '/wallet/swap',

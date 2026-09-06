@@ -81,13 +81,11 @@ class _WalletScreenState extends State<WalletScreen> {
   // ACTION 1: ADD MONEY (CARD & BANK MODAL)
   // ==========================================
   void _showAddMoneyModal() {
-    final vba = _walletData?['virtualAccount'];
-    final nuban = vba?['account_number'] ?? '9988776655';
-    final bank = vba?['bank_name'] ?? 'Wema Bank (Giga Dedicated)';
-    final name = vba?['account_name'] ?? 'Giga Passenger';
-
     int selectedTab = 0; // 0 = Card, 1 = Bank Transfer
     final amountCtrl = TextEditingController(text: '5000');
+    Map<String, dynamic>? dynamicTransfer;
+    bool isGenerating = false;
+    bool isVerifying = false;
 
     showModalBottomSheet(
       context: context,
@@ -256,78 +254,186 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                       ),
                     ] else ...[
-                      // BANK TRANSFER TAB (KORAPAY NUBAN)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppConstants.darkBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
+                      // BANK TRANSFER TAB (DYNAMIC PAYSTACK BANK ACCOUNT)
+                      if (dynamicTransfer == null) ...[
+                        const Text(
+                          'Paystack Dynamic Bank Transfer',
+                          style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Dedicated Bank Transfer', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                                  child: const Text('Instant NIP • 24/7', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            const Text('Bank Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                            Text(bank, style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(height: 8),
-                            const Text('Account Number', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(nuban, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 2)),
-                                IconButton(
-                                  icon: const Icon(Icons.copy, color: AppConstants.primaryColor, size: 20),
-                                  onPressed: () => _copyToClipboard(nuban, 'Account number'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            const Text('Account Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                            Text(name, style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
-                          ],
+                        const SizedBox(height: 6),
+                        const Text(
+                          'A temporary, one-time Paystack bank account is generated for this transfer. Funds are automatically credited to your Naira wallet once received.',
+                          style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Quick Deposit Simulation (Demo Mode):', style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [2000, 5000, 10000, 20000].map((amt) {
-                          return ActionChip(
-                            backgroundColor: AppConstants.darkBg,
-                            label: Text(_currencyFormat.format(amt), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () async {
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: amountCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          decoration: InputDecoration(
+                            labelText: 'Deposit Amount (₦)',
+                            labelStyle: const TextStyle(color: AppConstants.textMuted),
+                            prefixText: '₦ ',
+                            prefixStyle: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold),
+                            filled: true,
+                            fillColor: AppConstants.darkBg,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          children: [2000, 5000, 10000, 25000].map((amt) {
+                            return ActionChip(
+                              backgroundColor: AppConstants.darkBg,
+                              label: Text(_currencyFormat.format(amt), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: () => setModalState(() => amountCtrl.text = amt.toString()),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            icon: isGenerating
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.account_balance_rounded, size: 18, color: Colors.white),
+                            label: Text(
+                              isGenerating ? 'Generating Account...' : 'Get Dynamic Transfer Account',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.primaryColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: isGenerating ? null : () async {
+                              final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
+                              if (amt < 100) return;
                               final messenger = ScaffoldMessenger.of(context);
-                              Navigator.pop(ctx);
+                              setModalState(() => isGenerating = true);
                               try {
-                                await _api.addMoney(amt);
-                                if (!mounted) return;
-                                _loadWalletData();
-                                messenger.showSnackBar(
-                                  SnackBar(content: Text('Successfully deposited ${_currencyFormat.format(amt)}!'), backgroundColor: AppConstants.successColor),
-                                );
+                                final res = await _api.generateDynamicBankTransfer(amt);
+                                setModalState(() {
+                                  dynamicTransfer = res;
+                                  isGenerating = false;
+                                });
                               } catch (e) {
-                                if (!mounted) return;
+                                setModalState(() => isGenerating = false);
                                 messenger.showSnackBar(
-                                  SnackBar(content: Text(e.toString()), backgroundColor: AppConstants.dangerColor),
+                                  SnackBar(content: Text('Error: $e'), backgroundColor: AppConstants.dangerColor),
                                 );
                               }
                             },
-                          );
-                        }).toList(),
-                      ),
+                          ),
+                        ),
+                      ] else ...[
+                        // DYNAMIC ACCOUNT DETAILS CARD
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppConstants.darkBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Paystack Dynamic Account', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.timer_outlined, size: 12, color: Colors.amberAccent),
+                                        SizedBox(width: 4),
+                                        Text('Expires in 30 mins', style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Bank Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                              Text(dynamicTransfer!['bankName'] ?? 'Wema Bank / Paystack', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
+                              const SizedBox(height: 8),
+                              const Text('Dynamic Account Number', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    dynamicTransfer!['accountNumber'] ?? '',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 2),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.copy, color: AppConstants.primaryColor, size: 20),
+                                    onPressed: () => _copyToClipboard(dynamicTransfer!['accountNumber'] ?? '', 'Dynamic account number'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              const Text('Account Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                              Text(dynamicTransfer!['accountName'] ?? 'Paystack / Giga Ride', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
+                              const SizedBox(height: 8),
+                              const Text('Amount to Pay Exactly', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                              Text(
+                                _currencyFormat.format(dynamicTransfer!['amountNgn'] ?? 0),
+                                style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            icon: isVerifying
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
+                            label: Text(
+                              isVerifying ? 'Confirming Transfer...' : 'I Have Sent The Money',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.successColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: isVerifying ? null : () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              setModalState(() => isVerifying = true);
+                              final ref = dynamicTransfer!['reference'] as String;
+                              try {
+                                await _api.verifyDynamicBankTransfer(ref);
+                                if (!ctx.mounted) return;
+                                Navigator.pop(ctx);
+                                if (mounted) await _loadWalletData();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('✓ ${_currencyFormat.format(dynamicTransfer!['amountNgn'] ?? 0)} successfully credited to your Living Wallet!'),
+                                    backgroundColor: AppConstants.successColor,
+                                  ),
+                                );
+                              } catch (e) {
+                                setModalState(() => isVerifying = false);
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('Confirmation: $e'), backgroundColor: AppConstants.dangerColor),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => setModalState(() => dynamicTransfer = null),
+                            child: const Text('Cancel / Choose Different Amount', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -1039,8 +1145,6 @@ class _WalletScreenState extends State<WalletScreen> {
     final vba = _walletData?['virtualAccount'];
     final mainBal = (vba?['balance_ngn'] ?? 0) as num;
     final vaultBal = (vba?['vault_balance_ngn'] ?? 0) as num;
-    final nuban = vba?['account_number'] ?? '9988776655';
-    final bankName = vba?['bank_name'] ?? 'Wema Bank (Giga Dedicated)';
 
     // Filter statement by user selection
     final displayStatement = _selectedLedgerFilter == 'CARDS'
@@ -1134,34 +1238,23 @@ class _WalletScreenState extends State<WalletScreen> {
                         style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                       ),
                       const SizedBox(height: 16),
-                      // NUBAN Pill
+                      // Clean Digital Wallet Security Badge (No permanent bank account)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: Colors.black26,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: Colors.white12),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: const Row(
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(bankName, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                                Text(nuban, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
-                              ],
-                            ),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.copy, size: 12, color: Colors.white),
-                              label: const Text('Copy', style: TextStyle(fontSize: 10, color: Colors.white)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppConstants.primaryColor,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                minimumSize: const Size(60, 28),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            Icon(Icons.shield_outlined, color: AppConstants.accentColor, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Digital Naira Wallet • Pay via Card or Dynamic Bank Transfer',
+                                style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
                               ),
-                              onPressed: () => _copyToClipboard(nuban, 'Account number'),
                             ),
                           ],
                         ),
