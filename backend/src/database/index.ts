@@ -326,6 +326,12 @@ export interface PlatformSettingsRow {
   lagos_mot_levy_ngn: number;
   welcome_bonus_rides: number;
   search_radius_km: number;
+  // OneSignal Push Notifications
+  onesignal_app_id?: string;
+  onesignal_rest_api_key?: string;
+  paystack_base_url?: string;
+  prembly_base_url?: string;
+  prembly_public_key?: string;
   // Prembly Identity & KYC
   prembly_api_key?: string;
   prembly_app_id?: string;
@@ -393,21 +399,26 @@ export class DatabaseService {
       lagos_mot_levy_ngn: 50,
       welcome_bonus_rides: 5,
       search_radius_km: 7.0,
-      prembly_api_key: '',
-      prembly_app_id: '',
+      onesignal_app_id: process.env.ONESIGNAL_APP_ID || '',
+      onesignal_rest_api_key: process.env.ONESIGNAL_REST_API_KEY || '',
+      paystack_base_url: 'https://api.paystack.co',
+      prembly_base_url: 'https://api.prembly.com/identitypass/verification',
+      prembly_public_key: process.env.PREMBLY_PUBLIC_KEY || '',
+      prembly_api_key: process.env.PREMBLY_API_KEY || '',
+      prembly_app_id: process.env.PREMBLY_APP_ID || '',
       prembly_auto_approve: true,
-      paystack_secret_key: '',
-      paystack_public_key: '',
+      paystack_secret_key: process.env.PAYSTACK_SECRET_KEY || '',
+      paystack_public_key: process.env.PAYSTACK_PUBLIC_KEY || '',
       paystack_webhook_secret: '',
       korapay_secret_key: '',
       korapay_public_key: '',
       korapay_encryption_key: '',
       korapay_merchant_id: '',
-      resend_api_key: '',
+      resend_api_key: process.env.RESEND_API_KEY || '',
       resend_from_email: 'notifications@gigaride.ng',
-      twilio_account_sid: '',
-      twilio_auth_token: '',
-      twilio_phone_number: '',
+      twilio_account_sid: process.env.TWILIO_ACCOUNT_SID || '',
+      twilio_auth_token: process.env.TWILIO_AUTH_TOKEN || '',
+      twilio_phone_number: process.env.TWILIO_PHONE_NUMBER || '',
       twilio_verify_sid: '',
       auto_topup_enabled: true,
       auto_topup_threshold_rides: 2,

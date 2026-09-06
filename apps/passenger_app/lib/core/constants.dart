@@ -17,6 +17,10 @@ class AppConstants {
   static const Color successColor = Color(0xFF10B981); // Emerald
   static const Color dangerColor = Color(0xFFEF4444);  // Rose / Red
 
+  // Live Production API Credentials
+  static const String paystackPublicKey = 'pk_live_7ff0154fc1e7081a7281f6f0cec0ec48eaa89c41';
+  static const String oneSignalAppId = '41b932e7-a242-4e35-89c4-f743b0ff005a';
+
   // SharedPreferences Keys
   static const String keyHasSeenOnboarding = 'has_seen_onboarding';
   static const String keyAuthToken = 'auth_token';

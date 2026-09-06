@@ -401,6 +401,11 @@ export class AdminService {
     };
 
     return {
+      onesignal_app_id: s.onesignal_app_id || '',
+      onesignal_rest_api_key: maskKey(s.onesignal_rest_api_key),
+      prembly_public_key: s.prembly_public_key || '',
+      prembly_base_url: s.prembly_base_url || 'https://api.prembly.com/identitypass/verification',
+      paystack_base_url: s.paystack_base_url || 'https://api.paystack.co',
       prembly_api_key: maskKey(s.prembly_api_key),
       prembly_app_id: s.prembly_app_id || '',
       prembly_auto_approve: s.prembly_auto_approve !== false,
@@ -438,6 +443,11 @@ export class AdminService {
     };
 
     const updateData: Partial<PlatformSettingsRow> = {
+      onesignal_app_id: cleanSetting(payload.onesignal_app_id, current.onesignal_app_id),
+      onesignal_rest_api_key: cleanSetting(payload.onesignal_rest_api_key, current.onesignal_rest_api_key),
+      prembly_public_key: cleanSetting(payload.prembly_public_key, current.prembly_public_key),
+      prembly_base_url: cleanSetting(payload.prembly_base_url, current.prembly_base_url),
+      paystack_base_url: cleanSetting(payload.paystack_base_url, current.paystack_base_url),
       prembly_api_key: cleanSetting(payload.prembly_api_key, current.prembly_api_key),
       prembly_app_id: cleanSetting(payload.prembly_app_id, current.prembly_app_id),
       prembly_auto_approve: payload.prembly_auto_approve !== undefined ? Boolean(payload.prembly_auto_approve) : current.prembly_auto_approve,

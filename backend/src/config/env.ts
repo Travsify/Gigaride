@@ -3,17 +3,26 @@ dotenv.config();
 
 export const ENV = {
   PORT: parseInt(process.env.PORT || '4000', 10),
-  NODE_ENV: process.env.NODE_ENV || 'development',
+  NODE_ENV: process.env.NODE_ENV || 'production',
   JWT_SECRET: process.env.JWT_SECRET || 'giga_production_jwt_secret_key_nigeria_2026',
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/giga_ride',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || 'sk_test_paystack_secret_key',
-  PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY || 'pk_test_paystack_public_key',
+
+  // Paystack Card Payments
+  PAYSTACK_BASE_URL: process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co',
+  PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || '',
+  PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY || '',
   PAYSTACK_WEBHOOK_SECRET: process.env.PAYSTACK_WEBHOOK_SECRET || '',
 
+  // OneSignal Push Notifications
+  ONESIGNAL_APP_ID: process.env.ONESIGNAL_APP_ID || '',
+  ONESIGNAL_REST_API_KEY: process.env.ONESIGNAL_REST_API_KEY || '',
+
   // Prembly Identity & KYC
+  PREMBLY_BASE_URL: process.env.PREMBLY_BASE_URL || 'https://api.prembly.com/identitypass/verification',
   PREMBLY_API_KEY: process.env.PREMBLY_API_KEY || '',
   PREMBLY_APP_ID: process.env.PREMBLY_APP_ID || '',
+  PREMBLY_PUBLIC_KEY: process.env.PREMBLY_PUBLIC_KEY || '',
 
   // Korapay Virtual Accounts & Payouts
   KORAPAY_SECRET_KEY: process.env.KORAPAY_SECRET_KEY || '',

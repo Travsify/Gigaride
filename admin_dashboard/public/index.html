@@ -3391,6 +3391,8 @@
           document.getElementById('int_korapay_encryption_key').value = s.korapay_encryption_key || '';
 
           document.getElementById('int_resend_api_key').value = s.resend_api_key || '';
+          if (document.getElementById('int_onesignal_app_id')) document.getElementById('int_onesignal_app_id').value = s.onesignal_app_id || '';
+          if (document.getElementById('int_onesignal_rest_api_key')) document.getElementById('int_onesignal_rest_api_key').value = s.onesignal_rest_api_key || '';
           document.getElementById('int_resend_from_email').value = s.resend_from_email || 'notifications@gigaride.ng';
 
           document.getElementById('int_twilio_account_sid').value = s.twilio_account_sid || '';
@@ -3426,6 +3428,8 @@
         korapay_encryption_key: document.getElementById('int_korapay_encryption_key').value.trim(),
 
         resend_api_key: document.getElementById('int_resend_api_key').value.trim(),
+        onesignal_app_id: document.getElementById('int_onesignal_app_id') ? document.getElementById('int_onesignal_app_id').value.trim() : '',
+        onesignal_rest_api_key: document.getElementById('int_onesignal_rest_api_key') ? document.getElementById('int_onesignal_rest_api_key').value.trim() : '',
         resend_from_email: document.getElementById('int_resend_from_email').value.trim(),
 
         twilio_account_sid: document.getElementById('int_twilio_account_sid').value.trim(),
