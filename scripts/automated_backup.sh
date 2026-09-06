@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ==============================================================================
 # GIGA RIDE ENTERPRISE DISASTER RECOVERY & CONTINUOUS SNAPSHOT ENGINE
 # ==============================================================================
