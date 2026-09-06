@@ -323,6 +323,7 @@ adminRouter.post(
 const planUpdateSchema = z.object({
   name: z.string().min(3).optional(),
   description: z.string().optional(),
+  plan_type: z.enum(['RIDE_COUNT', 'UNLIMITED']).optional(),
   total_rides: z.number().int().positive().nullable().optional(),
   duration_days: z.number().int().positive().optional(),
   price_kobo: z.number().int().positive().optional(),

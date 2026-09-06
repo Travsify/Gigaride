@@ -512,9 +512,12 @@ export class DatabaseService {
         if (!this.store.backup_snapshots) this.store.backup_snapshots = [];
         if (!this.store.rider_subscriptions) this.store.rider_subscriptions = [];
         if (!this.store.beneficiaries) this.store.beneficiaries = [];
+        this.seedDefaultPlans();
         this.seedDefaultCities();
         this.seedDefaultPromos();
+        this.seedDefaultInspections();
         this.seedDefaultStaff();
+        this.saveStore();
       } catch {
         this.saveStore();
       }
@@ -522,6 +525,7 @@ export class DatabaseService {
       this.seedDefaultPlans();
       this.seedDefaultCities();
       this.seedDefaultPromos();
+      this.seedDefaultInspections();
       this.seedDefaultStaff();
       this.saveStore();
     }
@@ -678,6 +682,60 @@ export class DatabaseService {
           is_active: true,
           expires_at: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
           created_at: new Date().toISOString(),
+        },
+      ];
+    }
+  }
+
+  private seedDefaultInspections() {
+    if (!this.store.vehicle_inspections || this.store.vehicle_inspections.length === 0) {
+      const drivers = this.store.users.filter(u => u.role === 'DRIVER');
+      const sampleDriver1 = drivers[0]?.id || 'driver_001';
+      const sampleDriver2 = drivers[1]?.id || 'driver_002';
+      const sampleDriver3 = drivers[2]?.id || 'driver_003';
+
+      this.store.vehicle_inspections = [
+        {
+          id: 'insp_ikeja_001',
+          driver_id: sampleDriver1,
+          hub_name: 'Ikeja Fleet Quality Hub',
+          inspector_name: 'Engr. Babatunde O.',
+          status: 'PASSED',
+          ac_functional: true,
+          tires_healthy: true,
+          exterior_clean: true,
+          lights_functional: true,
+          notes: 'Excellent vehicle condition. All 5 safety parameters passed LASG roadworthiness audit.',
+          inspected_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 'insp_lekki_002',
+          driver_id: sampleDriver2,
+          hub_name: 'Lekki Phase 1 Hub',
+          inspector_name: 'Officer Chioma E.',
+          status: 'PASSED',
+          ac_functional: true,
+          tires_healthy: true,
+          exterior_clean: true,
+          lights_functional: true,
+          notes: 'Vehicle inspected and approved for Airport & Lekki expressway corridor trips.',
+          inspected_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 'insp_abuja_003',
+          driver_id: sampleDriver3,
+          hub_name: 'Abuja Central District Hub',
+          inspector_name: 'Inspector Aliyu M.',
+          status: 'PASSED',
+          ac_functional: true,
+          tires_healthy: true,
+          exterior_clean: true,
+          lights_functional: true,
+          notes: 'Full vehicle diagnostics verified. Approved for FCT urban mobility.',
+          inspected_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ];
     }
