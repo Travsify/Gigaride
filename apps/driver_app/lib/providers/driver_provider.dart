@@ -9,18 +9,28 @@ class DriverProvider with ChangeNotifier {
   bool isLoading = false;
   Map<String, dynamic>? user;
   Map<String, dynamic>? driverProfile;
+  Map<String, dynamic>? virtualAccount;
   
   // Subscription state
   bool hasActiveSubscription = false;
   int remainingRides = 0;
   String? planName;
   bool isGracePeriod = false;
+  List<dynamic> subscriptionPlans = [];
+
+  // Notifications
+  List<dynamic> notifications = [];
+  int unreadNotificationsCount = 0;
 
   // Radar / Trip state
   bool isOnline = true;
   List<Map<String, dynamic>> incomingRequests = [];
   Map<String, dynamic>? activeTrip;
   String? tripStep; // 'ARRIVED', 'IN_TRANSIT', 'COMPLETED'
+
+  // Daily Gross Earnings Summary
+  double todayGrossEarningsNgn = 0;
+  int todayCompletedTripsCount = 0;
 
   Future<bool> checkAuth() async {
     final token = await api.getToken();
@@ -30,6 +40,8 @@ class DriverProvider with ChangeNotifier {
       user = profile;
       driverProfile = profile['driverProfile'];
       await refreshSubscription();
+      await loadVirtualAccount();
+      await loadNotifications();
       connectSocket(token);
       return true;
     } catch (_) {
@@ -45,7 +57,28 @@ class DriverProvider with ChangeNotifier {
       user = res['user'];
       driverProfile = res['driverProfile'];
       await refreshSubscription();
+      await loadVirtualAccount();
+      await loadNotifications();
       connectSocket(res['token']);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loginWithPhoneOtp(String phoneNumber, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.verifyPhoneOtp(phoneNumber, otpCode);
+      if (res['token'] != null) {
+        user = res['user'];
+        driverProfile = res['driverProfile'];
+        await refreshSubscription();
+        await loadVirtualAccount();
+        await loadNotifications();
+        connectSocket(res['token']);
+      }
     } finally {
       isLoading = false;
       notifyListeners();
@@ -71,6 +104,8 @@ class DriverProvider with ChangeNotifier {
       user = res['user'];
       driverProfile = res['driverProfile'];
       await refreshSubscription();
+      await loadVirtualAccount();
+      await loadNotifications();
       connectSocket(res['token']);
     } finally {
       isLoading = false;
@@ -85,10 +120,56 @@ class DriverProvider with ChangeNotifier {
       remainingRides = sub['remainingRides'] ?? 0;
       planName = sub['planName'];
       isGracePeriod = sub['isGracePeriod'] ?? false;
+
+      // Also load available plans
+      subscriptionPlans = await api.getSubscriptionPlans();
       notifyListeners();
     } catch (e) {
       print('Failed to refresh subscription: $e');
     }
+  }
+
+  Future<void> loadVirtualAccount() async {
+    try {
+      virtualAccount = await api.getDedicatedVirtualAccount();
+      notifyListeners();
+    } catch (e) {
+      print('Failed to load virtual account: $e');
+    }
+  }
+
+  Future<void> loadNotifications() async {
+    try {
+      final data = await api.getNotifications();
+      notifications = data['notifications'] ?? [];
+      unreadNotificationsCount = data['unreadCount'] ?? 0;
+      notifyListeners();
+    } catch (e) {
+      print('Failed to load notifications: $e');
+    }
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    try {
+      await api.markNotificationRead(id);
+      final idx = notifications.indexWhere((n) => n['id'] == id);
+      if (idx != -1) {
+        notifications[idx]['is_read'] = true;
+        if (unreadNotificationsCount > 0) unreadNotificationsCount--;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await api.markAllNotificationsRead();
+      for (var n in notifications) {
+        n['is_read'] = true;
+      }
+      unreadNotificationsCount = 0;
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> purchasePlan(String planId) async {
@@ -103,11 +184,44 @@ class DriverProvider with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> initializeCardPayment(String planId) async {
+    return await api.initializeCardPayment(planId);
+  }
+
+  Future<void> verifyNIN(String nin, String firstName, String lastName, {String? dob}) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      await api.verifyNIN(nin, firstName, lastName, dob: dob);
+      if (driverProfile != null) {
+        driverProfile!['kyc_status'] = 'APPROVED';
+      }
+      await loadVirtualAccount();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> verifyLicense(String licenseNumber, String firstName, String lastName, {String? dob}) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      await api.verifyDriversLicense(licenseNumber, firstName, lastName, dob: dob);
+      if (driverProfile != null) {
+        driverProfile!['kyc_status'] = 'APPROVED';
+      }
+      await loadVirtualAccount();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void connectSocket(String token) {
     socket.connect(
       token,
       onNewRideRequest: (req) {
-        // Prevent duplicate requests
         incomingRequests.removeWhere((r) => r['rideId'] == req['rideId']);
         incomingRequests.insert(0, req);
         notifyListeners();
@@ -155,7 +269,6 @@ class DriverProvider with ChangeNotifier {
       counterFareNgn: counterFareNgn,
       etaMinutes: etaMinutes,
     );
-    // Remove from radar once bid is sent
     incomingRequests.removeWhere((r) => r['rideId'] == rideId);
     notifyListeners();
   }
@@ -168,6 +281,9 @@ class DriverProvider with ChangeNotifier {
     );
     tripStep = status;
     if (status == 'COMPLETED') {
+      final fare = activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? 0;
+      todayGrossEarningsNgn += fare;
+      todayCompletedTripsCount++;
       activeTrip = null;
       tripStep = null;
       refreshSubscription();
@@ -180,8 +296,11 @@ class DriverProvider with ChangeNotifier {
     socket.disconnect();
     user = null;
     driverProfile = null;
+    virtualAccount = null;
     activeTrip = null;
     incomingRequests.clear();
+    notifications.clear();
+    unreadNotificationsCount = 0;
     notifyListeners();
   }
 }
