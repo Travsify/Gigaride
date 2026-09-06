@@ -6,7 +6,8 @@ import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'offer_room_screen.dart';
 import 'wallet_screen.dart';
-import 'phone_auth_screen.dart';
+import 'activity_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,10 +16,19 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  int _currentIndex = 0;
   final currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
 
-  // Controllers (clean default state, NO dummy values)
+  // Radar Animation Controller for pulsating effect
+  late AnimationController _radarAnimCtrl;
+  late Animation<double> _pulseWave1;
+  late Animation<double> _pulseWave2;
+  late Animation<double> _pulseWave3;
+  late Animation<double> _pulseOpacity;
+  late Animation<double> _driverBlink;
+
+  // Controllers
   final _pickupCtrl = TextEditingController(text: 'Current Location');
   final _dropoffCtrl = TextEditingController();
   final _offerCtrl = TextEditingController();
@@ -26,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _notesCtrl = TextEditingController();
   final _corporateTagCtrl = TextEditingController();
 
-  // Active coordinates (default center: Lagos Mainland / Island corridor)
+  // Coordinates
   final double _pickupLat = 6.5244;
   final double _pickupLng = 3.3792;
   double _dropoffLat = 6.4281;
@@ -34,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
   DateTime? _scheduledDateTime;
-  bool _isCorporateMode = false;
+  final bool _isCorporateMode = false;
   bool _showNotesField = false;
 
   final List<Map<String, dynamic>> _quickDestinations = [
@@ -69,7 +79,51 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Setup pulsating radar animations
+    _radarAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat();
+
+    _pulseWave1 = Tween<double>(begin: 0.5, end: 1.6).animate(
+      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeOutQuad),
+    );
+
+    _pulseWave2 = Tween<double>(begin: 0.2, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _radarAnimCtrl,
+        curve: const Interval(0.25, 1.0, curve: Curves.easeOutQuad),
+      ),
+    );
+
+    _pulseWave3 = Tween<double>(begin: 0.1, end: 0.8).animate(
+      CurvedAnimation(
+        parent: _radarAnimCtrl,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOutQuad),
+      ),
+    );
+
+    _pulseOpacity = Tween<double>(begin: 0.7, end: 0.0).animate(
+      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeOut),
+    );
+
+    _driverBlink = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _radarAnimCtrl, curve: Curves.easeInOut),
+    );
+
+    _dropoffCtrl.addListener(() {
+      setState(() {});
+    });
+    _pickupCtrl.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _radarAnimCtrl.dispose();
     _pickupCtrl.dispose();
     _dropoffCtrl.dispose();
     _offerCtrl.dispose();
@@ -347,8 +401,8 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (ctx) => AlertDialog(
               backgroundColor: AppConstants.cardBg,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: const [
+              title: const Row(
+                children: [
                   Icon(Icons.check_circle, color: AppConstants.successColor, size: 26),
                   SizedBox(width: 10),
                   Text('Trip Scheduled!', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -456,605 +510,606 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<PassengerProvider>();
-    final user = provider.user;
-    final estimate = provider.currentEstimate;
-    final userName = user?['fullName'] ?? user?['full_name'] ?? 'Passenger';
-
     return Scaffold(
       backgroundColor: AppConstants.darkBg,
-      body: SafeArea(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildRidesTab(),
+          const WalletScreen(isTab: true),
+          ActivityScreen(onBookRidePressed: () => setState(() => _currentIndex = 0)),
+          ProfileScreen(onOfflineBookingPressed: () => _showOfflineBookingModal(context)),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  // ==========================================
+  // FOOTER BOTTOM NAVIGATION BAR
+  // ==========================================
+  Widget _buildBottomBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppConstants.cardBg,
+        border: const Border(top: BorderSide(color: AppConstants.surfaceBg)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.directions_car_filled_rounded, 'Rides'),
+              _buildNavItem(1, Icons.account_balance_wallet_rounded, 'Wallet'),
+              _buildNavItem(2, Icons.receipt_long_rounded, 'Activity'),
+              _buildNavItem(3, Icons.person_rounded, 'Account'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _currentIndex = index);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppConstants.primaryLight.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Top Header: Greeting, Living Wallet, and Drawer
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: const BoxDecoration(
-                color: AppConstants.cardBg,
-                border: Border(bottom: BorderSide(color: AppConstants.surfaceBg)),
+            Icon(
+              icon,
+              color: isSelected ? AppConstants.primaryLight : AppConstants.textMuted,
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppConstants.primaryLight : AppConstants.textMuted,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
-              child: Row(
-                children: [
-                  // Profile Avatar
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppConstants.primaryLight.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppConstants.primaryLight.withOpacity(0.5)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : 'P',
-                      style: const TextStyle(
-                        color: AppConstants.primaryLight,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 0: RIDES BOOKING HOME
+  // ==========================================
+  Widget _buildRidesTab() {
+    final provider = context.watch<PassengerProvider>();
+    final estimate = provider.currentEstimate;
+    final hasRoute = _pickupCtrl.text.trim().isNotEmpty && _dropoffCtrl.text.trim().isNotEmpty;
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Clean, Spacious Header (Logo + 0% Cut + Offline Action)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: const BoxDecoration(
+              color: AppConstants.cardBg,
+              border: Border(bottom: BorderSide(color: AppConstants.surfaceBg)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Brand Badge
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryLight.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.shield_rounded, color: AppConstants.accentColor, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'GIGA RIDE',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppConstants.successColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        '0% Cut',
+                        style: TextStyle(color: AppConstants.successColor, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
 
-                  // Greeting
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                // Clearly clickable Offline Booking button
+                GestureDetector(
+                  onTap: () => _showOfflineBookingModal(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 15),
+                        SizedBox(width: 4),
                         Text(
-                          'Hello, $userName 👋',
-                          style: const TextStyle(
-                            color: AppConstants.textLight,
-                            fontSize: 14,
+                          'Offline Mode',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _isCorporateMode = !_isCorporateMode);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(_isCorporateMode ? '🏢 Business Profile Active: Corporate expense tracking enabled.' : '🟢 Personal Profile Active: Standard zero-commission trips.'),
-                                backgroundColor: _isCorporateMode ? AppConstants.primaryColor : AppConstants.successColor,
-                                duration: const Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          child: Row(
-                            children: [
-                              Icon(Icons.circle, color: _isCorporateMode ? Colors.cyanAccent : AppConstants.successColor, size: 7),
-                              const SizedBox(width: 4),
-                              Text(
-                                _isCorporateMode ? '🏢 Business Mode' : '🟢 Personal • 0% Cut',
-                                style: TextStyle(
-                                  color: _isCorporateMode ? Colors.cyanAccent : AppConstants.textMuted,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              const Icon(Icons.sync_alt_rounded, size: 10, color: AppConstants.textMuted),
-                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                  // Offline / Low-Data Booking Pill
-                  GestureDetector(
-                    onTap: () => _showOfflineBookingModal(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 13),
-                          SizedBox(width: 3),
-                          Text(
-                            'Offline',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  // Living Wallet Balance Pill
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const WalletScreen()),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppConstants.accentColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppConstants.accentColor.withOpacity(0.4)),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.account_balance_wallet_rounded, color: AppConstants.accentColor, size: 14),
-                          SizedBox(width: 6),
-                          Text(
-                            'Wallet',
-                            style: TextStyle(
-                              color: AppConstants.accentColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // Logout
-                  IconButton(
-                    icon: const Icon(Icons.logout_rounded, color: AppConstants.textMuted, size: 20),
-                    tooltip: 'Sign Out',
-                    onPressed: () async {
-                      await provider.logout();
-                      if (!context.mounted) return;
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
-                        (r) => false,
-                      );
-                    },
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
 
-            // Scrollable Content
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Simulated Live Geo-Radar Canvas
-                    Container(
-                      height: 140,
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xFF0F2321),
-                            AppConstants.darkBg,
-                          ],
-                        ),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Radar Ring 1
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppConstants.primaryLight.withOpacity(0.15)),
-                            ),
-                          ),
-                          // Radar Ring 2
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
-                            ),
-                          ),
-                          // Center Pin (Passenger Location)
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: AppConstants.primaryLight,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppConstants.primaryLight.withOpacity(0.6),
-                                  blurRadius: 16,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 16),
-                          ),
-                          // Top Radar Badge
-                          Positioned(
-                            bottom: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppConstants.cardBg.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppConstants.surfaceBg),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(Icons.radar_rounded, color: AppConstants.primaryLight, size: 12),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Verified Drivers Active Nearby',
-                                    style: TextStyle(
-                                      color: AppConstants.textLight,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+          // Scrollable Content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Pulsating Live Geo-Radar Canvas
+                  _buildPulsatingRadarCanvas(),
+
+                  const SizedBox(height: 14),
+
+                  // 2. Service Category Pills (City, Airport, Interstate)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        _buildCategoryPill('CITY', '🚗 City Ride', Icons.directions_car_rounded),
+                        const SizedBox(width: 8),
+                        _buildCategoryPill('AIRPORT', '✈️ Airport VIP', Icons.flight_rounded),
+                        const SizedBox(width: 8),
+                        _buildCategoryPill('INTERSTATE', '🛣️ Interstate', Icons.alt_route_rounded),
+                      ],
                     ),
+                  ),
 
-                    // Service Category Pills
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  const SizedBox(height: 12),
+
+                  // 3. Decacorn Fuel Index & Savings Moat Ticker
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C2422),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
+                      ),
                       child: Row(
                         children: [
-                          _buildCategoryPill('CITY', '🚗 City Ride', Icons.directions_car_rounded),
-                          const SizedBox(width: 8),
-                          _buildCategoryPill('AIRPORT', '✈️ Airport VIP', Icons.flight_rounded),
-                          const SizedBox(width: 8),
-                          _buildCategoryPill('INTERSTATE', '🛣️ Interstate', Icons.alt_route_rounded),
+                          const Icon(Icons.local_gas_station_rounded, color: AppConstants.accentColor, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'PMS Fuel Moat: ₦1,050/L • You save ~₦750/trip vs 25% commission apps (100% to driver)',
+                              style: TextStyle(color: AppConstants.textLight.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
                         ],
                       ),
                     ),
+                  ),
 
-                    // Decacorn Fuel Index & Savings Moat Ticker
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0C2422),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.local_gas_station_rounded, color: AppConstants.accentColor, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'PMS Fuel Moat: ₦1,050/L • You save ~₦750/trip vs 25% commission apps (100% to driver)',
-                                style: TextStyle(color: AppConstants.textLight.withOpacity(0.9), fontSize: 10, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
+                  const SizedBox(height: 16),
+
+                  // 4. Address Input Card (Pickup & Where to)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppConstants.cardBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppConstants.surfaceBg),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.25),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ),
-
-                    // Address Booking Box
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppConstants.cardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppConstants.surfaceBg),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            // Pickup
-                            Row(
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.successColor.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.circle, color: AppConstants.successColor, size: 10),
+                      child: Column(
+                        children: [
+                          // Pickup
+                          Row(
+                            children: [
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: AppConstants.successColor.withOpacity(0.2),
+                                  shape: BoxShape.circle,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _pickupCtrl,
-                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Pickup Location',
-                                      hintStyle: TextStyle(color: AppConstants.textMuted),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                    ),
+                                child: const Icon(Icons.circle, color: AppConstants.successColor, size: 10),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: TextField(
+                                  controller: _pickupCtrl,
+                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Pickup Location',
+                                    labelStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                    hintText: 'Current Location',
+                                    hintStyle: TextStyle(color: AppConstants.textMuted),
+                                    border: InputBorder.none,
+                                    isDense: true,
                                   ),
-                                ),
-                              ],
-                            ),
-
-                            const Divider(color: AppConstants.surfaceBg, height: 20),
-
-                            // Destination
-                            Row(
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.dangerColor.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.location_on_rounded, color: AppConstants.dangerColor, size: 14),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _dropoffCtrl,
-                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Where to? (e.g. Lekki, Ikeja, VI)',
-                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontWeight: FontWeight.normal),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                    ),
-                                    onSubmitted: (_) => _calculateFareEstimate(),
-                                  ),
-                                ),
-                                if (_dropoffCtrl.text.isNotEmpty)
-                                  IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: AppConstants.textMuted, size: 16),
-                                    onPressed: () => setState(() => _dropoffCtrl.clear()),
-                                  ),
-                              ],
-                            ),
-
-                            // Advance Booking Fields (Airport / Interstate)
-                            if (_selectedCategory != 'CITY') ...[
-                              const Divider(color: AppConstants.surfaceBg, height: 20),
-                              GestureDetector(
-                                onTap: _pickScheduleDateTime,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: AppConstants.accentColor.withOpacity(0.2),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.calendar_today_rounded, color: AppConstants.accentColor, size: 12),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('Pickup Schedule', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
-                                          Text(
-                                            DateFormat('EEE, MMM d • h:mm a').format(
-                                              _scheduledDateTime ?? DateTime.now().add(Duration(hours: _selectedCategory == 'AIRPORT' ? 3 : 6)),
-                                            ),
-                                            style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppConstants.surfaceBg,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text('Change', style: TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
                                 ),
                               ),
                             ],
+                          ),
 
-                            if (_selectedCategory == 'AIRPORT') ...[
-                              const Divider(color: AppConstants.surfaceBg, height: 20),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: AppConstants.primaryLight.withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.flight_takeoff_rounded, color: AppConstants.primaryLight, size: 13),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _flightCtrl,
-                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Flight Number (e.g. BA075) [Optional]',
-                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          const Divider(color: AppConstants.surfaceBg, height: 24),
+
+                          // Destination ("Where to?")
+                          Row(
+                            children: [
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: AppConstants.dangerColor.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.location_on_rounded, color: AppConstants.dangerColor, size: 16),
                               ),
-                            ],
-
-                            // Corporate Billing Department Code
-                            if (_isCorporateMode) ...[
-                              const Divider(color: AppConstants.surfaceBg, height: 18),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: Colors.cyan.withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.corporate_fare_rounded, color: Colors.cyanAccent, size: 12),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: TextField(
+                                  controller: _dropoffCtrl,
+                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Destination',
+                                    labelStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                    hintText: 'Where to? (e.g. Lekki, Ikeja, VI)',
+                                    hintStyle: TextStyle(color: AppConstants.textMuted, fontWeight: FontWeight.normal),
+                                    border: InputBorder.none,
+                                    isDense: true,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _corporateTagCtrl,
-                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Cost Center / Dept Tag (e.g. Audit, Sales)',
-                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  onSubmitted: (_) => _calculateFareEstimate(),
+                                ),
                               ),
+                              if (_dropoffCtrl.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.clear_rounded, color: AppConstants.textMuted, size: 18),
+                                  onPressed: () {
+                                    setState(() {
+                                      _dropoffCtrl.clear();
+                                      _offerCtrl.clear();
+                                    });
+                                  },
+                                ),
                             ],
+                          ),
 
-                            // Driver Instructions / Gate Notes
-                            if (_showNotesField) ...[
-                              const Divider(color: AppConstants.surfaceBg, height: 18),
-                              Row(
+                          // Advance Booking Fields (Airport / Interstate)
+                          if (_selectedCategory != 'CITY') ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 24),
+                            GestureDetector(
+                              onTap: _pickScheduleDateTime,
+                              child: Row(
                                 children: [
                                   Container(
-                                    width: 24,
-                                    height: 24,
+                                    width: 26,
+                                    height: 26,
                                     decoration: BoxDecoration(
                                       color: AppConstants.accentColor.withOpacity(0.2),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.notes_rounded, color: AppConstants.accentColor, size: 12),
+                                    child: const Icon(Icons.calendar_today_rounded, color: AppConstants.accentColor, size: 14),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 14),
                                   Expanded(
-                                    child: TextField(
-                                      controller: _notesCtrl,
-                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Note for driver (e.g. Call at gate, 2 bags)',
-                                        hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Pickup Schedule', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                        Text(
+                                          DateFormat('EEE, MMM d • h:mm a').format(
+                                            _scheduledDateTime ?? DateTime.now().add(Duration(hours: _selectedCategory == 'AIRPORT' ? 3 : 6)),
+                                          ),
+                                          style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.close, size: 14, color: AppConstants.textMuted),
-                                    onPressed: () => setState(() => _showNotesField = false),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.surfaceBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text('Change', style: TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
-                            ] else ...[
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _showNotesField = true),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.add_circle_outline_rounded, color: AppConstants.primaryLight, size: 13),
-                                      SizedBox(width: 4),
-                                      Text('Add Gate Note / Driver Instructions', style: TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
-                                    ],
+                            ),
+                          ],
+
+                          if (_selectedCategory == 'AIRPORT') ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 24),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.primaryLight.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.flight_takeoff_rounded, color: AppConstants.primaryLight, size: 14),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _flightCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Flight Number (e.g. BA075) [Optional]',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
                                   ),
                                 ),
+                              ],
+                            ),
+                          ],
+
+                          // Corporate Billing Department Code
+                          if (_isCorporateMode) ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 20),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Colors.cyan.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.corporate_fare_rounded, color: Colors.cyanAccent, size: 14),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _corporateTagCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Cost Center / Dept Tag (e.g. Audit, Sales)',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          // Driver Instructions / Gate Notes
+                          if (_showNotesField) ...[
+                            const Divider(color: AppConstants.surfaceBg, height: 20),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.accentColor.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.notes_rounded, color: AppConstants.accentColor, size: 14),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _notesCtrl,
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Note for driver (e.g. Call at gate, 2 bags)',
+                                      hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 16, color: AppConstants.textMuted),
+                                  onPressed: () => setState(() => _showNotesField = false),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: GestureDetector(
+                                onTap: () => setState(() => _showNotesField = true),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle_outline_rounded, color: AppConstants.primaryLight, size: 14),
+                                    SizedBox(width: 6),
+                                    Text('Add Gate Note / Driver Instructions', style: TextStyle(color: AppConstants.primaryLight, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
                               ),
-                            ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // 5. Popular Lagos Destinations Chips
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Popular Lagos Destinations',
+                          style: TextStyle(
+                            color: AppConstants.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _quickDestinations.map((d) {
+                            return GestureDetector(
+                              onTap: () => _selectQuickDestination(d),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppConstants.cardBg,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppConstants.surfaceBg),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(d['icon'] as IconData, size: 14, color: AppConstants.primaryLight),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      d['name'] as String,
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // =========================================================================
+                  // 6. PROPOSED FARE TAB (ONLY VISIBLE WHEN PICKUP & DESTINATION ARE ENTERED)
+                  // =========================================================================
+                  if (!hasRoute) ...[
+                    // Elegant placeholder guiding the user to enter destination
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                        decoration: BoxDecoration(
+                          color: AppConstants.cardBg.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white.withOpacity(0.06)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppConstants.primaryLight.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.alt_route_rounded, color: AppConstants.primaryLight, size: 22),
+                            ),
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Set Your Route to Bid',
+                                    style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Enter where you are going above to unlock fuel-indexed fare estimates and live driver bidding.',
+                                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12, height: 1.3),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
-
-                    // Quick Destination Chips
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Popular Destinations in Lagos',
-                            style: TextStyle(
-                              color: AppConstants.textMuted,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _quickDestinations.map((d) {
-                              return GestureDetector(
-                                onTap: () => _selectQuickDestination(d),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.cardBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppConstants.surfaceBg),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(d['icon'] as IconData, size: 13, color: AppConstants.primaryLight),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        d['name'] as String,
-                                        style: const TextStyle(color: AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.w600),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Fare Bidding Dial (When destination is chosen)
+                  ] else ...[
+                    // ACTIVE PROPOSED FARE CARD (Clean, well-spaced, production-grade)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: AppConstants.cardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppConstants.surfaceBg),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: AppConstants.primaryLight.withOpacity(0.4)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppConstants.primaryLight.withOpacity(0.1),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,16 +1119,22 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 const Text(
                                   'Your Proposed Fare',
-                                  style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                                  style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
-                                if (estimate != null)
-                                  Text(
-                                    'Fuel Index: ₦${estimate['petrolPriceNgn'] ?? 1050}/L',
-                                    style: const TextStyle(color: AppConstants.accentColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.accentColor.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
+                                  child: Text(
+                                    'PMS: ₦${estimate?['petrolPriceNgn'] ?? 1050}/L',
+                                    style: const TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
 
                             // Offer Stepper Row
                             Row(
@@ -1084,18 +1145,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
                                       color: AppConstants.darkBg,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(14),
                                       border: Border.all(color: AppConstants.primaryLight.withOpacity(0.5)),
                                     ),
                                     alignment: Alignment.center,
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        const Text('₦', style: TextStyle(color: AppConstants.primaryLight, fontSize: 18, fontWeight: FontWeight.bold)),
-                                        const SizedBox(width: 2),
+                                        const Text('₦', style: TextStyle(color: AppConstants.primaryLight, fontSize: 20, fontWeight: FontWeight.bold)),
+                                        const SizedBox(width: 4),
                                         IntrinsicWidth(
                                           child: TextField(
                                             controller: _offerCtrl,
@@ -1103,7 +1164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
                                               color: AppConstants.textLight,
-                                              fontSize: 20,
+                                              fontSize: 22,
                                               fontWeight: FontWeight.w900,
                                             ),
                                             decoration: const InputDecoration(
@@ -1126,19 +1187,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
 
                             if (estimate != null) ...[
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 12),
                               Text(
                                 'Recommended: ${currencyFormat.format(estimate['recommendedFareNgn'] ?? 2500)} • Minimum Bid: ${currencyFormat.format(estimate['minimumBidFloorNgn'] ?? 1200)}',
-                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
                               ),
                             ],
 
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 18),
 
                             // CTA: Request Drivers
                             SizedBox(
                               width: double.infinity,
-                              height: 50,
+                              height: 52,
                               child: ElevatedButton(
                                 onPressed: provider.isLoading ? null : _findDrivers,
                                 style: ElevatedButton.styleFrom(
@@ -1150,8 +1211,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 child: provider.isLoading
                                     ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
+                                        width: 22,
+                                        height: 22,
                                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                       )
                                     : Row(
@@ -1163,10 +1224,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 : _selectedCategory == 'AIRPORT'
                                                     ? 'Schedule Airport VIP Transfer'
                                                     : 'Book Advance Interstate Ride',
-                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                           ),
                                           const SizedBox(width: 8),
-                                          const Icon(Icons.arrow_forward_rounded, size: 16),
+                                          const Icon(Icons.arrow_forward_rounded, size: 18),
                                         ],
                                       ),
                               ),
@@ -1175,15 +1236,225 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
                   ],
-                ),
+
+                  const SizedBox(height: 30),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  // ==========================================
+  // PULSATING RADAR CANVAS
+  // ==========================================
+  Widget _buildPulsatingRadarCanvas() {
+    return AnimatedBuilder(
+      animation: _radarAnimCtrl,
+      builder: (context, child) {
+        return Container(
+          height: 150,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF0D2826),
+                AppConstants.darkBg,
+              ],
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Wave Ring 1 (Pulsating & Expanding outwards)
+              Transform.scale(
+                scale: _pulseWave1.value,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppConstants.primaryLight.withOpacity(_pulseOpacity.value * 0.6),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Wave Ring 2 (Pulsating & Expanding)
+              Transform.scale(
+                scale: _pulseWave2.value,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppConstants.accentColor.withOpacity(_pulseOpacity.value * 0.7),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Wave Ring 3
+              Transform.scale(
+                scale: _pulseWave3.value,
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppConstants.primaryLight.withOpacity(_pulseOpacity.value * 0.15),
+                  ),
+                ),
+              ),
+
+              // Center Passenger Pin with pulsing glow
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryLight,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppConstants.primaryLight.withOpacity(0.4 + (_driverBlink.value * 0.4)),
+                      blurRadius: 16 * _driverBlink.value,
+                      spreadRadius: 4 * _driverBlink.value,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
+              ),
+
+              // Active Nearby Driver 1 (Northwest)
+              Positioned(
+                left: 70,
+                top: 30,
+                child: Opacity(
+                  opacity: _driverBlink.value,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppConstants.accentColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppConstants.accentColor.withOpacity(0.6),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
+                  ),
+                ),
+              ),
+
+              // Active Nearby Driver 2 (Southeast)
+              Positioned(
+                right: 80,
+                bottom: 40,
+                child: Opacity(
+                  opacity: (1.4 - _driverBlink.value).clamp(0.3, 1.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppConstants.primaryLight,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppConstants.primaryLight.withOpacity(0.6),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
+                  ),
+                ),
+              ),
+
+              // Active Nearby Driver 3 (Northeast)
+              Positioned(
+                right: 65,
+                top: 25,
+                child: Opacity(
+                  opacity: _driverBlink.value,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppConstants.successColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppConstants.successColor.withOpacity(0.6),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.directions_car_filled, color: Colors.white, size: 12),
+                  ),
+                ),
+              ),
+
+              // Pulsating Status Chip: Verified Drivers Active
+              Positioned(
+                bottom: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppConstants.cardBg.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppConstants.primaryLight.withOpacity(0.4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppConstants.primaryLight.withOpacity(0.25 * _driverBlink.value),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppConstants.accentColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppConstants.accentColor.withOpacity(_driverBlink.value),
+                              blurRadius: 6,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '8 Verified Drivers Active Nearby',
+                        style: TextStyle(
+                          color: AppConstants.textLight,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1194,7 +1465,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => setState(() => _selectedCategory = id),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? AppConstants.primaryColor : AppConstants.cardBg,
             borderRadius: BorderRadius.circular(14),
@@ -1216,7 +1487,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               color: isSelected ? Colors.white : AppConstants.textMuted,
               fontWeight: FontWeight.bold,
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ),
@@ -1228,7 +1499,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: AppConstants.surfaceBg,
           borderRadius: BorderRadius.circular(10),
@@ -1237,7 +1508,7 @@ class _HomeScreenState extends State<HomeScreen> {
           label,
           style: const TextStyle(
             color: AppConstants.textLight,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),

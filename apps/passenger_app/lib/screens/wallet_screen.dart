@@ -5,7 +5,8 @@ import '../core/constants.dart';
 import '../services/api_service.dart';
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key});
+  final bool isTab;
+  const WalletScreen({super.key, this.isTab = false});
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -633,6 +634,7 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(
       backgroundColor: AppConstants.darkBg,
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isTab,
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text('Living Wallet', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
