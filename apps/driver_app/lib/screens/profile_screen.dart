@@ -61,7 +61,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               _buildPolicySection(
                 '2. Information We Collect & Legal Basis',
-                'We collect government identity credentials (NIN and FRSC Driver\'s License verified in real time via Prembly), high-precision GPS telemetry for trip navigation and SOS dispatch, and vehicle technical specifications to ensure passenger safety and federal compliance.',
+                'We collect government identity credentials (NIN and FRSC Driver\'s License verified in real time via Official Identity Portals), high-precision GPS telemetry for trip navigation and SOS dispatch, and vehicle technical specifications to ensure passenger safety and federal compliance.',
               ),
               _buildPolicySection(
                 '3. Bank-Grade Financial Security',
@@ -331,7 +331,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // Vehicle Specs & Prembly Status Card
+            // Vehicle Specs & Government Status Card
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(color: AppConstants.cardBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
@@ -352,7 +352,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             border: Border.all(color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor),
                           ),
                           child: Text(
-                            kyc == 'APPROVED' ? '✓ Prembly Approved' : 'KYC $kyc',
+                            kyc == 'APPROVED' ? '✓ Verified & Approved' : 'KYC $kyc',
                             style: TextStyle(color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ),

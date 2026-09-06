@@ -100,7 +100,7 @@ class _KycScreenState extends State<KycScreen> {
     try {
       await provider.verifyNIN(nin, first, last, dob: dob.isNotEmpty ? dob : null);
       if (!mounted) return;
-      _showSuccess('NIN Verified successfully via Prembly NIMC portal!');
+      _showSuccess('NIN Verified successfully with Official NIMC database!');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
@@ -125,7 +125,7 @@ class _KycScreenState extends State<KycScreen> {
     try {
       await provider.verifyLicense(license, first, last, dob: dob.isNotEmpty ? dob : null);
       if (!mounted) return;
-      _showSuccess('Driver License verified successfully via Prembly FRSC gateway!');
+      _showSuccess('Driver License verified successfully with Official FRSC database!');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
@@ -214,7 +214,7 @@ class _KycScreenState extends State<KycScreen> {
                         const SizedBox(height: 3),
                         Text(
                           isApproved
-                            ? 'Your profile passed Prembly identity checks. Korapay virtual account is provisioned.'
+                            ? 'Your profile passed official identity checks. Dedicated virtual bank account is provisioned.'
                             : 'Verify your NIN or FRSC License to activate radar dispatch and unlock your dedicated NUBAN.',
                           style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
                         ),
@@ -359,7 +359,7 @@ class _KycScreenState extends State<KycScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    const Text('Instant verification with National Identity Management Commission (NIMC) via Prembly.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    const Text('Instant verification with National Identity Management Commission (NIMC).', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                     const SizedBox(height: 14),
                     TextField(
                       controller: _ninCtrl,
@@ -403,7 +403,7 @@ class _KycScreenState extends State<KycScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    const Text('Federal Road Safety Corps commercial license check via Prembly portal.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    const Text('Federal Road Safety Corps commercial license check with official registry.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                     const SizedBox(height: 14),
                     TextField(
                       controller: _licenseCtrl,

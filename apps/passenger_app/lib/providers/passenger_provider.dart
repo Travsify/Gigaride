@@ -34,14 +34,16 @@ class PassengerProvider with ChangeNotifier {
   bool preferQuiet = false;
   bool alwaysAcOn = true;
   bool luggageAssistance = false;
+  String? token;
 
   Future<bool> checkAuth() async {
-    final token = await api.getToken();
-    if (token == null) return false;
+    final t = await api.getToken();
+    if (t == null) return false;
+    token = t;
     try {
       final profile = await api.getMe();
       user = profile;
-      connectSocket(token);
+      connectSocket(t);
       return true;
     } catch (_) {
       return false;
@@ -65,10 +67,33 @@ class PassengerProvider with ChangeNotifier {
     try {
       final res = await api.verifyPhoneOtp(phoneNumber, otpCode);
       if (res['token'] != null && res['user'] != null) {
+        token = res['token'];
         user = res['user'];
         connectSocket(res['token']);
       }
       return res;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> sendEmailOtp(String email) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendEmailOtp(email);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyEmailOtp(String email, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.verifyEmailOtp(email, otpCode);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -80,6 +105,7 @@ class PassengerProvider with ChangeNotifier {
     notifyListeners();
     try {
       final res = await api.login(identifier, password);
+      token = res['token'];
       user = res['user'];
       connectSocket(res['token']);
     } finally {
@@ -98,6 +124,7 @@ class PassengerProvider with ChangeNotifier {
         email: email,
         password: password,
       );
+      token = res['token'];
       user = res['user'];
       connectSocket(res['token']);
     } finally {

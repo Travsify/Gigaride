@@ -13,7 +13,13 @@ export class AuthService {
     // 0. Mandatory Phone Verification Check
     const phoneVerified = await db.isPhoneVerified(dto.phoneNumber);
     if (!phoneVerified) {
-      throw new Error('Phone number must be verified via SMS OTP before registration. Please verify your phone number first.');
+      throw new Error('Phone number must be verified via SMS verification code before registration. Please verify your phone number first.');
+    }
+
+    // 0b. Mandatory Email Verification Check
+    const emailVerified = await db.isEmailVerified(dto.email);
+    if (!emailVerified) {
+      throw new Error('Email address must be verified via verification code before registration. Please verify your email first.');
     }
 
     // 1. Check if user already exists
@@ -40,6 +46,7 @@ export class AuthService {
       email: dto.email,
       password_hash: passwordHash,
       is_phone_verified: true,
+      is_email_verified: true,
       created_at: new Date().toISOString(),
     };
     await db.createUser(newUser);

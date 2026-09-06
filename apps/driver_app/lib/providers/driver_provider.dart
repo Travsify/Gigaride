@@ -31,10 +31,12 @@ class DriverProvider with ChangeNotifier {
   // Daily Gross Earnings Summary
   double todayGrossEarningsNgn = 0;
   int todayCompletedTripsCount = 0;
+  String? token;
 
   Future<bool> checkAuth() async {
-    final token = await api.getToken();
-    if (token == null) return false;
+    final t = await api.getToken();
+    if (t == null) return false;
+    token = t;
     try {
       final profile = await api.getMe();
       user = profile;
@@ -42,7 +44,7 @@ class DriverProvider with ChangeNotifier {
       await refreshSubscription();
       await loadVirtualAccount();
       await loadNotifications();
-      connectSocket(token);
+      connectSocket(t);
       return true;
     } catch (_) {
       return false;
@@ -54,6 +56,7 @@ class DriverProvider with ChangeNotifier {
     notifyListeners();
     try {
       final res = await api.login(identifier, password);
+      token = res['token'];
       user = res['user'];
       driverProfile = res['driverProfile'];
       await refreshSubscription();
@@ -72,6 +75,7 @@ class DriverProvider with ChangeNotifier {
     try {
       final res = await api.verifyPhoneOtp(phoneNumber, otpCode);
       if (res['token'] != null) {
+        token = res['token'];
         user = res['user'];
         driverProfile = res['driverProfile'];
         await refreshSubscription();
@@ -79,6 +83,28 @@ class DriverProvider with ChangeNotifier {
         await loadNotifications();
         connectSocket(res['token']);
       }
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> sendEmailOtp(String email) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendEmailOtp(email);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyEmailOtp(String email, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.verifyEmailOtp(email, otpCode);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -101,6 +127,7 @@ class DriverProvider with ChangeNotifier {
         vehicleColor: data['vehicleColor'],
         nin: data['nin'],
       );
+      token = res['token'];
       user = res['user'];
       driverProfile = res['driverProfile'];
       await refreshSubscription();

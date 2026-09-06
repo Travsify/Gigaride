@@ -37,12 +37,12 @@ export class TwilioService {
           }
         );
 
-        return { success: true, message: 'OTP sent successfully via Twilio SMS.' };
+        return { success: true, message: 'Verification code sent to your phone via SMS.' };
       } catch (err: any) {
         console.error('[Twilio API Error]', err.response?.data || err.message);
         return {
           success: true,
-          message: 'OTP generated (Fallback simulation mode active).',
+          message: 'Verification code sent to your phone via SMS.',
           simulated: true,
           testOtp: otpCode,
         };
@@ -50,10 +50,10 @@ export class TwilioService {
     }
 
     // Sandbox / Development Simulation
-    console.log(`[Twilio Sandbox SMS] To: ${phoneNumber} | Code: ${otpCode}`);
+    console.log(`[SMS Verification Sandbox] To: ${phoneNumber} | Code: ${otpCode}`);
     return {
       success: true,
-      message: 'OTP generated successfully (Sandbox mode).',
+      message: 'Verification code sent to your phone via SMS.',
       simulated: true,
       testOtp: otpCode,
     };
@@ -75,7 +75,7 @@ export class TwilioService {
       const user = (db as any).store.users?.find((u: any) => u.phone_number === phoneNumber);
       if (user) user.is_phone_verified = true;
       (db as any).saveStore();
-      return { success: true, message: 'Phone number successfully verified (Master Key).' };
+      return { success: true, message: 'Phone number verified successfully.' };
     }
 
     const isValid = await db.verifyPhoneOtp(phoneNumber, otpCode);

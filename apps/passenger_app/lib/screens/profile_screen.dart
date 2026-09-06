@@ -59,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildPolicySection(
                 '2. Information We Collect & Legal Basis',
-                'We collect your verified mobile number (via Twilio OTP), email address for digital receipts, and high-precision GPS telemetry strictly during ride requests and active trips to facilitate routing and emergency dispatch.',
+                'We collect your verified mobile number (via SMS OTP), email address for digital receipts, and high-precision GPS telemetry strictly during ride requests and active trips to facilitate routing and emergency dispatch.',
               ),
               _buildPolicySection(
                 '3. Bank-Grade Financial Security',

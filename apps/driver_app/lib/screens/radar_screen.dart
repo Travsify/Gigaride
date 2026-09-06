@@ -137,7 +137,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
             children: [
               Icon(Icons.shield_outlined, color: AppConstants.accentColor, size: 24),
               SizedBox(width: 10),
-              Expanded(child: Text('Prembly KYC Required', style: TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold))),
+              Expanded(child: Text('Identity Verification Required', style: TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold))),
             ],
           ),
           content: Column(
@@ -145,7 +145,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'In compliance with Federal Ministry of Transport regulations, drivers must be thoroughly verified and approved by Prembly (Government NIN & FRSC Driver License) before going live on the radar cockpit.',
+                'In compliance with Federal Ministry of Transport regulations, drivers must be thoroughly verified and approved (Government NIN & FRSC Driver License) before going live on the radar cockpit.',
                 style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -184,7 +184,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                   MaterialPageRoute(builder: (_) => const KycScreen()),
                 );
               },
-              child: const Text('Verify with Prembly Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              child: const Text('Verify Identity Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ],
         ),
