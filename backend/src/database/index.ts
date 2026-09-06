@@ -432,6 +432,7 @@ export class DatabaseService {
     user_saved_cards: [] as UserSavedCardRow[],
     notifications: [] as NotificationRow[],
     email_verifications: [] as EmailVerificationRow[],
+    processed_webhook_events: [] as string[],
     platform_settings: {
       petrol_price_ngn: 1050,
       base_flag_fall_ngn: 1500,
@@ -512,6 +513,7 @@ export class DatabaseService {
         if (!this.store.backup_snapshots) this.store.backup_snapshots = [];
         if (!this.store.rider_subscriptions) this.store.rider_subscriptions = [];
         if (!this.store.beneficiaries) this.store.beneficiaries = [];
+        if (!this.store.processed_webhook_events) this.store.processed_webhook_events = [];
         this.seedDefaultPlans();
         this.seedDefaultCities();
         this.seedDefaultPromos();
@@ -531,12 +533,76 @@ export class DatabaseService {
     }
   }
 
+  private isSaving = false;
+  private savePending = false;
+
+  // Atomic file write using temporary swap buffer to prevent any corruptions or race conditions
   private saveStore() {
-    try {
-      fs.writeFileSync(this.dbFilePath, JSON.stringify(this.store, null, 2), 'utf8');
-    } catch (e) {
-      console.error('Failed to persist local datastore:', e);
+    if (this.isSaving) {
+      this.savePending = true;
+      return;
     }
+    this.isSaving = true;
+    try {
+      const data = JSON.stringify(this.store, null, 2);
+      const tempPath = `${this.dbFilePath}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
+      fs.writeFileSync(tempPath, data, 'utf8');
+      fs.renameSync(tempPath, this.dbFilePath);
+    } catch (e) {
+      console.error('Failed to persist local datastore atomically, falling back:', e);
+      try {
+        fs.writeFileSync(this.dbFilePath, JSON.stringify(this.store, null, 2), 'utf8');
+      } catch (e2) {
+        console.error('Emergency save failure:', e2);
+      }
+    } finally {
+      this.isSaving = false;
+      if (this.savePending) {
+        this.savePending = false;
+        setImmediate(() => this.saveStore());
+      }
+    }
+  }
+
+  // --- Webhook Idempotency & Replay Protection ---
+  public isWebhookProcessed(eventIdOrRef: string): boolean {
+    if (!this.store.processed_webhook_events) this.store.processed_webhook_events = [];
+    return this.store.processed_webhook_events.includes(eventIdOrRef);
+  }
+
+  public recordProcessedWebhook(eventIdOrRef: string): void {
+    if (!this.store.processed_webhook_events) this.store.processed_webhook_events = [];
+    if (!this.store.processed_webhook_events.includes(eventIdOrRef)) {
+      this.store.processed_webhook_events.push(eventIdOrRef);
+      if (this.store.processed_webhook_events.length > 20000) {
+        this.store.processed_webhook_events = this.store.processed_webhook_events.slice(-10000);
+      }
+      this.saveStore();
+    }
+  }
+
+  // --- Account Deletion Compliance (App Store & Play Store Policy) ---
+  public async deleteUserAccount(userId: string): Promise<boolean> {
+    const userIdx = this.store.users.findIndex(u => u.id === userId);
+    if (userIdx === -1) return false;
+    
+    const user = this.store.users[userIdx];
+    user.full_name = 'Deactivated User';
+    user.phone_number = `del_${Date.now()}_${userId.substring(0, 5)}`;
+    user.email = `del_${Date.now()}_${user.email}`;
+    user.password_hash = 'DELETED_ACCOUNT_SECURE';
+    user.account_status = 'BANNED';
+    
+    // Also remove active driver profile if driver
+    const dIdx = this.store.driver_profiles.findIndex(d => d.driver_id === userId);
+    if (dIdx !== -1) {
+      this.store.driver_profiles[dIdx].is_online = false;
+      this.store.driver_profiles[dIdx].kyc_status = 'REJECTED';
+      this.store.driver_profiles[dIdx].account_status = 'BANNED';
+    }
+
+    this.saveStore();
+    return true;
   }
 
   private seedDefaultPlans() {

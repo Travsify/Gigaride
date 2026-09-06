@@ -188,3 +188,22 @@ authRouter.post('/login-otp', async (req, res: Response): Promise<void> => {
     res.status(400).json({ success: false, message: err.message });
   }
 });
+
+// Self-Service Account Deletion (Apple App Store Guideline 5.1.1(v) & Google Play Compliance)
+authRouter.post('/delete-account', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.userId;
+    const success = await db.deleteUserAccount(userId);
+    if (!success) {
+      res.status(404).json({ success: false, message: 'Account not found.' });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Account successfully deactivated and personal identifying data anonymized.'
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+

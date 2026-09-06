@@ -558,4 +558,15 @@ class ApiService {
     }
     return [];
   }
+
+  Future<void> deleteAccount() async {
+    final token = await getToken();
+    await http.post(
+      Uri.parse('$baseUrl/api/auth/delete-account'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+  }
 }

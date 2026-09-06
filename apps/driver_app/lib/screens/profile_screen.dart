@@ -202,6 +202,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppConstants.dangerColor),
             onPressed: () async {
               Navigator.pop(ctx);
+              try {
+                await provider.api.deleteAccount();
+              } catch (_) {}
               await provider.logout();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const PhoneAuthScreen()), (r) => false);

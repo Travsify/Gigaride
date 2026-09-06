@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -69,6 +70,9 @@ class PassengerProvider with ChangeNotifier {
       if (res['token'] != null && res['user'] != null) {
         token = res['token'];
         user = res['user'];
+        if (user?['id'] != null) {
+          OneSignal.login(user!['id']);
+        }
         connectSocket(res['token']);
       }
       return res;
@@ -107,6 +111,9 @@ class PassengerProvider with ChangeNotifier {
       final res = await api.login(identifier, password);
       token = res['token'];
       user = res['user'];
+      if (user?['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
       connectSocket(res['token']);
     } finally {
       isLoading = false;
@@ -126,6 +133,9 @@ class PassengerProvider with ChangeNotifier {
       );
       token = res['token'];
       user = res['user'];
+      if (user?['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
       connectSocket(res['token']);
     } finally {
       isLoading = false;
@@ -390,6 +400,7 @@ class PassengerProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    OneSignal.logout();
     await api.clearAuth();
     socket.disconnect();
     user = null;

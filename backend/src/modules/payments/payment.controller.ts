@@ -45,6 +45,15 @@ paymentRouter.post('/paystack/webhook', async (req: Request, res: Response): Pro
     }
 
     const event = req.body;
+    const eventKey = event.data?.reference || event.id || (event.data?.id ? String(event.data.id) : null);
+    if (eventKey && db.isWebhookProcessed(eventKey)) {
+      res.status(200).json({ status: 'success', message: 'Webhook event already processed (idempotent)' });
+      return;
+    }
+    if (eventKey) {
+      db.recordProcessedWebhook(eventKey);
+    }
+
     if (event.event === 'charge.success') {
       await paystackService.handleSuccessfulCharge(event.data);
     }
@@ -93,6 +102,15 @@ paymentRouter.post('/korapay/webhook', async (req: Request, res: Response): Prom
     if (!isValid) {
       res.status(400).send('Invalid Korapay signature');
       return;
+    }
+
+    const eventKey = req.body?.data?.reference || req.body?.reference || req.body?.event_id;
+    if (eventKey && db.isWebhookProcessed(`kora_${eventKey}`)) {
+      res.status(200).json({ status: 'success', message: 'Korapay event already processed (idempotent)' });
+      return;
+    }
+    if (eventKey) {
+      db.recordProcessedWebhook(`kora_${eventKey}`);
     }
 
     await korapayService.handleVirtualAccountCreditWebhook(req.body);

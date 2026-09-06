@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 
@@ -59,6 +60,9 @@ class DriverProvider with ChangeNotifier {
       token = res['token'];
       user = res['user'];
       driverProfile = res['driverProfile'];
+      if (user != null && user!['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
       await refreshSubscription();
       await loadVirtualAccount();
       await loadNotifications();
@@ -78,6 +82,9 @@ class DriverProvider with ChangeNotifier {
         token = res['token'];
         user = res['user'];
         driverProfile = res['driverProfile'];
+        if (user != null && user!['id'] != null) {
+          OneSignal.login(user!['id']);
+        }
         await refreshSubscription();
         await loadVirtualAccount();
         await loadNotifications();
@@ -326,6 +333,7 @@ class DriverProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    OneSignal.logout();
     await api.clearAuth();
     socket.disconnect();
     user = null;

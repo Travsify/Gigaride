@@ -142,6 +142,17 @@ export function setupBiddingGateway(io: SocketIOServer) {
             createdAt: ride.created_at,
           });
         }
+
+        // High-Priority Push Notification to nearby drivers (even if phone screen is locked or app minimized)
+        const driverIds = nearbyDrivers.map(c => c.driverId);
+        if (driverIds.length > 0) {
+          oneSignalService.sendPush({
+            userIds: driverIds,
+            heading: '🚖 New Ride Request Nearby!',
+            content: `Pickup: ${ride.pickup_address} (Offer: ₦${(ride.rider_offer_ngn || ride.suggested_fare_ngn || 0).toLocaleString()})`,
+            data: { type: 'NEW_RIDE_REQUEST', rideId: ride.id }
+          }).catch(e => console.error('[Driver Dispatch Push Error]', e.message));
+        }
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }

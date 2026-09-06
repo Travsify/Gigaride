@@ -40,12 +40,19 @@ export class OneSignalService {
 
       if (payload.userIds && payload.userIds.length > 0) {
         body.include_aliases = { external_id: payload.userIds };
+        body.include_external_user_ids = payload.userIds;
         body.target_channel = 'push';
       } else if (payload.segments && payload.segments.length > 0) {
         body.included_segments = payload.segments;
       } else {
         body.included_segments = ['Subscribed Users'];
       }
+
+      body.priority = 10;
+      body.android_accent_color = 'FF0F766E';
+      body.android_channel_id = 'giga_dispatch_channel';
+      body.android_sound = 'notification';
+      body.ios_sound = 'notification.wav';
 
       if (payload.data) {
         body.data = payload.data;

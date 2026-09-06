@@ -4,8 +4,16 @@ import 'core/constants.dart';
 import 'providers/driver_provider.dart';
 import 'screens/splash_screen.dart';
 
-void main() {
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize OneSignal Push Notification Engine
+  OneSignal.Debug.setLogLevel(OSLogLevel.none);
+  OneSignal.initialize(AppConstants.oneSignalAppId);
+  OneSignal.Notifications.requestPermission(true);
+
   runApp(const GigaDriverApp());
 }
 
