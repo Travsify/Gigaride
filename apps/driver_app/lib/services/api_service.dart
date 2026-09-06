@@ -297,6 +297,75 @@ class ApiService {
     throw Exception(data['message'] ?? 'Payment initialization failed');
   }
 
+  Future<List<dynamic>> getSavedCards() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/cards'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> getCardTransactions() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/cards/transactions'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> chargeSavedCard({
+    required String cardId,
+    required int amountNgn,
+    required String planId,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/cards/charge-saved'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'cardId': cardId,
+        'amountNgn': amountNgn,
+        'purpose': 'SUBSCRIPTION_PURCHASE',
+        'planId': planId,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to charge card');
+  }
+
+  Future<Map<String, dynamic>> verifyCardTransaction(String reference) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/cards/verify'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'reference': reference}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to verify transaction');
+  }
+
   // --- In-App Notifications Suite ---
   Future<Map<String, dynamic>> getNotifications() async {
     final token = await getToken();

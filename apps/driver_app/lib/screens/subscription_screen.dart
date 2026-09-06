@@ -1,6 +1,8 @@
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/api_service.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 
@@ -22,39 +24,175 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     });
   }
 
+  final ApiService _api = ApiService();
+
   void _purchase(String planId, String planName, int priceNgn) async {
     final provider = context.read<DriverProvider>();
-    showDialog(
+    List<dynamic> savedCards = [];
+    try {
+      savedCards = await _api.getSavedCards();
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppConstants.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Purchase $planName?', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
-        content: Text(
-          'Total cost is ₦${NumberFormat('#,##0', 'en_US').format(priceNgn)}. You keep 100% of your earnings on all rides with zero platform commission deductions.',
-          style: const TextStyle(color: AppConstants.textMuted, fontSize: 13),
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Purchase $planName', style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Total: ₦${NumberFormat('#,##0', 'en_US').format(priceNgn)} • 100% Commission Kept',
+              style: const TextStyle(color: AppConstants.accentColor, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text('Choose Payment Method:', style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+
+            // Option 1: Saved Cards (1-Click Instant)
+            if (savedCards.isNotEmpty) ...[
+              ...savedCards.map((c) {
+                final brand = (c['card_brand'] ?? 'card').toString().toUpperCase();
+                final last4 = c['card_last4'] ?? '••••';
+                final bank = c['card_bank'] ?? 'Bank';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppConstants.darkBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.credit_card_rounded, color: Colors.cyanAccent, size: 20),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('$brand •••• $last4', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(bank, style: const TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0)),
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            final res = await _api.chargeSavedCard(cardId: c['id'], amountNgn: priceNgn, planId: planId);
+                            await provider.refreshSubscription();
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('✓ ${res['message'] ?? "$planName activated!"}'), backgroundColor: AppConstants.successColor),
+                            );
+                          } catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: AppConstants.dangerColor),
+                            );
+                          }
+                        },
+                        child: const Text('1-Click Pay', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 6),
+            ],
+
+            // Option 2: Pay with Wallet Balance
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppConstants.darkBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet_outlined, color: Colors.greenAccent, size: 20),
+                      SizedBox(width: 10),
+                      Text('Living Wallet Balance', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppConstants.successColor, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0)),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await provider.purchasePlan(planId);
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('✓ $planName activated successfully!'), backgroundColor: AppConstants.successColor),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: AppConstants.dangerColor),
+                        );
+                      }
+                    },
+                    child: const Text('Pay Wallet', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Option 3: Pay with New Card (Paystack Checkout)
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.add_card_rounded, color: Colors.white, size: 16),
+                label: const Text('Pay with New Card (Paystack Checkout)', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    final res = await _api.initializeCardPayment(planId);
+                    final authUrl = res['authorizationUrl'] as String?;
+                    final ref = res['reference'] as String?;
+                    if (authUrl != null && await canLaunchUrl(Uri.parse(authUrl))) {
+                      await launchUrl(Uri.parse(authUrl), mode: LaunchMode.externalApplication);
+                    }
+                    if (ref != null) {
+                      await _api.verifyCardTransaction(ref);
+                    }
+                    await provider.refreshSubscription();
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('✓ $planName card transaction processed!'), backgroundColor: AppConstants.successColor),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Payment error: $e'), backgroundColor: AppConstants.dangerColor),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppConstants.textMuted))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final scaffold = ScaffoldMessenger.of(context);
-              try {
-                await provider.purchasePlan(planId);
-                scaffold.showSnackBar(
-                  SnackBar(content: Text('✓ $planName activated successfully!'), backgroundColor: AppConstants.successColor),
-                );
-              } catch (e) {
-                scaffold.showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: AppConstants.dangerColor),
-                );
-              }
-            },
-            child: const Text('Activate Pack', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

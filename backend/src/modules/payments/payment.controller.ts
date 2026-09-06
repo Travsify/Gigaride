@@ -259,7 +259,7 @@ paymentRouter.get(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const search = req.query.search as string | undefined;
-      const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+      const days = req.query.days ? parseInt(String(req.query.days), 10) : 90;
       const beneficiaries = await db.getBeneficiaries(req.user!.userId, search, days);
       res.json({ success: true, data: beneficiaries });
     } catch (err: any) {
@@ -323,6 +323,171 @@ paymentRouter.get(
       res.json({ success: true, data: transactions });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+
+// ==========================================
+// SAVED CARDS & CARD TRANSACTIONS
+// ==========================================
+
+// 9. Get user's saved cards
+paymentRouter.get(
+  '/cards',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const cards = await db.getUserSavedCards(req.user!.userId);
+      res.json({ success: true, data: cards });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 10. Delete a saved card
+paymentRouter.delete(
+  '/cards/:id',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const cardId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const success = await db.deleteSavedCard(req.user!.userId, cardId);
+      res.json({ success, message: success ? 'Card removed successfully.' : 'Card not found.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 11. Set default card
+paymentRouter.post(
+  '/cards/:id/default',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const cardId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const card = await db.setDefaultSavedCard(req.user!.userId, cardId);
+      res.json({ success: true, message: 'Default card updated.', data: card });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 12. Get Card Transactions only
+paymentRouter.get(
+  '/cards/transactions',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const cardTxs = await db.getCardTransactions(req.user!.userId);
+      res.json({ success: true, data: cardTxs });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 13. Initialize Paystack card payment (for funding wallet or purchasing subscription)
+paymentRouter.post(
+  '/cards/initialize-funding',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      if (!amountNgn || amountNgn < 100) {
+        res.status(400).json({ success: false, message: 'Minimum deposit amount is ₦100.' });
+        return;
+      }
+
+      const result = await paystackService.initializeCardFunding(
+        req.user!.userId,
+        amountNgn,
+        req.user!.email
+      );
+
+      res.json({ success: true, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 14. 1-Click Instant Debit on Saved Card
+paymentRouter.post(
+  '/cards/charge-saved',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { cardId, amountNgn, purpose, planId } = req.body;
+      if (!cardId || !amountNgn) {
+        res.status(400).json({ success: false, message: 'cardId and amountNgn are required.' });
+        return;
+      }
+
+      const result = await paystackService.chargeSavedCard(
+        req.user!.userId,
+        String(cardId),
+        Number(amountNgn),
+        purpose || 'WALLET_FUNDING',
+        planId
+      );
+
+      res.json({ success: true, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 15. Verify Card Transaction by Reference
+paymentRouter.post(
+  '/cards/verify',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        res.status(400).json({ success: false, message: 'Transaction reference is required.' });
+        return;
+      }
+
+      const result = await paystackService.verifyCardTransaction(String(reference));
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 16. Peer-to-Peer Wallet Transfer (With 3-Month Auto-Beneficiary)
+paymentRouter.post(
+  '/wallet/transfer-p2p',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { recipientSearch, amountNgn, saveAsBeneficiary } = req.body;
+      if (!recipientSearch || !amountNgn) {
+        res.status(400).json({ success: false, message: 'Recipient identifier and amount are required.' });
+        return;
+      }
+
+      const result = await db.transferP2PWallet(
+        req.user!.userId,
+        String(recipientSearch),
+        Number(amountNgn),
+        saveAsBeneficiary !== false
+      );
+
+      res.json({
+        success: true,
+        message: `Successfully transferred ₦${Number(amountNgn).toLocaleString()} to ${result.recipientName}.`,
+        data: result,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 );

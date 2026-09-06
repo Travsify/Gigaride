@@ -300,7 +300,7 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to withdraw funds');
   }
 
-  Future<List<dynamic>> getBeneficiaries({String? search, int days = 30}) async {
+  Future<List<dynamic>> getBeneficiaries({String? search, int days = 90}) async {
     final token = await getToken();
     String url = '$baseUrl/api/payments/wallet/beneficiaries?days=$days';
     if (search != null && search.isNotEmpty) {
@@ -315,6 +315,128 @@ class ApiService {
       return data['data'] as List<dynamic>;
     }
     return [];
+  }
+
+  Future<List<dynamic>> getSavedCards() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/cards'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<bool> deleteSavedCard(String cardId) async {
+    final token = await getToken();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/payments/cards/$cardId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    return data['success'] == true;
+  }
+
+  Future<List<dynamic>> getCardTransactions() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/cards/transactions'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> initializeCardFunding(int amountNgn) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/cards/initialize-funding'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'amountNgn': amountNgn}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to initialize card funding');
+  }
+
+  Future<Map<String, dynamic>> chargeSavedCard({
+    required String cardId,
+    required int amountNgn,
+    String purpose = 'WALLET_FUNDING',
+    String? planId,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/cards/charge-saved'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'cardId': cardId,
+        'amountNgn': amountNgn,
+        'purpose': purpose,
+        if (planId != null) ...{'planId': planId},
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to charge saved card');
+  }
+
+  Future<Map<String, dynamic>> verifyCardTransaction(String reference) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/cards/verify'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'reference': reference}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to verify transaction');
+  }
+
+  Future<Map<String, dynamic>> transferP2P({
+    required String recipientSearch,
+    required int amountNgn,
+    bool saveAsBeneficiary = true,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/transfer-p2p'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'recipientSearch': recipientSearch,
+        'amountNgn': amountNgn,
+        'saveAsBeneficiary': saveAsBeneficiary,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'P2P transfer failed');
   }
 
   Future<List<dynamic>> getStatement() async {

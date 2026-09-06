@@ -188,6 +188,20 @@ export interface RideBidRow {
   created_at: string;
 }
 
+export interface UserSavedCardRow {
+  id: string;
+  user_id: string;
+  authorization_code: string;
+  card_brand: string; // 'visa' | 'mastercard' | 'verve'
+  card_last4: string; // '4081'
+  card_bank: string;  // 'Access Bank'
+  exp_month: string;  // '12'
+  exp_year: string;   // '2028'
+  card_holder_name?: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 export interface PaymentTransactionRow {
   id: string;
   reference: string;
@@ -197,6 +211,11 @@ export interface PaymentTransactionRow {
   payment_type: 'SUBSCRIPTION_PURCHASE' | 'WALLET_FUNDING' | 'RIDE_PAYMENT';
   channel: string;
   meta_data: any;
+  card_brand?: string;
+  card_last4?: string;
+  card_bank?: string;
+  card_exp_month?: string;
+  card_exp_year?: string;
   refunded_at?: string;
   refund_reason?: string;
   created_at: string;
@@ -409,6 +428,7 @@ export class DatabaseService {
     backup_snapshots: [] as BackupSnapshotRow[],
     rider_subscriptions: [] as RiderSubscriptionRow[],
     beneficiaries: [] as BeneficiaryRow[],
+    user_saved_cards: [] as UserSavedCardRow[],
     notifications: [] as NotificationRow[],
     email_verifications: [] as EmailVerificationRow[],
     platform_settings: {
@@ -773,6 +793,8 @@ export class DatabaseService {
 
   // --- User Repository ---
   public async createUser(user: UserRow): Promise<UserRow> {
+    if (!user.id) user.id = `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    if (!user.created_at) user.created_at = new Date().toISOString();
     this.store.users.push(user);
     this.saveStore();
     return user;
@@ -1721,7 +1743,7 @@ export class DatabaseService {
     return newBen;
   }
 
-  public async getBeneficiaries(userId: string, search?: string, daysLimit: number = 30): Promise<BeneficiaryRow[]> {
+  public async getBeneficiaries(userId: string, search?: string, daysLimit: number = 90): Promise<BeneficiaryRow[]> {
     const cutoffTime = Date.now() - daysLimit * 24 * 60 * 60 * 1000;
 
     let list = this.store.beneficiaries.filter((b) => {
@@ -1784,7 +1806,7 @@ export class DatabaseService {
       .filter((t) => t.user_id === userId)
       .slice(0, 50);
 
-    const beneficiaries = await this.getBeneficiaries(userId, undefined, 30);
+    const beneficiaries = await this.getBeneficiaries(userId, undefined, 90);
 
     return {
       virtualAccount: acc ? { ...acc, vault_balance_ngn: acc.vault_balance_ngn || 0 } : null,
@@ -1792,6 +1814,160 @@ export class DatabaseService {
       recentTransactions: transactions,
       beneficiaries,
     };
+  }
+
+
+  // --- Saved Cards & Card Transactions Management ---
+  public async getUserSavedCards(userId: string): Promise<UserSavedCardRow[]> {
+    if (!this.store.user_saved_cards) this.store.user_saved_cards = [];
+    return this.store.user_saved_cards.filter((c) => c.user_id === userId);
+  }
+
+  public async saveCardToken(userId: string, cardData: Omit<UserSavedCardRow, 'id' | 'created_at'>): Promise<UserSavedCardRow> {
+    if (!this.store.user_saved_cards) this.store.user_saved_cards = [];
+    
+    let existing = this.store.user_saved_cards.find(
+      (c) => c.user_id === userId && c.card_last4 === cardData.card_last4 && c.card_brand.toLowerCase() === cardData.card_brand.toLowerCase()
+    );
+
+    const now = new Date().toISOString();
+    if (existing) {
+      existing.authorization_code = cardData.authorization_code;
+      existing.card_bank = cardData.card_bank;
+      existing.exp_month = cardData.exp_month;
+      existing.exp_year = cardData.exp_year;
+      if (cardData.is_default) {
+        this.store.user_saved_cards.forEach((c) => { if (c.user_id === userId) c.is_default = false; });
+        existing.is_default = true;
+      }
+      this.saveStore();
+      return existing;
+    }
+
+    const hasCards = this.store.user_saved_cards.some((c) => c.user_id === userId);
+    const newCard: UserSavedCardRow = {
+      id: `card_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      ...cardData,
+      user_id: userId,
+      is_default: cardData.is_default ?? (!hasCards),
+      created_at: now,
+    };
+
+    if (newCard.is_default) {
+      this.store.user_saved_cards.forEach((c) => { if (c.user_id === userId) c.is_default = false; });
+    }
+
+    this.store.user_saved_cards.unshift(newCard);
+    this.saveStore();
+    return newCard;
+  }
+
+  public async deleteSavedCard(userId: string, cardId: string): Promise<boolean> {
+    if (!this.store.user_saved_cards) this.store.user_saved_cards = [];
+    const idx = this.store.user_saved_cards.findIndex((c) => c.id === cardId && c.user_id === userId);
+    if (idx >= 0) {
+      this.store.user_saved_cards.splice(idx, 1);
+      this.saveStore();
+      return true;
+    }
+    return false;
+  }
+
+  public async setDefaultSavedCard(userId: string, cardId: string): Promise<UserSavedCardRow> {
+    if (!this.store.user_saved_cards) this.store.user_saved_cards = [];
+    let target: UserSavedCardRow | undefined;
+    for (const c of this.store.user_saved_cards) {
+      if (c.user_id === userId) {
+        if (c.id === cardId) {
+          c.is_default = true;
+          target = c;
+        } else {
+          c.is_default = false;
+        }
+      }
+    }
+    if (!target) throw new Error('Card not found.');
+    this.saveStore();
+    return target;
+  }
+
+  public async getCardTransactions(userId: string): Promise<PaymentTransactionRow[]> {
+    return this.store.payment_transactions
+      .filter((t) => t.user_id === userId && (t.channel.includes('card') || t.channel.includes('paystack') || Boolean(t.card_last4)))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  // --- Peer-to-Peer Wallet Transfer with 3-Month Auto-Beneficiary ---
+  public async transferP2PWallet(
+    senderId: string,
+    recipientSearch: string,
+    amountNgn: number,
+    saveAsBeneficiary: boolean = true
+  ): Promise<{ transaction: PaymentTransactionRow; remainingBalance: number; recipientName: string }> {
+    const senderAcc = this.store.virtual_bank_accounts.find((v) => v.user_id === senderId);
+    if (!senderAcc) throw new Error('Sender wallet not found.');
+    if (amountNgn < 100) throw new Error('Minimum transfer amount is ₦100.');
+    if (senderAcc.balance_ngn < amountNgn) throw new Error('Insufficient wallet balance.');
+
+    const q = recipientSearch.trim().toLowerCase();
+    const recipient = this.store.users.find(
+      (u) => u.id !== senderId && (u.phone_number.toLowerCase().includes(q) || u.email.toLowerCase() === q || u.full_name.toLowerCase().includes(q))
+    );
+    if (!recipient) throw new Error('Recipient user not found on Giga Ride.');
+
+    let recipientAcc = this.store.virtual_bank_accounts.find((v) => v.user_id === recipient.id);
+    if (!recipientAcc) {
+      recipientAcc = {
+        id: `va_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        user_id: recipient.id,
+        account_reference: `ref_va_${Date.now()}`,
+        account_number: `100${Math.floor(1000000 + Math.random() * 9000000)}`,
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: recipient.full_name,
+        provider: 'korapay',
+        balance_ngn: 0,
+        vault_balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(recipientAcc);
+    }
+
+    senderAcc.balance_ngn = Number((senderAcc.balance_ngn - amountNgn).toFixed(2));
+    recipientAcc.balance_ngn = Number((recipientAcc.balance_ngn + amountNgn).toFixed(2));
+
+    const txRef = `P2P_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const tx: PaymentTransactionRow = {
+      id: `tx_${txRef}`,
+      reference: txRef,
+      user_id: senderId,
+      amount_kobo: Math.round(amountNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'SUBSCRIPTION_PURCHASE',
+      channel: 'P2P_TRANSFER',
+      meta_data: {
+        recipientId: recipient.id,
+        recipientName: recipient.full_name,
+        recipientPhone: recipient.phone_number,
+        amountNgn,
+        type: 'P2P_TRANSFER'
+      },
+      created_at: new Date().toISOString(),
+    };
+    this.store.payment_transactions.unshift(tx);
+
+    if (saveAsBeneficiary) {
+      await this.saveOrUpdateBeneficiary(senderId, {
+        account_name: recipient.full_name,
+        account_number: recipient.phone_number,
+        bank_name: 'Giga Living Wallet',
+        bank_code: 'GIGA_P2P',
+      });
+    }
+
+    this.saveStore();
+    return { transaction: tx, remainingBalance: senderAcc.balance_ngn, recipientName: recipient.full_name };
   }
 
   // --- Phone OTP Verifications (Twilio) ---

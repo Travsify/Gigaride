@@ -3552,7 +3552,9 @@
               <td class="py-2 px-3 font-mono text-amber-400 font-bold">${tx.reference}</td>
               <td class="py-2 px-3">${tx.user ? tx.user.full_name : 'Driver'}</td>
               <td class="py-2 px-3 font-bold text-white">₦${(tx.amount_kobo / 100).toLocaleString()}</td>
-              <td class="py-2 px-3">${tx.channel}</td>
+              <td class="py-2 px-3">
+                ${tx.card_brand ? `<span class="bg-blue-500/20 text-cyan-300 px-2 py-0.5 rounded text-[11px] font-bold">💳 ${tx.card_brand.toUpperCase()} •••• ${tx.card_last4 || ''}</span><div class="text-[10px] text-slate-400">${tx.card_bank || tx.channel}</div>` : tx.channel}
+              </td>
               <td class="py-2 px-3">
                 <span class="${tx.status === 'SUCCESS' ? 'text-emerald-400' : tx.status === 'REFUNDED' ? 'text-rose-400' : 'text-amber-400'} font-bold">${tx.status}</span>
               </td>
