@@ -32,6 +32,7 @@ class DriverInteractiveMap extends StatefulWidget {
 
 class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
   late final MapController _mapController;
+  bool _isSatelliteMode = false;
 
   @override
   void initState() {
@@ -44,6 +45,10 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
     super.didUpdateWidget(oldWidget);
     if (widget.routePoints.isNotEmpty && widget.routePoints != oldWidget.routePoints) {
       _fitRouteBounds();
+    } else if (widget.routePoints.isEmpty &&
+        (widget.driverLocation.latitude != oldWidget.driverLocation.latitude ||
+         widget.driverLocation.longitude != oldWidget.driverLocation.longitude)) {
+      _mapController.move(widget.driverLocation, 16.0);
     }
   }
 
@@ -61,7 +66,7 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
   }
 
   void _recenterOnDriver() {
-    _mapController.move(widget.driverLocation, 15.0);
+    _mapController.move(widget.driverLocation, 16.0);
     if (widget.onRecenter != null) {
       widget.onRecenter!();
     }
@@ -99,6 +104,11 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
 
   @override
   Widget build(BuildContext context) {
+    final token = AppConstants.mapboxPublicToken;
+    final tileUrl = _isSatelliteMode
+        ? 'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token'
+        : 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token';
+
     return Container(
       height: widget.height,
       width: double.infinity,
@@ -110,18 +120,22 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // OpenStreetMap Tile Layer
+          // Mapbox Map Layer (Watermark-Free)
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: widget.driverLocation,
-              initialZoom: 14.5,
-              minZoom: 5.0,
-              maxZoom: 18.0,
+              initialZoom: 16.0,
+              minZoom: 4.0,
+              maxZoom: 19.0,
+              onMapReady: () {
+                _mapController.move(widget.driverLocation, 16.0);
+              },
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+                key: ValueKey(_isSatelliteMode),
+                urlTemplate: tileUrl,
                 userAgentPackageName: 'com.gigaride.driver',
                 maxZoom: 19,
               ),
@@ -270,6 +284,46 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          // Top Right Controls (Satellite Toggle)
+          Positioned(
+            top: 12,
+            right: widget.activeTrip != null ? 140 : 14,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isSatelliteMode = !_isSatelliteMode;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isSatelliteMode ? AppConstants.primaryColor : AppConstants.cardBg.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isSatelliteMode ? Icons.layers_rounded : Icons.satellite_alt_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isSatelliteMode ? '2D Streets' : 'Satellite',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

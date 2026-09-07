@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
@@ -36,15 +38,32 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
   }
 
 
+  StreamSubscription<Position>? _driverLocationSub;
+
   void _initDriverLocation() async {
+    // 1. Instant check for cached last known position (0ms)
+    final cached = await LocationService.getLastKnownLocation();
+    if (cached != null && mounted) {
+      setState(() => _driverLocation = cached);
+    }
+
+    // 2. Fetch fresh high accuracy location
     final pos = await LocationService.getCurrentLocation();
     if (mounted) {
       setState(() => _driverLocation = pos);
     }
+
+    // 3. Keep driver location live as vehicle moves
+    _driverLocationSub?.cancel();
+    _driverLocationSub = LocationService.getPositionStream().listen((Position newPos) {
+      if (!mounted) return;
+      setState(() => _driverLocation = LatLng(newPos.latitude, newPos.longitude));
+    });
   }
 
   @override
   void dispose() {
+    _driverLocationSub?.cancel();
     _pulseController.dispose();
     super.dispose();
   }

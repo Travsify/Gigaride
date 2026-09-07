@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../core/constants.dart';
@@ -11,6 +13,7 @@ import 'profile_screen.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../services/routing_service.dart';
+import '../services/places_service.dart';
 import '../widgets/interactive_ride_map.dart';
 import '../widgets/places_search_modal.dart';
 
@@ -87,7 +90,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
 
+  StreamSubscription<Position>? _positionSub;
+
   void _initLocationAndDrivers() async {
+    // 1. Instant check for cached last known position (0ms)
+    final cached = await LocationService.getLastKnownLocation();
+    if (cached != null && mounted) {
+      setState(() {
+        _currentLocation = cached;
+        if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
+          _pickupLocation = cached;
+        }
+        _updateNearbyDrivers(cached);
+      });
+      _reverseGeocodePickup(cached);
+    }
+
+    // 2. Fetch fresh high-accuracy satellite GPS coordinates
     final pos = await LocationService.getCurrentLocation();
     if (mounted) {
       setState(() {
@@ -95,14 +114,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
           _pickupLocation = pos;
         }
-        _nearbyDrivers = [
-          LatLng(pos.latitude + 0.0042, pos.longitude + 0.0035),
-          LatLng(pos.latitude - 0.0031, pos.longitude + 0.0051),
-          LatLng(pos.latitude + 0.0055, pos.longitude - 0.0028),
-          LatLng(pos.latitude - 0.0048, pos.longitude - 0.0039),
-        ];
+        _updateNearbyDrivers(pos);
       });
+      _reverseGeocodePickup(pos);
     }
+
+    // 3. Keep location live as user moves
+    _positionSub?.cancel();
+    _positionSub = LocationService.getPositionStream().listen((Position newPos) {
+      if (!mounted) return;
+      final livePos = LatLng(newPos.latitude, newPos.longitude);
+      setState(() {
+        _currentLocation = livePos;
+        if (_routePoints.isEmpty && (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location')) {
+          _pickupLocation = livePos;
+        }
+      });
+    });
+  }
+
+  void _updateNearbyDrivers(LatLng center) {
+    _nearbyDrivers = [
+      LatLng(center.latitude + 0.0035, center.longitude + 0.0028),
+      LatLng(center.latitude - 0.0028, center.longitude + 0.0042),
+      LatLng(center.latitude + 0.0045, center.longitude - 0.0025),
+      LatLng(center.latitude - 0.0038, center.longitude - 0.0035),
+    ];
+  }
+
+  Future<void> _reverseGeocodePickup(LatLng pos) async {
+    try {
+      final address = await PlacesService.reverseGeocode(pos);
+      if (mounted && address.isNotEmpty && address != 'Current Location') {
+        setState(() {
+          if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
+            _pickupCtrl.text = address;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _openDestinationSearch() async {
@@ -158,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _pickupCtrl.dispose();
     _dropoffCtrl.dispose();
     _stopCtrl.dispose();

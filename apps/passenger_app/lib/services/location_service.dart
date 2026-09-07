@@ -4,6 +4,9 @@ import 'package:latlong2/latlong.dart';
 class LocationService {
   static const LatLng defaultLagosLocation = LatLng(6.5244, 3.3792);
 
+  /// In-memory cache of the user's latest resolved coordinates
+  static LatLng? lastKnownUserLocation;
+
   /// Check and request location permission.
   static Future<bool> requestLocationPermission() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -26,12 +29,37 @@ class LocationService {
     return true;
   }
 
-  /// Get current user device location with fallback to default Lagos coordinates
+  /// Instant lookup of device's last known position (0ms delay)
+  static Future<LatLng?> getLastKnownLocation() async {
+    if (lastKnownUserLocation != null) {
+      return lastKnownUserLocation;
+    }
+    try {
+      final hasPermission = await requestLocationPermission();
+      if (!hasPermission) return null;
+
+      final pos = await Geolocator.getLastKnownPosition();
+      if (pos != null) {
+        final loc = LatLng(pos.latitude, pos.longitude);
+        lastKnownUserLocation = loc;
+        return loc;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get current user device location with instant fallback to last known position
   static Future<LatLng> getCurrentLocation() async {
     try {
       final hasPermission = await requestLocationPermission();
       if (!hasPermission) {
-        return defaultLagosLocation;
+        return lastKnownUserLocation ?? defaultLagosLocation;
+      }
+
+      // Check last known position first
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null) {
+        lastKnownUserLocation = LatLng(lastPos.latitude, lastPos.longitude);
       }
 
       final position = await Geolocator.getCurrentPosition(
@@ -41,9 +69,11 @@ class LocationService {
         ),
       );
 
-      return LatLng(position.latitude, position.longitude);
+      final loc = LatLng(position.latitude, position.longitude);
+      lastKnownUserLocation = loc;
+      return loc;
     } catch (_) {
-      return defaultLagosLocation;
+      return lastKnownUserLocation ?? defaultLagosLocation;
     }
   }
 
@@ -52,7 +82,7 @@ class LocationService {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // Every 5 meters
+        distanceFilter: 3, // Every 3 meters
       ),
     );
   }

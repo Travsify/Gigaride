@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/constants.dart';
 import '../services/places_service.dart';
+import '../services/location_service.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Mandatory Location Gate for Giga Ride.
@@ -126,11 +127,12 @@ class _LocationPermissionGateState extends State<LocationPermissionGate>
         ),
       );
 
+      final resolvedLoc = LatLng(pos.latitude, pos.longitude);
+      LocationService.lastKnownUserLocation = resolvedLoc;
+
       // Reverse geocode to get Nigerian area name
       try {
-        final address = await PlacesService.reverseGeocode(
-          LatLng(pos.latitude, pos.longitude),
-        );
+        final address = await PlacesService.reverseGeocode(resolvedLoc);
         if (mounted && address.isNotEmpty && address != 'Current Location') {
           setState(() {
             _detectedArea = address;
