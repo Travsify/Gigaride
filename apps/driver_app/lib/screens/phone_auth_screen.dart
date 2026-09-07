@@ -6,6 +6,7 @@ import '../providers/driver_provider.dart';
 import '../services/biometric_service.dart';
 import 'kyc_screen.dart';
 import 'driver_shell.dart';
+import '../widgets/location_permission_gate.dart';
 
 class PhoneAuthScreen extends StatefulWidget {
   final bool initialIsSignUp;
@@ -306,11 +307,12 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
 
   void _navigateAfterAuth(DriverProvider provider) {
     final kyc = provider.driverProfile?['kyc_status'];
-    if (kyc != 'APPROVED') {
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const KycScreen()), (r) => false);
-    } else {
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const DriverShell()), (r) => false);
-    }
+    final target = (kyc != 'APPROVED') ? const KycScreen() : const DriverShell();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
+      (r) => false,
+    );
   }
 
   // ==========================================

@@ -7,6 +7,7 @@ import 'onboarding_screen.dart';
 import 'phone_auth_screen.dart';
 import 'kyc_screen.dart';
 import 'driver_shell.dart';
+import '../widgets/location_permission_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -68,17 +69,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     } else {
       // Authenticated: check KYC status
       final kycStatus = provider.driverProfile?['kyc_status'];
-      if (kycStatus != 'APPROVED') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const KycScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DriverShell()),
-        );
-      }
+      final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
+      );
     }
   }
 

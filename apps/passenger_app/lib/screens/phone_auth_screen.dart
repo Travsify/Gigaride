@@ -5,6 +5,7 @@ import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import '../services/biometric_service.dart';
 import 'home_screen.dart';
+import '../widgets/location_permission_gate.dart';
 
 class PhoneAuthScreen extends StatefulWidget {
   final bool initialIsSignUp;
@@ -270,7 +271,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   void _navigateToHome() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const LocationPermissionGate(nextScreen: HomeScreen())),
       (r) => false,
     );
   }

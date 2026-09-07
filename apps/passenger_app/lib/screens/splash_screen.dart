@@ -7,6 +7,7 @@ import '../providers/passenger_provider.dart';
 import 'onboarding_screen.dart';
 import 'phone_auth_screen.dart';
 import 'home_screen.dart';
+import '../widgets/location_permission_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -78,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (isAuthenticated) {
-      _navigateTo(const HomeScreen());
+      _navigateTo(const LocationPermissionGate(nextScreen: HomeScreen()));
     } else {
       _navigateTo(const PhoneAuthScreen());
     }
