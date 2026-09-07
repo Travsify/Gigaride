@@ -121,10 +121,8 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${AppConstants.mapboxPublicToken}',
-                additionalOptions: {
-                  'accessToken': AppConstants.mapboxPublicToken,
-                },
+                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+                userAgentPackageName: 'com.gigaride.driver',
                 maxZoom: 19,
               ),
               // Route Polyline Layer (Active trip)

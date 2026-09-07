@@ -524,6 +524,65 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                         ),
                         if (notes != null && notes.toString().trim().isNotEmpty) ...[
                           const SizedBox(height: 12),
+                          // Comfort Requirement Badges
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (notes.toString().contains('AC: Must Be ON') || notes.toString().contains('Comfort AC'))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.cyan.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.cyanAccent.withOpacity(0.4)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.ac_unit_rounded, color: Colors.cyanAccent, size: 13),
+                                      SizedBox(width: 4),
+                                      Text('AC ON Required', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              if (notes.toString().contains('Quiet Ride'))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.purpleAccent.withOpacity(0.4)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.volume_off_rounded, color: Colors.purpleAccent, size: 13),
+                                      SizedBox(width: 4),
+                                      Text('Quiet Ride Requested', style: TextStyle(color: Colors.purpleAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              if (notes.toString().contains('Luggage Assistance'))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.amberAccent.withOpacity(0.4)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.luggage_rounded, color: Colors.amberAccent, size: 13),
+                                      SizedBox(width: 4),
+                                      Text('Luggage Assistance', style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(10),

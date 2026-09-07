@@ -670,6 +670,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (_gatePassCtrl.text.trim().isNotEmpty) {
       notesList.add('[Estate Gate Pass: ${_gatePassCtrl.text.trim()}]');
     }
+    // Ride Comfort Preferences & Vehicle Tier
+    if (provider.alwaysAcOn) {
+      notesList.add('[❄️ AC: Must Be ON]');
+    }
+    if (provider.preferQuiet) {
+      notesList.add('[🤫 Quiet Ride]');
+    }
+    if (provider.luggageAssistance) {
+      notesList.add('[🧳 Luggage Assistance]');
+    }
+    if (_selectedVehicleTier == 'COMFORT') {
+      notesList.add('[✨ Comfort AC Tier]');
+    } else if (_selectedVehicleTier == 'XL_SUV') {
+      notesList.add('[🚙 XL SUV Tier]');
+    }
     if (_notesCtrl.text.trim().isNotEmpty) {
       notesList.add(_notesCtrl.text.trim());
     }
