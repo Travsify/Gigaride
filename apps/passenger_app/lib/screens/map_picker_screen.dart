@@ -102,7 +102,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             children: [
               TileLayer(
                 urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${AppConstants.mapboxPublicToken}',
-                additionalOptions: const {
+                additionalOptions: {
                   'accessToken': AppConstants.mapboxPublicToken,
                 },
                 maxZoom: 19,
