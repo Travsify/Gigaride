@@ -121,8 +121,11 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.gigaride.driver',
+                urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${AppConstants.mapboxPublicToken}',
+                additionalOptions: const {
+                  'accessToken': AppConstants.mapboxPublicToken,
+                },
+                maxZoom: 19,
               ),
               // Route Polyline Layer (Active trip)
               if (widget.routePoints.isNotEmpty)

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import '../core/constants.dart';
 
 class RouteResult {
   final List<LatLng> polyline;
@@ -15,20 +16,22 @@ class RouteResult {
 }
 
 class RoutingService {
-  /// Zero-Burn road routing via OSRM (Open Source Routing Machine)
+  /// Fast, high-precision driving navigation & polylines via Mapbox Directions API
+  /// Includes real Nigerian road network and traffic duration estimates
   static Future<RouteResult?> getDrivingRoute(LatLng start, LatLng end) async {
+    final token = AppConstants.mapboxPublicToken;
     final url = Uri.parse(
-      'https://router.project-osrm.org/route/v1/driving/'
+      'https://api.mapbox.com/directions/v5/mapbox/driving/'
       '${start.longitude},${start.latitude};'
       '${end.longitude},${end.latitude}'
-      '?overview=full&geometries=geojson',
+      '?geometries=geojson&overview=full&access_token=$token',
     );
 
     try {
       final response = await http.get(
         url,
         headers: {'User-Agent': 'GigaRide/1.0 (info@gigaride.ng)'},
-      ).timeout(const Duration(seconds: 7));
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -38,7 +41,8 @@ class RoutingService {
           final firstRoute = routes[0];
           final distanceMeters = (firstRoute['distance'] as num?)?.toDouble() ?? 0.0;
           final durationSecs = (firstRoute['duration'] as num?)?.toDouble() ?? 0.0;
-          final coords = firstRoute['geometry']['coordinates'] as List<dynamic>? ?? [];
+          final geometry = firstRoute['geometry'] as Map<String, dynamic>?;
+          final coords = geometry?['coordinates'] as List<dynamic>? ?? [];
 
           final polyline = coords.map((c) {
             return LatLng(
@@ -48,7 +52,7 @@ class RoutingService {
           }).toList();
 
           return RouteResult(
-            polyline: polyline,
+            polyline: polyline.isNotEmpty ? polyline : [start, end],
             distanceKm: (distanceMeters / 1000.0),
             durationMinutes: (durationSecs / 60.0).round(),
           );

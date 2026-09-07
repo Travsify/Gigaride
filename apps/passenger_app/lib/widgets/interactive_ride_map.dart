@@ -96,8 +96,10 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-                userAgentPackageName: 'ng.giga.passengerApp',
+                urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${AppConstants.mapboxPublicToken}',
+                additionalOptions: const {
+                  'accessToken': AppConstants.mapboxPublicToken,
+                },
                 maxZoom: 19,
               ),
               // Route Polyline Layer

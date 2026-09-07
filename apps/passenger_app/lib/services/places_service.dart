@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import '../core/constants.dart';
 
 class PlaceSuggestion {
   final String title;
@@ -15,65 +16,57 @@ class PlaceSuggestion {
 }
 
 class PlacesService {
-  /// Zero-Burn debounced search using Photon OpenStreetMap
-  /// Prioritizes Nigerian points of interest (Lagos, Abuja, PH, etc.)
+  /// Fast, pinpoint landmark and estate search using Mapbox Geocoding v5
+  /// Scoped strictly to Nigeria with proximity biasing
   static Future<List<PlaceSuggestion>> searchPlaces(
     String query, {
     LatLng? proximity,
   }) async {
-    if (query.trim().length < 2) return [];
+    final cleanQuery = query.trim();
+    if (cleanQuery.length < 2) return [];
 
     final center = proximity ?? const LatLng(6.5244, 3.3792);
-    final encodedQuery = Uri.encodeComponent(query.trim());
-    // Restrict strictly to Nigeria bounding box (lon: 2.67 to 14.68, lat: 4.27 to 13.89)
+    final encodedQuery = Uri.encodeComponent(cleanQuery);
+    final token = AppConstants.mapboxPublicToken;
+
     final url = Uri.parse(
-      'https://photon.komoot.io/api/?q=$encodedQuery&limit=15&lat=${center.latitude}&lon=${center.longitude}&bbox=2.67,4.27,14.68,13.89',
+      'https://api.mapbox.com/geocoding/v5/mapbox.places/$encodedQuery.json'
+      '?country=ng'
+      '&proximity=${center.longitude},${center.latitude}'
+      '&types=poi,address,neighborhood,locality,place'
+      '&limit=10'
+      '&access_token=$token',
     );
 
     try {
       final response = await http.get(
         url,
         headers: {'User-Agent': 'GigaRide/1.0 (info@gigaride.ng)'},
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final features = data['features'] as List<dynamic>? ?? [];
 
-        // Strictly filter to Nigerian locations only
-        final nigerianFeatures = features.where((feat) {
-          final props = feat['properties'] as Map<String, dynamic>? ?? {};
-          final countryCode = (props['countrycode'] ?? '').toString().toUpperCase();
-          final country = (props['country'] ?? '').toString().toLowerCase();
-          final geom = feat['geometry'] as Map<String, dynamic>? ?? {};
-          final coords = geom['coordinates'] as List<dynamic>? ?? [0.0, 0.0];
-          final lng = (coords[0] as num).toDouble();
-          final lat = (coords[1] as num).toDouble();
+        return features.map((feat) {
+          final title = (feat['text'] ?? feat['place_name'] ?? 'Unknown Location').toString();
+          final fullName = (feat['place_name'] ?? '').toString();
 
-          final isInsideNigeria = lat >= 4.2 && lat <= 13.9 && lng >= 2.6 && lng <= 14.7;
-          final isExplicitNonNg = ['BJ', 'CM', 'NE', 'TD', 'GH', 'US', 'GB', 'FR', 'DE'].contains(countryCode);
+          // Generate a clean subtitle by stripping the title prefix if present
+          String subtitle = fullName;
+          if (fullName.startsWith(title) && fullName.length > title.length) {
+            subtitle = fullName.substring(title.length).replaceFirst(RegExp(r'^,\s*'), '');
+          }
+          if (subtitle.isEmpty) subtitle = 'Nigeria';
 
-          return !isExplicitNonNg && (countryCode == 'NG' || country.contains('nigeria') || isInsideNigeria);
-        }).toList();
-
-        return nigerianFeatures.map((feat) {
-          final props = feat['properties'] as Map<String, dynamic>? ?? {};
-          final geom = feat['geometry'] as Map<String, dynamic>? ?? {};
-          final coords = geom['coordinates'] as List<dynamic>? ?? [0.0, 0.0];
-
-          final name = props['name'] ?? props['street'] ?? 'Unknown Location';
-          final city = props['city'] ?? props['state'] ?? props['country'] ?? 'Nigeria';
-          final district = props['district'] ?? props['locality'] ?? '';
-
-          final subtitle = [district, city].where((s) => s.isNotEmpty).join(', ');
+          final centerCoords = feat['center'] as List<dynamic>? ?? [center.longitude, center.latitude];
+          final lng = (centerCoords[0] as num).toDouble();
+          final lat = (centerCoords[1] as num).toDouble();
 
           return PlaceSuggestion(
-            title: name.toString(),
-            subtitle: subtitle.isNotEmpty ? subtitle : 'Nigeria',
-            location: LatLng(
-              (coords[1] as num).toDouble(),
-              (coords[0] as num).toDouble(),
-            ),
+            title: title,
+            subtitle: subtitle,
+            location: LatLng(lat, lng),
           );
         }).toList();
       }
@@ -84,10 +77,15 @@ class PlacesService {
     return [];
   }
 
-  /// Reverse geocode LatLng to readable address name
+  /// Reverse geocode LatLng to readable Nigerian street/estate name via Mapbox
   static Future<String> reverseGeocode(LatLng location) async {
+    final token = AppConstants.mapboxPublicToken;
     final url = Uri.parse(
-      'https://photon.komoot.io/reverse?lat=${location.latitude}&lon=${location.longitude}',
+      'https://api.mapbox.com/geocoding/v5/mapbox.places/${location.longitude},${location.latitude}.json'
+      '?country=ng'
+      '&types=address,poi,neighborhood,locality'
+      '&limit=1'
+      '&access_token=$token',
     );
 
     try {
@@ -100,11 +98,10 @@ class PlacesService {
         final data = jsonDecode(response.body);
         final features = data['features'] as List<dynamic>? ?? [];
         if (features.isNotEmpty) {
-          final props = features[0]['properties'] as Map<String, dynamic>? ?? {};
-          final name = props['name'] ?? props['street'] ?? '';
-          final city = props['city'] ?? props['state'] ?? '';
-          if (name.isNotEmpty) {
-            return city.isNotEmpty ? '$name, $city' : name;
+          final top = features[0];
+          final placeName = (top['place_name'] ?? top['text'] ?? '').toString();
+          if (placeName.isNotEmpty) {
+            return placeName;
           }
         }
       }

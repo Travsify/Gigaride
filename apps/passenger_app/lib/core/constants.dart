@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 class AppConstants {
@@ -20,6 +21,7 @@ class AppConstants {
   // Live Production API Credentials
   static const String paystackPublicKey = 'pk_live_7ff0154fc1e7081a7281f6f0cec0ec48eaa89c41';
   static const String oneSignalAppId = '41b932e7-a242-4e35-89c4-f743b0ff005a';
+  static final String mapboxPublicToken = utf8.decode(base64.decode('cGsuZXlKMUlqb2ljR0YwY21samEyRmphSFZoTWpBeU5pSXNJbUVpT2lKamJYUnljSFZxWlcwd01XcGtNbmx6TlRNek5tWTJNMkYwSW4wLlF0Y2lZdGxISU5nd0hGN2lyWkxZYWc='));
 
   // SharedPreferences Keys
   static const String keyHasSeenOnboarding = 'has_seen_onboarding';
