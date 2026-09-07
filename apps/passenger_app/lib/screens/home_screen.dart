@@ -161,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       userLocation: _currentLocation,
       initialQuery: _dropoffCtrl.text,
       title: 'Where to?',
+      isInterstate: _selectedCategory == 'INTERSTATE',
     );
 
     if (place != null && mounted) {
@@ -178,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       userLocation: _currentLocation,
       initialQuery: _pickupCtrl.text == 'Current Location' ? '' : _pickupCtrl.text,
       title: 'Set Pickup Location',
+      isInterstate: _selectedCategory == 'INTERSTATE',
     );
 
     if (place != null && mounted) {

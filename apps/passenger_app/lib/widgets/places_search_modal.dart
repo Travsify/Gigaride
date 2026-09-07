@@ -10,12 +10,14 @@ class PlacesSearchModal extends StatefulWidget {
   final String initialQuery;
   final LatLng userLocation;
   final String title;
+  final bool isInterstate;
 
   const PlacesSearchModal({
     super.key,
     this.initialQuery = '',
     required this.userLocation,
     this.title = 'Search Destination',
+    this.isInterstate = false,
   });
 
   static Future<PlaceSuggestion?> show(
@@ -23,6 +25,7 @@ class PlacesSearchModal extends StatefulWidget {
     String initialQuery = '',
     required LatLng userLocation,
     String title = 'Search Destination',
+    bool isInterstate = false,
   }) {
     return showModalBottomSheet<PlaceSuggestion>(
       context: context,
@@ -32,6 +35,7 @@ class PlacesSearchModal extends StatefulWidget {
         initialQuery: initialQuery,
         userLocation: userLocation,
         title: title,
+        isInterstate: isInterstate,
       ),
     );
   }
@@ -82,6 +86,7 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
     final results = await PlacesService.searchPlaces(
       query,
       proximity: widget.userLocation,
+      isInterstate: widget.isInterstate,
     );
 
     if (mounted) {
