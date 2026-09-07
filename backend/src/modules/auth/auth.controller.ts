@@ -114,13 +114,47 @@ authRouter.post('/reset-password', async (req, res: Response): Promise<void> => 
   }
 });
 
+// Pre-check phone or email availability to prevent duplicates early
+authRouter.post('/check-availability', async (req, res: Response): Promise<void> => {
+  try {
+    const { phoneNumber, email } = req.body;
+    const result = await authService.checkAvailability(phoneNumber, email);
+    res.status(result.available ? 200 : 409).json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, isSignUp, isLogin } = req.body;
     if (!phoneNumber) {
       res.status(400).json({ success: false, message: 'phoneNumber is required.' });
       return;
     }
+
+    if (isSignUp) {
+      const existing = await db.findUserByPhone(phoneNumber);
+      if (existing) {
+        res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_EXISTS',
+          message: 'This phone number is already registered with an active Giga Ride account. Please sign in instead.',
+        });
+        return;
+      }
+    } else if (isLogin) {
+      const existing = await db.findUserByPhone(phoneNumber);
+      if (!existing) {
+        res.status(404).json({
+          success: false,
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'No account found with this phone number. Please create an account.',
+        });
+        return;
+      }
+    }
+
     const result = await twilioService.sendOtp(phoneNumber);
     res.json(result);
   } catch (err: any) {
@@ -147,11 +181,34 @@ authRouter.post('/verify-otp', async (req, res: Response): Promise<void> => {
 // Dispatches 6-digit Email Verification OTP via Resend
 authRouter.post('/send-email-otp', async (req, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
+    const { email, isSignUp, isLogin } = req.body;
     if (!email || !email.includes('@')) {
       res.status(400).json({ success: false, message: 'A valid email address is required.' });
       return;
     }
+
+    if (isSignUp) {
+      const existing = await db.findUserByEmail(email);
+      if (existing) {
+        res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_EXISTS',
+          message: 'This email address is already registered with an active Giga Ride account. Please sign in instead.',
+        });
+        return;
+      }
+    } else if (isLogin) {
+      const existing = await db.findUserByEmail(email);
+      if (!existing) {
+        res.status(404).json({
+          success: false,
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'No account found with this email address. Please create an account.',
+        });
+        return;
+      }
+    }
+
     const result = await authService.sendEmailVerificationOtp(email);
     res.json(result);
   } catch (err: any) {
@@ -183,6 +240,42 @@ authRouter.post('/login-otp', async (req, res: Response): Promise<void> => {
       return;
     }
     const result = await authService.loginWithPhoneOtp(phoneNumber, otpCode);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// 1-Tap Passwordless Login via Email OTP
+authRouter.post('/login-email-otp', async (req, res: Response): Promise<void> => {
+  try {
+    const { email, otpCode } = req.body;
+    if (!email || !otpCode) {
+      res.status(400).json({ success: false, message: 'email and otpCode are required.' });
+      return;
+    }
+    const result = await authService.loginWithEmailOtp(email, otpCode);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// 1-Tap Google Sign-In (Creates or logs into account seamlessly)
+authRouter.post('/google-login', async (req, res: Response): Promise<void> => {
+  try {
+    const { email, fullName, googleId, photoUrl, role } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, message: 'Google account email is required.' });
+      return;
+    }
+    const result = await authService.loginWithGoogle({
+      email,
+      fullName,
+      googleId,
+      photoUrl,
+      role: role || 'PASSENGER',
+    });
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });

@@ -23,11 +23,11 @@ class ApiService {
   }
 
   // --- Authentication Suite ---
-  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber) async {
+  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber, {bool isSignUp = false, bool isLogin = false}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/send-otp'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phoneNumber': phoneNumber}),
+      body: jsonEncode({'phoneNumber': phoneNumber, if (isSignUp) 'isSignUp': true, if (isLogin) 'isLogin': true}),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
@@ -35,6 +35,47 @@ class ApiService {
     }
     throw Exception(data['message'] ?? 'Failed to dispatch verification SMS');
   }
+
+  Future<Map<String, dynamic>> checkAvailability({String? phoneNumber, String? email}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/check-availability'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({if (phoneNumber != null) 'phoneNumber': phoneNumber, if (email != null) 'email': email}),
+    );
+    final data = jsonDecode(response.body);
+    // 200 = available, 409 = taken
+    return data;
+  }
+
+  Future<Map<String, dynamic>> sendEmailLoginOtp(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/send-email-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'isLogin': true}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data;
+    }
+    throw Exception(data['message'] ?? 'Failed to dispatch email verification code');
+  }
+
+  Future<Map<String, dynamic>> loginWithEmailOtp(String email, String otpCode) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/login-email-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'otpCode': otpCode}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      if (data['data']?['token'] != null) {
+        await saveToken(data['data']['token']);
+      }
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Invalid or expired email verification code');
+  }
+
 
   Future<Map<String, dynamic>> forgotPassword(String identifier) async {
     final response = await http.post(

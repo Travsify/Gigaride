@@ -118,6 +118,43 @@ class DriverProvider with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> checkAvailability({String? phoneNumber, String? email}) async {
+    return await api.checkAvailability(phoneNumber: phoneNumber, email: email);
+  }
+
+  Future<Map<String, dynamic>> sendEmailLoginOtp(String email) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendEmailLoginOtp(email);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loginWithEmailOtp(String email, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.loginWithEmailOtp(email, otpCode);
+      token = res['token'];
+      user = res['user'];
+      driverProfile = res['driverProfile'];
+      if (user != null && user!['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
+      await refreshSubscription();
+      await loadVirtualAccount();
+      await loadNotifications();
+      connectSocket(res['token']);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+
   Future<void> register(Map<String, dynamic> data) async {
     isLoading = true;
     notifyListeners();

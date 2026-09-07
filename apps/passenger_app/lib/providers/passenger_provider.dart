@@ -51,11 +51,11 @@ class PassengerProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber) async {
+  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber, {bool isSignUp = false, bool isLogin = false}) async {
     isLoading = true;
     notifyListeners();
     try {
-      return await api.sendPhoneOtp(phoneNumber);
+      return await api.sendPhoneOtp(phoneNumber, isSignUp: isSignUp, isLogin: isLogin);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -103,6 +103,67 @@ class PassengerProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<Map<String, dynamic>> checkAvailability({String? phoneNumber, String? email}) async {
+    return await api.checkAvailability(phoneNumber: phoneNumber, email: email);
+  }
+
+  Future<Map<String, dynamic>> sendEmailLoginOtp(String email) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendEmailLoginOtp(email);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loginWithEmailOtp(String email, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.loginWithEmailOtp(email, otpCode);
+      token = res['token'];
+      user = res['user'];
+      if (user?['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
+      connectSocket(res['token']);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loginWithGoogle({
+    required String email,
+    String? fullName,
+    String? googleId,
+    String? photoUrl,
+  }) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      final res = await api.loginWithGoogle(
+        email: email,
+        fullName: fullName,
+        googleId: googleId,
+        photoUrl: photoUrl,
+      );
+      token = res['token'];
+      user = res['user'];
+      if (user?['id'] != null) {
+        OneSignal.login(user!['id']);
+      }
+      connectSocket(res['token']);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+
 
   Future<void> login(String identifier, String password) async {
     isLoading = true;

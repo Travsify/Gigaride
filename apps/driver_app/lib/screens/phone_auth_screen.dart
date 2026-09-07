@@ -18,7 +18,7 @@ class PhoneAuthScreen extends StatefulWidget {
 
 class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   late bool _isSignUp;
-  // Sign In Modes: 'PHONE', 'EMAIL', 'PHONE_OTP'
+  // Sign In Modes: 'PHONE', 'EMAIL', 'PHONE_OTP', 'EMAIL_OTP'
   String _signInMode = 'PHONE';
   bool _obscurePassword = true;
 
@@ -34,6 +34,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
 
   // Sign In OTP state
   bool _loginOtpSent = false;
+  bool _loginEmailOtpSent = false;
+
 
   // Sign Up Controllers
   final _phoneCtrl = TextEditingController();
@@ -113,13 +115,25 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     final provider = context.read<DriverProvider>();
 
     try {
-      await provider.api.sendPhoneOtp(formatted);
+      // Check if phone is already registered before sending OTP
+      final avail = await provider.checkAvailability(phoneNumber: formatted);
+      if (avail['available'] == false) {
+        if (!mounted) return;
+        _showDuplicateDialog(
+          message: avail['message'] ?? 'This phone number is already registered.',
+          prefillPhone: _phoneCtrl.text.trim(),
+        );
+        return;
+      }
+
+      await provider.api.sendPhoneOtp(formatted, isSignUp: true);
       setState(() => _phoneOtpSent = true);
       _showSuccess('Verification code sent to your phone via SMS.');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
   }
+
 
   void _verifyPhoneOtp() async {
     final phone = _formatPhone(_phoneCtrl.text.trim());
@@ -171,6 +185,17 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
 
     final provider = context.read<DriverProvider>();
     try {
+      // Check if email is already registered
+      final avail = await provider.checkAvailability(email: email);
+      if (avail['available'] == false) {
+        if (!mounted) return;
+        _showDuplicateDialog(
+          message: avail['message'] ?? 'This email address is already registered.',
+          prefillEmail: email,
+        );
+        return;
+      }
+
       await provider.sendEmailOtp(email);
       setState(() => _emailOtpSent = true);
       _showSuccess('Verification code sent to your email address.');
@@ -178,6 +203,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
   }
+
 
   void _completeRegistration() async {
     final email = _emailCtrl.text.trim();
@@ -417,7 +443,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     final provider = context.read<DriverProvider>();
 
     try {
-      await provider.api.sendPhoneOtp(formatted);
+      await provider.api.sendPhoneOtp(formatted, isLogin: true);
       setState(() => _loginOtpSent = true);
       _showSuccess('Verification code sent to your phone via SMS.');
     } catch (e) {
@@ -441,6 +467,82 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
+  }
+
+  void _sendLoginEmailOtp() async {
+    final email = _loginEmailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Please enter a valid email address');
+      return;
+    }
+    final provider = context.read<DriverProvider>();
+    try {
+      await provider.sendEmailLoginOtp(email);
+      setState(() => _loginEmailOtpSent = true);
+      _showSuccess('Verification code sent to your email address.');
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  void _verifyLoginEmailOtp() async {
+    final email = _loginEmailCtrl.text.trim();
+    final otp = _loginOtpCtrl.text.trim();
+    if (otp.length < 6) {
+      _showError('Please enter the 6-digit email code');
+      return;
+    }
+    final provider = context.read<DriverProvider>();
+    try {
+      await provider.loginWithEmailOtp(email, otp);
+      if (!mounted) return;
+      _navigateAfterAuth(provider);
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  void _showDuplicateDialog({required String message, String? prefillPhone, String? prefillEmail}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppConstants.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_rounded, color: AppConstants.accentColor, size: 22),
+            SizedBox(width: 10),
+            Expanded(child: Text('Account Already Exists', style: TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: Text(
+          '$message\n\nWould you like to sign in instead?',
+          style: const TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Stay Here', style: TextStyle(color: AppConstants.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _isSignUp = false;
+                _signInMode = 'PHONE';
+                if (prefillPhone != null) _loginPhoneCtrl.text = prefillPhone;
+                if (prefillEmail != null) {
+                  _signInMode = 'EMAIL';
+                  _loginEmailCtrl.text = prefillEmail;
+                }
+              });
+            },
+            child: const Text('Sign In', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showForgotPasswordSheet() {
@@ -724,7 +826,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   ),
                 ],
 
-                // Selector: Phone Number vs Email Address
+                // Selector: Sign-in method tabs
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -736,22 +838,22 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () => setState(() {
-                            _signInMode = 'PHONE';
+                            _signInMode = 'PHONE_OTP';
                             _loginOtpSent = false;
                           }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: (_signInMode == 'PHONE' || _signInMode == 'PHONE_OTP') ? AppConstants.cardBg : Colors.transparent,
+                              color: (_signInMode == 'PHONE_OTP') ? AppConstants.cardBg : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.phone_iphone_rounded, size: 16, color: (_signInMode == 'PHONE' || _signInMode == 'PHONE_OTP') ? AppConstants.primaryLight : AppConstants.textMuted),
-                                const SizedBox(width: 6),
-                                Text('Phone Number', style: TextStyle(color: (_signInMode == 'PHONE' || _signInMode == 'PHONE_OTP') ? AppConstants.textLight : AppConstants.textMuted, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Icon(Icons.sms_rounded, size: 18, color: (_signInMode == 'PHONE_OTP') ? AppConstants.primaryLight : AppConstants.textMuted),
+                                const SizedBox(height: 3),
+                                Text('SMS Code', style: TextStyle(color: (_signInMode == 'PHONE_OTP') ? AppConstants.textLight : AppConstants.textMuted, fontWeight: FontWeight.bold, fontSize: 11)),
                               ],
                             ),
                           ),
@@ -760,22 +862,46 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () => setState(() {
-                            _signInMode = 'EMAIL';
+                            _signInMode = 'EMAIL_OTP';
+                            _loginEmailOtpSent = false;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _signInMode == 'EMAIL_OTP' ? AppConstants.cardBg : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.mark_email_unread_rounded, size: 18, color: _signInMode == 'EMAIL_OTP' ? AppConstants.primaryLight : AppConstants.textMuted),
+                                const SizedBox(height: 3),
+                                Text('Email Code', style: TextStyle(color: _signInMode == 'EMAIL_OTP' ? AppConstants.textLight : AppConstants.textMuted, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() {
+                            _signInMode = 'PHONE';
                             _loginOtpSent = false;
                           }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: _signInMode == 'EMAIL' ? AppConstants.cardBg : Colors.transparent,
+                              color: (_signInMode == 'PHONE' || _signInMode == 'EMAIL') ? AppConstants.cardBg : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.alternate_email_rounded, size: 16, color: _signInMode == 'EMAIL' ? AppConstants.primaryLight : AppConstants.textMuted),
-                                const SizedBox(width: 6),
-                                Text('Email Address', style: TextStyle(color: _signInMode == 'EMAIL' ? AppConstants.textLight : AppConstants.textMuted, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Icon(Icons.lock_rounded, size: 18, color: (_signInMode == 'PHONE' || _signInMode == 'EMAIL') ? AppConstants.primaryLight : AppConstants.textMuted),
+                                const SizedBox(height: 3),
+                                Text('Password', style: TextStyle(color: (_signInMode == 'PHONE' || _signInMode == 'EMAIL') ? AppConstants.textLight : AppConstants.textMuted, fontWeight: FontWeight.bold, fontSize: 11)),
                               ],
                             ),
                           ),
@@ -786,63 +912,6 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 ),
 
                 const SizedBox(height: 18),
-
-                // Phone Login View
-                if (_signInMode == 'PHONE') ...[
-                  _buildFieldLabel('Phone Number'),
-                  TextField(
-                    controller: _loginPhoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold),
-                    decoration: _buildInputDecoration(
-                      hint: '0801 234 5678',
-                      icon: Icons.phone_iphone_rounded,
-                      prefixWidget: Container(
-                        padding: const EdgeInsets.only(left: 12, right: 8),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('🇳🇬', style: TextStyle(fontSize: 16)), SizedBox(width: 4), Text('+234', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 13))]),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildFieldLabel('Password'),
-                  TextField(
-                    controller: _loginPasswordCtrl,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
-                    decoration: _buildInputDecoration(
-                      hint: '••••••••••••',
-                      icon: Icons.lock_outline_rounded,
-                      suffixWidget: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppConstants.textMuted, size: 20),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton(
-                        onPressed: () => setState(() => _signInMode = 'PHONE_OTP'),
-                        child: const Text('Sign in with SMS Code instead', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)),
-                      ),
-                      TextButton(
-                        onPressed: _showForgotPasswordSheet,
-                        child: const Text('Forgot Password?', style: TextStyle(color: AppConstants.primaryLight, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      onPressed: isLoading ? null : _submitLogin,
-                      child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Sign In to Driver Cockpit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                    ),
-                  ),
-                ],
 
                 // Phone OTP Login View
                 if (_signInMode == 'PHONE_OTP') ...[
@@ -895,17 +964,10 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                     const SizedBox(height: 10),
                     Center(child: TextButton(onPressed: _sendLoginPhoneOtp, child: const Text('Resend SMS Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)))),
                   ],
-                  const SizedBox(height: 8),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => setState(() => _signInMode = 'PHONE'),
-                      child: const Text('← Back to Password Login', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                    ),
-                  ),
                 ],
 
-                // Email Login View
-                if (_signInMode == 'EMAIL') ...[
+                // Email OTP Login View
+                if (_signInMode == 'EMAIL_OTP') ...[
                   _buildFieldLabel('Email Address'),
                   TextField(
                     controller: _loginEmailCtrl,
@@ -913,8 +975,83 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                     style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
                     decoration: _buildInputDecoration(hint: 'name@example.ng', icon: Icons.alternate_email_rounded),
                   ),
+                  const SizedBox(height: 16),
+                  if (!_loginEmailOtpSent) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        onPressed: isLoading ? null : _sendLoginEmailOtp,
+                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Send Email Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                  ] else ...[
+                    _buildFieldLabel('Enter 6-Digit Email Code'),
+                    TextField(
+                      controller: _loginOtpCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppConstants.successColor, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 8),
+                      decoration: _buildInputDecoration(hint: '••••••', icon: Icons.mark_email_read_rounded),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.successColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        onPressed: isLoading ? null : _verifyLoginEmailOtp,
+                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Verify & Enter Cockpit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Center(child: TextButton(onPressed: _sendLoginEmailOtp, child: const Text('Resend Email Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)))),
+                  ],
+                ],
+
+                // Password Login View (Phone or Email + Password)
+                if (_signInMode == 'PHONE' || _signInMode == 'EMAIL') ...[
+                  if (_signInMode == 'PHONE') ...[
+                    _buildFieldLabel('Phone Number'),
+                    TextField(
+                      controller: _loginPhoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      style: const TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                      decoration: _buildInputDecoration(
+                        hint: '0801 234 5678',
+                        icon: Icons.phone_iphone_rounded,
+                        prefixWidget: Container(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('🇳🇬', style: TextStyle(fontSize: 16)), SizedBox(width: 4), Text('+234', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 13))]),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    _buildFieldLabel('Email Address'),
+                    TextField(
+                      controller: _loginEmailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                      decoration: _buildInputDecoration(hint: 'name@example.ng', icon: Icons.alternate_email_rounded),
+                    ),
+                  ],
                   const SizedBox(height: 14),
-                  _buildFieldLabel('Password'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildFieldLabel('Password'),
+                      GestureDetector(
+                        onTap: () => setState(() => _signInMode = _signInMode == 'PHONE' ? 'EMAIL' : 'PHONE'),
+                        child: Text(
+                          _signInMode == 'PHONE' ? 'Switch to Email' : 'Switch to Phone',
+                          style: const TextStyle(color: AppConstants.accentColor, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: _loginPasswordCtrl,
                     obscureText: _obscurePassword,
@@ -940,11 +1077,12 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       onPressed: isLoading ? null : _submitLogin,
-                      child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Sign In with Email', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Sign In with Password', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ),
                 ],
               ],
+
 
               // ==========================================
               // SIGN UP TAB (DUAL PHONE & EMAIL VERIFICATION)

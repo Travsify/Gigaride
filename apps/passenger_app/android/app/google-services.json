@@ -1,0 +1,47 @@
+﻿{
+  "project_info": {
+    "project_number": "179714173901",
+    "project_id": "giga-7324f",
+    "storage_bucket": "giga-7324f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179714173901:android:0c71b1ebec194657783284",
+        "android_client_info": {
+          "package_name": "com.gigaride.passenger"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "179714173901-v7mekhsosihjo7d9lqd0ssqrsil7n7so.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gigaride.passenger",
+            "certificate_hash": "90069dee4e4fa7cb65c3927f84ec6118d4c9ef5a"
+          }
+        },
+        {
+          "client_id": "179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxAGSMn1M9bWDSKEgAyDviQueqLlk-QUY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
