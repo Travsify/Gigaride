@@ -10,16 +10,16 @@ export const authRouter = Router();
 const registerSchema = z.object({
   role: z.enum(['PASSENGER', 'DRIVER', 'ADMIN']),
   fullName: z.string().min(2),
-  phoneNumber: z.string().min(10),
+  phoneNumber: z.string().min(8),
   email: z.string().email(),
   password: z.string().min(6),
-  vehicleMake: z.string().optional(),
-  vehicleModel: z.string().optional(),
-  vehicleYear: z.number().optional(),
-  licensePlate: z.string().optional(),
-  vehicleColor: z.string().optional(),
-  nin: z.string().optional(),
-  bvn: z.string().optional(),
+  vehicleMake: z.string().nullable().optional(),
+  vehicleModel: z.string().nullable().optional(),
+  vehicleYear: z.union([z.number(), z.string()]).transform(v => typeof v === 'string' ? (parseInt(v, 10) || 2018) : (v || 2018)).nullable().optional(),
+  licensePlate: z.string().nullable().optional(),
+  vehicleColor: z.string().nullable().optional(),
+  nin: z.string().nullable().optional(),
+  bvn: z.string().nullable().optional(),
 });
 
 const loginSchema = z.object({
@@ -30,10 +30,15 @@ const loginSchema = z.object({
 authRouter.post('/register', async (req, res: Response): Promise<void> => {
   try {
     const validated = registerSchema.parse(req.body);
-    const result = await authService.register(validated);
+    const result = await authService.register(validated as any);
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message || 'Registration failed' });
+    let errMsg = error.message || 'Registration failed';
+    if (error.errors && Array.isArray(error.errors)) {
+      errMsg = error.errors.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(', ');
+    }
+    console.error('[Registration Failed]', errMsg);
+    res.status(400).json({ success: false, message: errMsg });
   }
 });
 
@@ -255,7 +260,7 @@ authRouter.post('/login-email-otp', async (req, res: Response): Promise<void> =>
       return;
     }
     const result = await authService.loginWithEmailOtp(email, otpCode);
-    res.json(result);
+    res.json({ success: true, data: result, ...result });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -276,7 +281,7 @@ authRouter.post('/google-login', async (req, res: Response): Promise<void> => {
       photoUrl,
       role: role || 'PASSENGER',
     });
-    res.json(result);
+    res.json({ success: true, data: result, ...result });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }

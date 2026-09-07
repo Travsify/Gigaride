@@ -2126,9 +2126,12 @@ export class DatabaseService {
   }
 
   public async isPhoneVerified(phoneNumber: string): Promise<boolean> {
-    const user = this.store.users.find((u) => u.phone_number === phoneNumber);
+    if (!phoneNumber) return false;
+    const clean = phoneNumber.replace(/[\s\-\(\)\+]/g, '');
+    const last10 = clean.slice(-10);
+    const user = this.store.users.find((u) => (u.phone_number || '').replace(/[\s\-\(\)\+]/g, '').endsWith(last10));
     if (user && user.is_phone_verified) return true;
-    const record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber && p.is_verified);
+    const record = this.store.phone_verifications.find((p) => (p.phone_number || '').replace(/[\s\-\(\)\+]/g, '').endsWith(last10) && p.is_verified);
     return !!record;
   }
 

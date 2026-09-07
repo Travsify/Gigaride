@@ -341,6 +341,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   Future<void> _signInWithGoogle() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: '179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
       final GoogleSignInAccount? account = await googleSignIn.signIn();
@@ -361,7 +362,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       if (!mounted) return;
       _navigateToHome();
     } catch (e) {
-      _showError('Google Sign-In failed: ${e.toString().replaceAll('Exception: ', '')}');
+      if (!mounted) return;
+      _showError('Google Sign-In: ${e.toString().replaceAll('Exception: ', '')}');
     }
   }
 

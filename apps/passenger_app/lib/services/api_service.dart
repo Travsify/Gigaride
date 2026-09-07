@@ -66,10 +66,13 @@ class ApiService {
     );
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
-      if (data['data']?['token'] != null) {
-        await saveToken(data['data']['token']);
+      final Map<String, dynamic> payload = (data['data'] is Map<String, dynamic>)
+          ? (data['data'] as Map<String, dynamic>)
+          : (data as Map<String, dynamic>);
+      if (payload['token'] != null) {
+        await saveToken(payload['token']);
       }
-      return data['data'];
+      return payload;
     }
     throw Exception(data['message'] ?? 'Invalid or expired email verification code');
   }
@@ -93,10 +96,13 @@ class ApiService {
     );
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
-      if (data['token'] != null) {
-        await saveToken(data['token']);
+      final Map<String, dynamic> payload = (data['data'] is Map<String, dynamic>)
+          ? (data['data'] as Map<String, dynamic>)
+          : (data as Map<String, dynamic>);
+      if (payload['token'] != null) {
+        await saveToken(payload['token']);
       }
-      return data;
+      return payload;
     }
     throw Exception(data['message'] ?? 'Google Sign-In failed');
   }
@@ -205,8 +211,13 @@ class ApiService {
 
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
-      await saveToken(data['data']['token']);
-      return data['data'];
+      final Map<String, dynamic> payload = (data['data'] is Map<String, dynamic>)
+          ? (data['data'] as Map<String, dynamic>)
+          : (data as Map<String, dynamic>);
+      if (payload['token'] != null) {
+        await saveToken(payload['token']);
+      }
+      return payload;
     }
     if (data['requiresPhoneVerification'] == true) {
       final p = data['phoneNumber'] ?? identifier;
