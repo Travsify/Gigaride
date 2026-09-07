@@ -175,6 +175,11 @@ export interface RideRow {
   is_airport?: boolean;
   is_interstate?: boolean;
   driver_pre_assigned?: boolean;
+  notes?: string | null;
+  rider_type?: 'SELF' | 'FRIEND' | null;
+  rider_name?: string | null;
+  rider_phone?: string | null;
+  is_business?: boolean | null;
   created_at: string;
   completed_at?: string | null;
 }

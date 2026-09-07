@@ -6,6 +6,11 @@ export interface CreateRideRequestDto {
   dropoffLng: number;
   dropoffAddress: string;
   riderOfferNgn: number;
+  riderName?: string | null;
+  riderPhone?: string | null;
+  riderType?: 'SELF' | 'FRIEND' | null;
+  notes?: string | null;
+  isBusiness?: boolean | null;
 }
 
 export interface FareEstimateDto {

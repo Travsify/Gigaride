@@ -256,6 +256,9 @@ class PassengerProvider with ChangeNotifier {
     required int riderOfferNgn,
     String? notes,
     bool isBusiness = false,
+    String? riderName,
+    String? riderPhone,
+    String? riderType,
   }) async {
     isLoading = true;
     incomingBids.clear();
@@ -273,6 +276,9 @@ class PassengerProvider with ChangeNotifier {
         riderOfferNgn: riderOfferNgn,
         notes: notes,
         isBusiness: isBusiness,
+        riderName: riderName,
+        riderPhone: riderPhone,
+        riderType: riderType,
       );
 
       // Broadcast ride request to nearby drivers via Socket.io

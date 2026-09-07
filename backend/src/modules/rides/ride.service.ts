@@ -45,6 +45,11 @@ export class RideService {
       agreed_fare_ngn: null,
       distance_km: estimate.distanceKm,
       status: 'NEGOTIATING',
+      notes: dto.notes || null,
+      rider_type: dto.riderType || 'SELF',
+      rider_name: dto.riderName || null,
+      rider_phone: dto.riderPhone || null,
+      is_business: dto.isBusiness || false,
       created_at: new Date().toISOString(),
     };
 

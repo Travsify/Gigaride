@@ -61,36 +61,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _showStopField = false;
   bool _showGatePassField = false;
 
-  final List<Map<String, dynamic>> _quickDestinations = [
-    {
-      'name': 'Victoria Island',
-      'address': 'Adetokunbo Ademola, VI',
-      'lat': 6.4281,
-      'lng': 3.4219,
-      'icon': Icons.business_rounded,
-    },
-    {
-      'name': 'MMA2 Airport',
-      'address': 'Murtala Muhammed Airport, Ikeja',
-      'lat': 6.5774,
-      'lng': 3.3214,
-      'icon': Icons.flight_takeoff_rounded,
-    },
-    {
-      'name': 'Lekki Phase 1',
-      'address': 'Admiralty Way, Lekki',
-      'lat': 6.4474,
-      'lng': 3.4723,
-      'icon': Icons.apartment_rounded,
-    },
-    {
-      'name': 'Ikeja City Mall',
-      'address': 'Alausa, Ikeja',
-      'lat': 6.6194,
-      'lng': 3.3581,
-      'icon': Icons.shopping_bag_rounded,
-    },
-  ];
+  // Rider Selection Mode ('SELF' or 'FRIEND')
+  String _riderType = 'SELF';
+  String? _friendName;
+  String? _friendPhone;
 
   @override
   void initState() {
@@ -118,7 +92,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) {
       setState(() {
         _currentLocation = pos;
-        _pickupLocation = pos;
+        if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
+          _pickupLocation = pos;
+        }
         _nearbyDrivers = [
           LatLng(pos.latitude + 0.0042, pos.longitude + 0.0035),
           LatLng(pos.latitude - 0.0031, pos.longitude + 0.0051),
@@ -329,12 +305,189 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _selectQuickDestination(Map<String, dynamic> dest) {
-    setState(() {
-      _dropoffCtrl.text = dest['address'] ?? dest['name'];
-      _dropoffLocation = LatLng((dest['lat'] as num).toDouble(), (dest['lng'] as num).toDouble());
-    });
-    _fetchRouteAndCalculateFare();
+  void _showRiderSelectorModal() {
+    final nameCtrl = TextEditingController(text: _friendName ?? '');
+    final phoneCtrl = TextEditingController(text: _friendPhone ?? '');
+    String tempRiderType = _riderType;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Who is taking this ride?',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Drivers will see the rider details and contact the passenger directly.',
+                  style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                // Option 1: For Me
+                Container(
+                  decoration: BoxDecoration(
+                    color: tempRiderType == 'SELF' ? AppConstants.primaryColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: tempRiderType == 'SELF' ? AppConstants.primaryLight : Colors.transparent,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryColor.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.person_rounded, color: AppConstants.primaryLight, size: 20),
+                    ),
+                    title: const Text('For Me', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('You are taking this ride yourself', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    trailing: tempRiderType == 'SELF' ? const Icon(Icons.check_circle_rounded, color: AppConstants.primaryLight) : null,
+                    onTap: () {
+                      setModalState(() => tempRiderType = 'SELF');
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Option 2: For a Friend
+                Container(
+                  decoration: BoxDecoration(
+                    color: tempRiderType == 'FRIEND' ? AppConstants.accentColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: tempRiderType == 'FRIEND' ? AppConstants.accentColor : Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppConstants.accentColor.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.group_rounded, color: AppConstants.accentColor, size: 20),
+                        ),
+                        title: const Text('For a Friend or Colleague', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: const Text('Book for someone at a different location', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                        trailing: tempRiderType == 'FRIEND' ? const Icon(Icons.check_circle_rounded, color: AppConstants.accentColor) : null,
+                        onTap: () {
+                          setModalState(() => tempRiderType = 'FRIEND');
+                        },
+                      ),
+                      if (tempRiderType == 'FRIEND') ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: nameCtrl,
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: "Friend's Full Name",
+                                  labelStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                  hintText: 'e.g. Adaeze Okafor',
+                                  hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                  filled: true,
+                                  fillColor: AppConstants.darkBg,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: phoneCtrl,
+                                keyboardType: TextInputType.phone,
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: "Friend's Phone Number",
+                                  labelStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                  hintText: 'e.g. 08012345678',
+                                  hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                  filled: true,
+                                  fillColor: AppConstants.darkBg,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      if (tempRiderType == 'FRIEND') {
+                        final name = nameCtrl.text.trim();
+                        final phone = phoneCtrl.text.trim();
+                        if (name.isEmpty || phone.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Please enter your friend's name and phone number")),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          _riderType = 'FRIEND';
+                          _friendName = name;
+                          _friendPhone = phone;
+                        });
+                      } else {
+                        setState(() {
+                          _riderType = 'SELF';
+                          _friendName = null;
+                          _friendPhone = null;
+                        });
+                      }
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Confirm Rider Selection', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _handleSavedPlaceTap(String label) {
@@ -508,6 +661,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Assemble comprehensive driver notes
     final List<String> notesList = [];
+    if (_riderType == 'FRIEND' && _friendName != null && _friendPhone != null) {
+      notesList.add('[Rider: $_friendName • Phone: $_friendPhone]');
+    }
     if (_stopCtrl.text.trim().isNotEmpty) {
       notesList.add('[Intermediate Stop: ${_stopCtrl.text.trim()}]');
     }
@@ -623,6 +779,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         riderOfferNgn: offer > 0 ? offer : 2500,
         notes: combinedNotes,
         isBusiness: _isCorporateMode,
+        riderName: _friendName,
+        riderPhone: _friendPhone,
+        riderType: _riderType,
       );
 
       if (mounted) {
@@ -857,32 +1016,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                   const SizedBox(height: 12),
 
-                  // 3. Decacorn Fuel Index & Savings Moat Ticker
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C2422),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.local_gas_station_rounded, color: AppConstants.accentColor, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'PMS Fuel Moat: ₦1,050/L • You save ~₦750/trip vs 25% commission apps (100% to driver)',
-                              style: TextStyle(color: AppConstants.textLight.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // 4. Address Input Card (Pickup, Multi-Stop & Where to)
                   Padding(
@@ -903,6 +1037,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       child: Column(
                         children: [
+                          // Rider Selector ("Who is riding?")
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: _showRiderSelectorModal,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _riderType == 'FRIEND' ? AppConstants.accentColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: _riderType == 'FRIEND' ? AppConstants.accentColor : Colors.white12,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _riderType == 'FRIEND' ? Icons.group_rounded : Icons.person_rounded,
+                                        size: 14,
+                                        color: _riderType == 'FRIEND' ? AppConstants.accentColor : AppConstants.primaryLight,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _riderType == 'FRIEND' ? 'Rider: $_friendName' : 'For Me',
+                                        style: TextStyle(
+                                          color: _riderType == 'FRIEND' ? AppConstants.accentColor : AppConstants.textLight,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.arrow_drop_down_rounded, size: 16, color: AppConstants.textMuted),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (_riderType == 'FRIEND')
+                                Text(
+                                  _friendPhone ?? '',
+                                  style: const TextStyle(color: AppConstants.textMuted, fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
                           // Pickup
                           Row(
                             children: [
@@ -1301,56 +1482,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                   const SizedBox(height: 16),
 
-                  // 6. Popular Lagos Destinations Chips
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Popular Lagos Destinations',
-                          style: TextStyle(
-                            color: AppConstants.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _quickDestinations.map((d) {
-                            return GestureDetector(
-                              onTap: () => _selectQuickDestination(d),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: AppConstants.cardBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppConstants.surfaceBg),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(d['icon'] as IconData, size: 14, color: AppConstants.primaryLight),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      d['name'] as String,
-                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
                   // =========================================================================
                   // 7. PROPOSED FARE TAB (ONLY VISIBLE WHEN PICKUP & DESTINATION ARE ENTERED)
                   // =========================================================================
@@ -1386,7 +1517,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    'Enter where you are going above to unlock fuel-indexed fare estimates and live driver bidding.',
+                                    'Enter your destination above to unlock instant fare estimates and live driver bidding.',
                                     style: TextStyle(color: AppConstants.textMuted, fontSize: 12, height: 1.3),
                                   ),
                                 ],
@@ -1593,7 +1724,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               if (mounted) {
                 setState(() {
                   _currentLocation = pos;
-                  _pickupLocation = pos;
+                  if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
+                    _pickupLocation = pos;
+                  }
                 });
               }
             },

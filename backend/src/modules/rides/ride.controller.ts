@@ -21,6 +21,11 @@ const createRideSchema = z.object({
   dropoffLng: z.number(),
   dropoffAddress: z.string(),
   riderOfferNgn: z.number().positive(),
+  riderName: z.string().optional().nullable(),
+  riderPhone: z.string().optional().nullable(),
+  riderType: z.enum(['SELF', 'FRIEND']).optional().nullable(),
+  notes: z.string().optional().nullable(),
+  isBusiness: z.boolean().optional().nullable(),
 });
 
 // Calculate fair suggested fare and minimum floor

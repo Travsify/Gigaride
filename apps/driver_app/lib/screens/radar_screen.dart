@@ -424,6 +424,9 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                     final pickup = req['pickupAddress'] ?? 'Pickup Address';
                     final dropoff = req['dropoffAddress'] ?? 'Destination Address';
                     final distance = req['driverPickupDistanceKm'] ?? 1.8;
+                    final isFriend = req['riderType'] == 'FRIEND' || req['rider_type'] == 'FRIEND';
+                    final riderName = req['riderName'] ?? req['rider_name'];
+                    final notes = req['notes'] ?? req['tripInstructions'];
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -431,7 +434,10 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                       decoration: BoxDecoration(
                         color: AppConstants.cardBg,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3), width: 1.5),
+                        border: Border.all(
+                          color: isFriend ? Colors.amber.withOpacity(0.5) : AppConstants.primaryLight.withOpacity(0.3),
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
                         ],
@@ -443,13 +449,39 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppConstants.primaryColor.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text('${distance.toStringAsFixed(1)} km to pickup', style: const TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppConstants.primaryColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text('${distance.toStringAsFixed(1)} km to pickup', style: const TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                  if (isFriend && riderName != null) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.18),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.people_alt_rounded, color: Colors.amberAccent, size: 12),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'For: $riderName',
+                                            style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -482,6 +514,31 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                               Expanded(child: Text(dropoff, style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
                             ],
                           ),
+                          if (notes != null && notes.toString().trim().isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.speaker_notes_outlined, color: AppConstants.accentColor, size: 14),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      notes.toString(),
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
 
                           const SizedBox(height: 16),
 

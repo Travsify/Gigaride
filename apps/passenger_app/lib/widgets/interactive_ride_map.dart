@@ -96,8 +96,9 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.gigaride.passenger',
+                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+                userAgentPackageName: 'ng.giga.passengerApp',
+                maxZoom: 19,
               ),
               // Route Polyline Layer
               if (widget.routePoints.isNotEmpty)

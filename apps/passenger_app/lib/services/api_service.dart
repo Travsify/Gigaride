@@ -274,6 +274,9 @@ class ApiService {
     required int riderOfferNgn,
     String? notes,
     bool isBusiness = false,
+    String? riderName,
+    String? riderPhone,
+    String? riderType,
   }) async {
     final token = await getToken();
     final response = await http.post(
@@ -292,6 +295,9 @@ class ApiService {
         'riderOfferNgn': riderOfferNgn,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         if (isBusiness) 'isBusiness': true,
+        if (riderName != null) 'riderName': riderName,
+        if (riderPhone != null) 'riderPhone': riderPhone,
+        if (riderType != null) 'riderType': riderType,
       }),
     );
 

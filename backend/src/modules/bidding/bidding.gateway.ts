@@ -139,6 +139,10 @@ export function setupBiddingGateway(io: SocketIOServer) {
             riderOfferNgn: ride.rider_offer_ngn,
             suggestedFareNgn: ride.suggested_fare_ngn,
             driverPickupDistanceKm: candidate.distanceKm,
+            riderType: ride.rider_type || 'SELF',
+            riderName: ride.rider_name || null,
+            riderPhone: ride.rider_phone || null,
+            notes: ride.notes || null,
             createdAt: ride.created_at,
           });
         }
@@ -243,7 +247,9 @@ export function setupBiddingGateway(io: SocketIOServer) {
         await db.updateRideStatus(data.rideId, 'ACCEPTED', data.driverId, data.agreedFareNgn);
         await db.acceptBid(data.rideId, data.driverId);
 
-        console.log(`[Ride Confirmed] Ride ${data.rideId} locked to Driver ${data.driverId} at ₦${data.agreedFareNgn}`);
+        const riderUser = await db.findUserById(ride.rider_id);
+        const effectiveRiderName = ride.rider_name || riderUser?.full_name || 'Passenger';
+        const effectiveRiderPhone = ride.rider_phone || riderUser?.phone_number || null;
 
         // Notify chosen driver
         io.to(`user:${data.driverId}`).emit('ride:assigned', {
@@ -256,14 +262,17 @@ export function setupBiddingGateway(io: SocketIOServer) {
           dropoffLat: ride.dropoff_lat,
           dropoffLng: ride.dropoff_lng,
           riderId: ride.rider_id,
+          riderType: ride.rider_type || 'SELF',
+          riderName: effectiveRiderName,
+          riderPhone: effectiveRiderPhone,
+          bookerName: riderUser?.full_name || 'Passenger',
+          notes: ride.notes || null,
         });
-
-        const riderUser = await db.findUserById(ride.rider_id);
 
         // 🎉 Push & In-App Notification to Driver
         oneSignalService.sendMatchAlertToDriver(
           data.driverId,
-          riderUser?.full_name || 'Passenger',
+          effectiveRiderName,
           ride.pickup_address,
           ride.id
         ).catch(() => {});

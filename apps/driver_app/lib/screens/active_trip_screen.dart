@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../services/routing_service.dart';
 import '../services/navigation_helper.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/driver_interactive_map.dart';
 
 class ActiveTripScreen extends StatefulWidget {
@@ -219,6 +220,12 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final pickup = widget.trip['pickupAddress'] ?? 'Pickup Location';
     final dropoff = widget.trip['dropoffAddress'] ?? 'Destination Location';
     final gateCode = widget.trip['gateCode'] ?? widget.trip['estateGateCode'];
+    final riderType = widget.trip['riderType'] ?? widget.trip['rider_type'] ?? 'SELF';
+    final isFriend = riderType == 'FRIEND';
+    final riderName = (widget.trip['riderName'] ?? widget.trip['rider_name'] ?? widget.trip['passengerName'] ?? widget.trip['passenger_name'] ?? 'Passenger').toString();
+    final riderPhone = widget.trip['riderPhone'] ?? widget.trip['rider_phone'] ?? widget.trip['passengerPhone'] ?? widget.trip['passenger_phone'];
+    final bookerName = widget.trip['bookerName'] ?? widget.trip['booker_name'];
+    final notes = widget.trip['notes'] ?? widget.trip['tripInstructions'];
 
     String actionTitle = 'I Have Arrived at Pickup';
     Color actionColor = AppConstants.primaryColor;
@@ -441,6 +448,109 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                     ),
                   ],
 
+                  // Passenger Details Card (Shows Friend info if booked for someone else)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppConstants.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isFriend ? Colors.amber.withOpacity(0.4) : Colors.white10,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: isFriend ? Colors.amber.withOpacity(0.2) : AppConstants.surfaceBg,
+                              child: Icon(
+                                isFriend ? Icons.people_alt_rounded : Icons.person_rounded,
+                                color: isFriend ? Colors.amberAccent : AppConstants.primaryLight,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          riderName,
+                                          style: const TextStyle(
+                                            color: AppConstants.textLight,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isFriend)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                                          ),
+                                          child: const Text(
+                                            'FRIEND RIDER',
+                                            style: TextStyle(
+                                              color: Colors.amberAccent,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isFriend && bookerName != null
+                                        ? 'Booked by $bookerName${riderPhone != null ? ' • $riderPhone' : ''}'
+                                        : (riderPhone != null ? 'Phone: $riderPhone' : 'Giga Verified Passenger'),
+                                    style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (notes != null && notes.toString().trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppConstants.surfaceBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.speaker_notes_outlined, color: AppConstants.accentColor, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Note: ${notes.toString()}',
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 16),
 
                   // Communication Options Card
@@ -454,19 +564,43 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildAction(Icons.phone_in_talk_rounded, 'Call Rider', () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Connecting masked VoIP call to passenger...')),
-                          );
+                        _buildAction(Icons.phone_in_talk_rounded, isFriend ? 'Call Friend' : 'Call Rider', () async {
+                          if (riderPhone != null && riderPhone.toString().isNotEmpty) {
+                            final uri = Uri.parse('tel:${riderPhone.toString().replaceAll(RegExp(r'[^0-9+]'), '')}');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Cannot launch phone dialer for $riderPhone')),
+                                );
+                              }
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('No passenger phone number provided.')),
+                            );
+                          }
                         }),
                         _buildAction(Icons.navigation_rounded, 'Google Maps', () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Launching GPS navigation...')),
+                          final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;
+                          final pLng = (widget.trip['pickupLng'] as num?)?.toDouble() ?? 3.3792;
+                          final dLat = (widget.trip['dropoffLat'] as num?)?.toDouble() ?? 6.4281;
+                          final dLng = (widget.trip['dropoffLng'] as num?)?.toDouble() ?? 3.4219;
+                          final target = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED')
+                              ? LatLng(pLat, pLng)
+                              : LatLng(dLat, dLng);
+                          final label = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED')
+                              ? (widget.trip['pickupAddress'] ?? 'Pickup')
+                              : (widget.trip['dropoffAddress'] ?? 'Destination');
+                          NavigationHelper.launchExternalNavigation(
+                            destination: target,
+                            destinationLabel: label,
                           );
                         }),
                         _buildAction(Icons.chat_bubble_outline_rounded, 'In-App Chat', () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('In-App message prompt active.')),
+                            const SnackBar(content: Text('In-App chat active with passenger.')),
                           );
                         }),
                       ],

@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../core/constants.dart';
 import '../services/places_service.dart';
 import '../services/location_service.dart';
+import '../screens/map_picker_screen.dart';
 
 class PlacesSearchModal extends StatefulWidget {
   final String initialQuery;
@@ -45,44 +46,6 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
   List<PlaceSuggestion> _suggestions = [];
   bool _isSearching = false;
 
-  final List<Map<String, dynamic>> _quickSpots = [
-    {
-      'title': 'Victoria Island',
-      'subtitle': 'Adetokunbo Ademola, Lagos',
-      'lat': 6.4281,
-      'lng': 3.4219,
-      'icon': Icons.business_rounded,
-    },
-    {
-      'title': 'Murtala Muhammed Airport (MMA2)',
-      'subtitle': 'Airport Road, Ikeja, Lagos',
-      'lat': 6.5774,
-      'lng': 3.3214,
-      'icon': Icons.flight_takeoff_rounded,
-    },
-    {
-      'title': 'Lekki Phase 1',
-      'subtitle': 'Admiralty Way, Lekki, Lagos',
-      'lat': 6.4474,
-      'lng': 3.4723,
-      'icon': Icons.apartment_rounded,
-    },
-    {
-      'title': 'Ikeja City Mall (ICM)',
-      'subtitle': 'Obafemi Awolowo Way, Alausa, Ikeja',
-      'lat': 6.6194,
-      'lng': 3.3581,
-      'icon': Icons.shopping_bag_rounded,
-    },
-    {
-      'title': 'Yaba Tech / Tech Corridor',
-      'subtitle': 'Herbert Macaulay Way, Yaba, Lagos',
-      'lat': 6.5167,
-      'lng': 3.3778,
-      'icon': Icons.code_rounded,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -101,7 +64,7 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
 
   void _onQueryChanged(String query) {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
       _performSearch(query);
     });
   }
@@ -141,6 +104,22 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
           location: pos,
         ),
       );
+    }
+  }
+
+  void _selectOnMap() async {
+    final place = await Navigator.push<PlaceSuggestion>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerScreen(
+          initialLocation: widget.userLocation,
+          title: widget.title,
+          isPickup: widget.title.toLowerCase().contains('pickup'),
+        ),
+      ),
+    );
+    if (place != null && mounted) {
+      Navigator.pop(context, place);
     }
   }
 
@@ -212,7 +191,7 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
                     autofocus: true,
                     style: const TextStyle(color: AppConstants.textLight, fontSize: 15),
                     decoration: const InputDecoration(
-                      hintText: 'Type address, estate, street or landmark...',
+                      hintText: 'Search street, landmark, estate, or city...',
                       hintStyle: TextStyle(color: AppConstants.textMuted, fontSize: 13),
                       border: InputBorder.none,
                     ),
@@ -238,7 +217,7 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
           ),
           const SizedBox(height: 16),
 
-          // 1-Tap Option: Current Location
+          // 1. Current Location Button
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Container(
@@ -250,12 +229,29 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
               child: const Icon(Icons.my_location_rounded, color: AppConstants.primaryLight, size: 20),
             ),
             title: const Text('Use Current Location', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: const Text('Auto-detect via high-precision phone GPS', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+            subtitle: const Text('Auto-detect active GPS position', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
             onTap: _selectCurrentLocation,
+          ),
+          const SizedBox(height: 4),
+
+          // 2. Set Location on Map (Crosshair Draggable Pin)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppConstants.accentColor.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.map_rounded, color: AppConstants.accentColor, size: 20),
+            ),
+            title: const Text('Set Location on Map', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: const Text('Drag crosshair pin to exact building or gate', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+            onTap: _selectOnMap,
           ),
           const Divider(color: Colors.white10),
 
-          // Results or Quick Suggestions
+          // 3. Search Results or Empty State
           Expanded(
             child: _suggestions.isNotEmpty
                 ? ListView.separated(
@@ -285,50 +281,24 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
                       );
                     },
                   )
-                : ListView(
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          'Popular Lagos Locations',
-                          style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.travel_explore_rounded, size: 40, color: AppConstants.textMuted.withOpacity(0.4)),
+                          const SizedBox(height: 10),
+                          Text(
+                            _searchCtrl.text.isEmpty
+                                ? 'Type an address or set directly on map'
+                                : 'No locations found. Try setting directly on map.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                          ),
+                        ],
                       ),
-                      ..._quickSpots.map((spot) {
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppConstants.surfaceBg,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(spot['icon'] as IconData, color: AppConstants.primaryLight, size: 18),
-                          ),
-                          title: Text(
-                            spot['title'] as String,
-                            style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            spot['subtitle'] as String,
-                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
-                          ),
-                          onTap: () {
-                            Navigator.pop(
-                              context,
-                              PlaceSuggestion(
-                                title: spot['title'] as String,
-                                subtitle: spot['subtitle'] as String,
-                                location: LatLng(
-                                  (spot['lat'] as num).toDouble(),
-                                  (spot['lng'] as num).toDouble(),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }),
-                    ],
+                    ),
                   ),
           ),
         ],
