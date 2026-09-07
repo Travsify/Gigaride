@@ -1,13 +1,15 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com</string>
+	<string>179714173901-rtl15mlsim82cebtjs2cisb13tqarktt.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.179714173901-phs0ef10bfg17640rsase3kefasvh1qo</string>
+	<string>com.googleusercontent.apps.179714173901-rtl15mlsim82cebtjs2cisb13tqarktt</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>179714173901-v7mekhsosihjo7d9lqd0ssqrsil7n7so.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAxAGSMn1M9bWDSKEgAyDviQueqLlk-QUY</string>
+	<string>AIzaSyAiQJAN-p9Ywx-XQ9TuE1AEDCcry1v52NQ</string>
 	<key>GCM_SENDER_ID</key>
 	<string>179714173901</string>
 	<key>PLIST_VERSION</key>
@@ -29,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:179714173901:ios:0c71b1ebec194657783284</string>
+	<string>1:179714173901:ios:121cf12254e94690783284</string>
 </dict>
 </plist>

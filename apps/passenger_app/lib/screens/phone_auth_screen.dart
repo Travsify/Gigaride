@@ -341,7 +341,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   Future<void> _signInWithGoogle() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: '179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com',
+        clientId: '179714173901-rtl15mlsim82cebtjs2cisb13tqarktt.apps.googleusercontent.com',
+        serverClientId: '179714173901-phs0ef10bfg17640rsase3kefasvh1qo.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
       final GoogleSignInAccount? account = await googleSignIn.signIn();
