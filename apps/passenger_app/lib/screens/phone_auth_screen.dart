@@ -763,7 +763,57 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 style: const TextStyle(color: AppConstants.textMuted, fontSize: 13),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // ==========================================
+              // GOOGLE 1-TAP SOCIAL SIGN-IN / SIGN-UP
+              // ==========================================
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: isLoading ? null : _signInWithGoogle,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4285F4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Text('G', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Continue with Google',
+                        style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+              const Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.white24)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    child: Text('OR USE PHONE / EMAIL', style: TextStyle(color: AppConstants.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  ),
+                  Expanded(child: Divider(color: Colors.white24)),
+                ],
+              ),
+              const SizedBox(height: 18),
 
               // ==========================================
               // SIGN IN TAB
@@ -1252,55 +1302,6 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   ],
                 ],
               ],
-              // ==========================================
-              // GOOGLE 1-TAP SOCIAL SIGN-IN / SIGN-UP
-              // ==========================================
-              const SizedBox(height: 24),
-              const Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white24)),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14),
-                    child: Text('OR', style: TextStyle(color: AppConstants.textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                  ),
-                  Expanded(child: Divider(color: Colors.white24)),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black87,
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: isLoading ? null : _signInWithGoogle,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4285F4),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Text('G', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Continue with Google',
-                        style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
               const SizedBox(height: 28),
             ],
