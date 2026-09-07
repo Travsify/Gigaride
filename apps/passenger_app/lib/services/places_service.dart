@@ -25,8 +25,9 @@ class PlacesService {
 
     final center = proximity ?? const LatLng(6.5244, 3.3792);
     final encodedQuery = Uri.encodeComponent(query.trim());
+    // Restrict strictly to Nigeria bounding box (lon: 2.67 to 14.68, lat: 4.27 to 13.89)
     final url = Uri.parse(
-      'https://photon.komoot.io/api/?q=$encodedQuery&limit=7&lat=${center.latitude}&lon=${center.longitude}',
+      'https://photon.komoot.io/api/?q=$encodedQuery&limit=15&lat=${center.latitude}&lon=${center.longitude}&bbox=2.67,4.27,14.68,13.89',
     );
 
     try {
@@ -39,7 +40,23 @@ class PlacesService {
         final data = jsonDecode(response.body);
         final features = data['features'] as List<dynamic>? ?? [];
 
-        return features.map((feat) {
+        // Strictly filter to Nigerian locations only
+        final nigerianFeatures = features.where((feat) {
+          final props = feat['properties'] as Map<String, dynamic>? ?? {};
+          final countryCode = (props['countrycode'] ?? '').toString().toUpperCase();
+          final country = (props['country'] ?? '').toString().toLowerCase();
+          final geom = feat['geometry'] as Map<String, dynamic>? ?? {};
+          final coords = geom['coordinates'] as List<dynamic>? ?? [0.0, 0.0];
+          final lng = (coords[0] as num).toDouble();
+          final lat = (coords[1] as num).toDouble();
+
+          final isInsideNigeria = lat >= 4.2 && lat <= 13.9 && lng >= 2.6 && lng <= 14.7;
+          final isExplicitNonNg = ['BJ', 'CM', 'NE', 'TD', 'GH', 'US', 'GB', 'FR', 'DE'].contains(countryCode);
+
+          return !isExplicitNonNg && (countryCode == 'NG' || country.contains('nigeria') || isInsideNigeria);
+        }).toList();
+
+        return nigerianFeatures.map((feat) {
           final props = feat['properties'] as Map<String, dynamic>? ?? {};
           final geom = feat['geometry'] as Map<String, dynamic>? ?? {};
           final coords = geom['coordinates'] as List<dynamic>? ?? [0.0, 0.0];
