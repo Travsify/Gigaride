@@ -461,6 +461,12 @@ class DriverProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void clearActiveTrip() {
+    activeTrip = null;
+    tripStep = null;
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     _stopGpsStreaming();
     OneSignal.logout();

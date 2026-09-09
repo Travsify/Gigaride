@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'tracking_screen.dart';
 import 'offer_room_screen.dart';
+import '../widgets/ride_receipt_dialog.dart';
 
 class ActivityScreen extends StatefulWidget {
   final VoidCallback onBookRidePressed;
@@ -34,129 +36,8 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   }
 
   void _showReceiptModal(BuildContext context, dynamic ride) {
-    final fare = ride['agreed_fare_ngn'] ?? ride['suggested_fare_ngn'] ?? ride['rider_offer_ngn'] ?? 0;
-    final pickup = ride['pickup_address'] ?? 'Pickup Point';
-    final dropoff = ride['dropoff_address'] ?? 'Dropoff Point';
-    final date = ride['created_at']?.toString().split('T')[0] ?? 'Today';
-    final id = (ride['id'] ?? 'GIGA-TRIP').toString().substring(0, 8).toUpperCase();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppConstants.cardBg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.receipt_long_rounded, color: AppConstants.primaryLight, size: 24),
-                      SizedBox(width: 10),
-                      Text('Official Ride Receipt', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppConstants.surfaceBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Receipt Ref', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                        Text('#$id', style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Date & Time', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                        Text(date, style: const TextStyle(color: AppConstants.textLight, fontSize: 12)),
-                      ],
-                    ),
-                    const Divider(color: Colors.white10, height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.trip_origin_rounded, color: AppConstants.successColor, size: 14),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(pickup, style: const TextStyle(color: AppConstants.textLight, fontSize: 12))),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.location_on_rounded, color: AppConstants.dangerColor, size: 14),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(dropoff, style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    const Divider(color: Colors.white10, height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Driver Net Payout (100%)', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                        Text(currencyFormat.format(fare), style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('Lagos State MOT Road Tax', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                        Text('₦50 (Included)', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text('Platform Commission Taken', style: TextStyle(color: AppConstants.successColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text('₦0 (0% Cut)', style: TextStyle(color: AppConstants.successColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const Divider(color: Colors.white10, height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Settled Fare', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
-                        Text(currencyFormat.format(fare), style: const TextStyle(color: AppConstants.accentColor, fontSize: 20, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-                  icon: const Icon(Icons.check, color: Colors.white, size: 18),
-                  label: const Text('Close Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    HapticFeedback.lightImpact();
+    RideReceiptDialog.show(context, Map<String, dynamic>.from(ride));
   }
 
   @override

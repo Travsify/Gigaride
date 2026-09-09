@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import 'package:latlong2/latlong.dart';
@@ -55,6 +57,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   // Step state: 'ACCEPTED' -> 'ARRIVED' -> 'IN_TRANSIT' -> 'COMPLETED'
   String _currentStep = 'ACCEPTED';
   int _passengerRating = 5;
+  int _unreadChatMessages = 0;
+  bool _isChatSheetOpen = false;
 
   @override
   void initState() {
@@ -69,6 +73,265 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         _showIncomingCallSheet(callData);
       }
     };
+
+    // 🚨 Listen for passenger cancelling ride
+    provider.socket.onRideCancelled = (cancelData) {
+      if (mounted) {
+        _showRideCancelledModal(cancelData);
+      }
+    };
+
+    // 💬 Listen for incoming messages from passenger
+    provider.socket.onChatMessage = (msgData) {
+      if (mounted) {
+        _handleIncomingChatMessage(msgData);
+      }
+    };
+  }
+
+  void _showRideCancelledModal(Map<String, dynamic> cancelData) {
+    HapticFeedback.heavyImpact();
+    final reason = cancelData['reason']?.toString() ?? 'Passenger cancelled this ride.';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppConstants.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppConstants.dangerColor, width: 1.5)),
+        title: Row(
+          children: const [
+            Icon(Icons.cancel_rounded, color: AppConstants.dangerColor, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Ride Cancelled',
+                style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The passenger has cancelled this trip request.',
+              style: TextStyle(color: AppConstants.textLight, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppConstants.surfaceBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Stated Reason:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(
+                    reason,
+                    style: const TextStyle(color: AppConstants.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Your terminal has returned to active radar mode with 0% platform commission.',
+              style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                final provider = context.read<DriverProvider>();
+                provider.clearActiveTrip();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Return to Radar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleIncomingChatMessage(Map<String, dynamic> msgData) {
+    if (!_isChatSheetOpen) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _unreadChatMessages++;
+      });
+      final text = msgData['text']?.toString() ?? 'New message';
+      final riderName = widget.trip['passengerName'] ?? widget.trip['riderName'] ?? widget.trip['rider_name'] ?? 'Passenger';
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF13202E),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          content: Row(
+            children: [
+              const Icon(Icons.chat_bubble_rounded, color: AppConstants.accentColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$riderName:', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'REPLY',
+            textColor: AppConstants.primaryLight,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              _openDriverChatSheet();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  void _openDriverChatSheet() {
+    setState(() {
+      _unreadChatMessages = 0;
+      _isChatSheetOpen = true;
+    });
+    final riderName = (widget.trip['passengerName'] ?? widget.trip['riderName'] ?? widget.trip['rider_name'] ?? 'Passenger').toString();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DriverChatSheet(
+        rideId: (widget.trip['rideId'] ?? widget.trip['id'] ?? '').toString(),
+        passengerId: (widget.trip['riderId'] ?? widget.trip['passengerId'] ?? widget.trip['rider_id'] ?? '').toString(),
+        passengerName: riderName,
+      ),
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _isChatSheetOpen = false;
+        });
+      }
+    });
+  }
+
+  void _showCallRiderSheet() {
+    final riderPhone = (widget.trip['riderPhone'] ??
+            widget.trip['rider_phone'] ??
+            widget.trip['passengerPhone'] ??
+            widget.trip['passenger_phone'] ??
+            widget.trip['phone'] ??
+            widget.trip['passenger']?['phone'] ??
+            '')
+        .toString();
+    final riderName = (widget.trip['passengerName'] ?? widget.trip['riderName'] ?? widget.trip['rider_name'] ?? 'Passenger').toString();
+    final rId = (widget.trip['passengerId'] ??
+            widget.trip['userId'] ??
+            widget.trip['riderId'] ??
+            widget.trip['passenger']?['id'] ??
+            '')
+        .toString();
+    final rRideId = (widget.trip['id'] ?? widget.trip['rideId'] ?? '').toString();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_in_talk_rounded, color: AppConstants.accentColor, size: 24),
+                      const SizedBox(width: 10),
+                      Text('Contact $riderName', style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Option 1: Direct Cellular GSM Dial (Guaranteed 100% audio transmission)
+              if (riderPhone.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.call, color: Colors.white),
+                    label: Text(
+                      'Direct Phone Call ($riderPhone)',
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      launchUrl(Uri.parse('tel:$riderPhone'), mode: LaunchMode.externalApplication);
+                    },
+                  ),
+                ),
+              // Option 2: In-App VoIP Call
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppConstants.primaryLight),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.headset_mic_rounded, color: AppConstants.primaryLight),
+                  label: const Text('In-App VoIP Call', style: TextStyle(color: AppConstants.primaryLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => InAppCallScreen(
+                          rideId: rRideId,
+                          riderId: rId,
+                          riderName: riderName,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showIncomingCallSheet(Map<String, dynamic> callData) {
@@ -515,20 +778,32 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 24),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (ctx) => DriverChatSheet(
-                  rideId: (widget.trip['rideId'] ?? widget.trip['id'] ?? '').toString(),
-                  passengerId: (widget.trip['riderId'] ?? widget.trip['passengerId'] ?? widget.trip['rider_id'] ?? '').toString(),
-                  passengerName: riderName,
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 24),
+                onPressed: _openDriverChatSheet,
+              ),
+              if (_unreadChatMessages > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppConstants.dangerColor,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      '$_unreadChatMessages',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-              );
-            },
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.sos_rounded, color: AppConstants.dangerColor, size: 28),
@@ -893,26 +1168,11 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildAction(Icons.phone_in_talk_rounded, isFriend ? 'Call Friend' : 'Call Rider', () {
-                          final rId = (widget.trip['passengerId'] ??
-                                  widget.trip['userId'] ??
-                                  widget.trip['riderId'] ??
-                                  widget.trip['passenger']?['id'] ??
-                                  '')
-                              .toString();
-                          final rRideId = (widget.trip['id'] ?? widget.trip['rideId'] ?? '').toString();
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => InAppCallScreen(
-                                rideId: rRideId,
-                                riderId: rId,
-                                riderName: riderName,
-                              ),
-                            ),
-                          );
-                        }),
+                        _buildAction(
+                          Icons.phone_in_talk_rounded,
+                          isFriend ? 'Call Friend' : 'Call Rider',
+                          _showCallRiderSheet,
+                        ),
                         _buildAction(Icons.navigation_rounded, 'Google Maps', () {
                           final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;
                           final pLng = (widget.trip['pickupLng'] as num?)?.toDouble() ?? 3.3792;
@@ -929,18 +1189,12 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             destinationLabel: label,
                           );
                         }),
-                        _buildAction(Icons.chat_bubble_outline_rounded, 'In-App Chat', () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (ctx) => DriverChatSheet(
-                              rideId: (widget.trip['rideId'] ?? widget.trip['id'] ?? '').toString(),
-                              passengerId: (widget.trip['riderId'] ?? widget.trip['passengerId'] ?? widget.trip['rider_id'] ?? '').toString(),
-                              passengerName: riderName,
-                            ),
-                          );
-                        }),
+                        _buildAction(
+                          Icons.chat_bubble_outline_rounded,
+                          'In-App Chat',
+                          _openDriverChatSheet,
+                          badgeCount: _unreadChatMessages,
+                        ),
                       ],
                     ),
                   ),
@@ -967,7 +1221,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     );
   }
 
-  Widget _buildAction(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildAction(IconData icon, String label, VoidCallback onTap, {int? badgeCount}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -975,10 +1229,33 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         padding: const EdgeInsets.all(8),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: AppConstants.surfaceBg, shape: BoxShape.circle),
-              child: Icon(icon, color: AppConstants.primaryLight, size: 20),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: AppConstants.surfaceBg, shape: BoxShape.circle),
+                  child: Icon(icon, color: AppConstants.primaryLight, size: 20),
+                ),
+                if (badgeCount != null && badgeCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppConstants.dangerColor,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$badgeCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(label, style: const TextStyle(color: AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.w600)),

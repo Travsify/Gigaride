@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 
@@ -10,7 +11,7 @@ class InAppCallScreen extends StatefulWidget {
   final String driverId;
   final String driverName;
   final String? vehicleInfo;
-
+  final String? driverPhone;
   final bool isIncoming;
 
   const InAppCallScreen({
@@ -19,6 +20,7 @@ class InAppCallScreen extends StatefulWidget {
     required this.driverId,
     required this.driverName,
     this.vehicleInfo,
+    this.driverPhone,
     this.isIncoming = false,
   });
 
@@ -263,6 +265,30 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                   ],
                 ),
               ),
+
+              if (widget.driverPhone != null && widget.driverPhone!.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 18),
+                      label: Text(
+                        'Direct Cellular Call (${widget.driverPhone})',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () {
+                        launchUrl(Uri.parse('tel:${widget.driverPhone}'), mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                  ),
+                ),
+              ],
 
               // Call Controls Area
               Padding(

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 
 class DriverSupportHelpScreen extends StatefulWidget {
@@ -10,16 +12,33 @@ class DriverSupportHelpScreen extends StatefulWidget {
 }
 
 class _DriverSupportHelpScreenState extends State<DriverSupportHelpScreen> {
-  final List<Map<String, dynamic>> _driverTickets = [
-    {
-      'id': 'DRV-40192',
-      'category': 'Subscription & Quota',
-      'subject': 'Daily 100-Ride Pass activation inquiry',
-      'status': 'RESOLVED',
-      'date': 'Yesterday',
-      'response': 'Your subscription was verified. 999 rides active on your terminal with 0% platform commission.',
-    }
-  ];
+  List<Map<String, dynamic>> _driverTickets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedTickets();
+  }
+
+  Future<void> _loadSavedTickets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('giga_driver_tickets');
+      if (raw != null && raw.isNotEmpty && mounted) {
+        final List decoded = jsonDecode(raw);
+        setState(() {
+          _driverTickets = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveTickets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('giga_driver_tickets', jsonEncode(_driverTickets));
+    } catch (_) {}
+  }
 
   void _showNewDriverComplaintModal(String category, {String? defaultSubject}) {
     final subjectCtrl = TextEditingController(text: defaultSubject ?? '');
@@ -153,6 +172,7 @@ class _DriverSupportHelpScreenState extends State<DriverSupportHelpScreen> {
                         'response': 'Assigned to Senior Driver Relations & Dispatch Team.',
                       });
                     });
+                    _saveTickets();
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -296,8 +316,34 @@ class _DriverSupportHelpScreenState extends State<DriverSupportHelpScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            ..._driverTickets.map((t) => Container(
+            if (_driverTickets.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppConstants.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle_outline_rounded, color: AppConstants.successColor.withOpacity(0.8), size: 42),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'No Open Complaints or Disputes',
+                      style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'You have no pending partner tickets. Select a category above if you need urgent dispatch or payment assistance.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ..._driverTickets.map((t) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

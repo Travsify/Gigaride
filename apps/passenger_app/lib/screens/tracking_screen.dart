@@ -14,6 +14,7 @@ import 'package:latlong2/latlong.dart';
 import '../services/places_service.dart';
 import '../services/routing_service.dart';
 import '../widgets/interactive_ride_map.dart';
+import '../widgets/ride_receipt_dialog.dart';
 
 class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({super.key});
@@ -36,6 +37,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   List<LatLng> _liveRoutePoints = [];
   bool _isLoadingRoute = false;
   String? _lastRoutedStatus;
+  int _unreadChatMessages = 0;
+  bool _isChatSheetOpen = false;
 
   @override
   void initState() {
@@ -48,7 +51,59 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
           _showIncomingCallSheet(callData);
         }
       };
+      provider.socket.onChatMessage = (msgData) {
+        if (mounted) {
+          _handleIncomingChatMessage(msgData);
+        }
+      };
     });
+  }
+
+  void _handleIncomingChatMessage(Map<String, dynamic> msgData) {
+    if (!_isChatSheetOpen) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _unreadChatMessages++;
+      });
+      final provider = context.read<PassengerProvider>();
+      final driver = provider.selectedDriverBid;
+      final driverName = driver?['driverName'] ?? 'Driver';
+      final text = msgData['text']?.toString() ?? 'New message';
+      final rideId = provider.currentRide?['id'] ?? driver?['rideId'] ?? 'active-ride';
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF13202E),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          content: Row(
+            children: [
+              const Icon(Icons.chat_bubble_rounded, color: AppConstants.accentColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$driverName:', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'REPLY',
+            textColor: AppConstants.primaryLight,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              _openChatSheet(context, driver, rideId);
+            },
+          ),
+        ),
+      );
+    }
   }
 
   void _showIncomingCallSheet(Map<String, dynamic> callData) {
@@ -259,6 +314,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           driverId: driverId,
                           driverName: name,
                           vehicleInfo: vehicle,
+                          driverPhone: phone,
                         ),
                       ),
                     );
@@ -266,7 +322,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Option 2: Direct Cellular GSM Dial
+              // Option 2: Direct Cellular GSM Dial (Guaranteed Clear Voice)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -276,13 +332,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.phone_android_rounded, color: AppConstants.textMuted, size: 20),
+                    const Icon(Icons.phone_android_rounded, color: AppConstants.accentColor, size: 22),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Driver Verified Line', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                          const Text('Driver Verified Cellular Line', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                           Text(
                             phone,
                             style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
@@ -291,7 +347,15 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.copy_rounded, color: AppConstants.accentColor, size: 20),
+                      icon: const Icon(Icons.call, color: Colors.greenAccent, size: 22),
+                      tooltip: 'Direct Phone Call',
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        launchUrl(Uri.parse('tel:$phone'), mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: AppConstants.accentColor, size: 18),
                       tooltip: 'Copy Number',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: phone));
@@ -317,6 +381,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   }
 
   void _openChatSheet(BuildContext context, Map<String, dynamic>? driver, String rideId) {
+    setState(() {
+      _unreadChatMessages = 0;
+      _isChatSheetOpen = true;
+    });
     final name = driver?['driverName'] ?? 'Driver';
     final driverId = driver?['driverId'] ?? 'driver';
     showModalBottomSheet(
@@ -328,7 +396,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
         driverId: driverId,
         driverName: name,
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _isChatSheetOpen = false;
+        });
+      }
+    });
   }
 
   void _shareLiveTrackingLink(BuildContext context, String rideId, Map<String, dynamic>? driver) async {
@@ -1237,7 +1311,37 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 18),
+                  // 📄 Download & View Official Ride Receipt Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppConstants.accentColor, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.receipt_long_rounded, color: AppConstants.accentColor),
+                      label: const Text(
+                        'Download / View Ride Receipt',
+                        style: TextStyle(color: AppConstants.accentColor, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        RideReceiptDialog.show(context, {
+                          'id': rideId,
+                          'date': DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+                          'pickupAddress': provider.currentRide?['pickupAddress'] ?? provider.currentRide?['pickup_address'] ?? 'Pickup Point',
+                          'dropoffAddress': provider.currentRide?['dropoffAddress'] ?? provider.currentRide?['dropoff_address'] ?? 'Destination',
+                          'finalFarePaid': provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0,
+                          'driverName': driver?['driverName'] ?? 'Driver',
+                          'vehicleModel': driver?['vehicleModel'] ?? 'Vehicle',
+                          'licensePlate': driver?['licensePlate'] ?? 'LAG-000-XX',
+                          'paymentMethod': _walletPaymentSuccess ? 'Giga Living Wallet' : 'Cash / Direct Bank Transfer',
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
                   // Finish / Book Another Ride Button
                   SizedBox(
@@ -1570,14 +1674,40 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 18),
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 18),
+                          if (_unreadChatMessages > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: AppConstants.dangerColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                child: Text(
+                                  '$_unreadChatMessages',
+                                  style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: AppConstants.accentColor.withOpacity(0.6)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () => _openChatSheet(context, driver, rideId),
-                      label: const Text('Chat', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold)),
+                      label: Text(
+                        _unreadChatMessages > 0 ? 'Chat ($_unreadChatMessages)' : 'Chat',
+                        style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),

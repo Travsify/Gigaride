@@ -57,6 +57,13 @@ class SocketService {
       }
     });
 
+    // Ride Cancellation Listener
+    socket!.on('ride:cancelled', (data) {
+      if (data != null && onRideCancelled != null) {
+        onRideCancelled!(Map<String, dynamic>.from(data));
+      }
+    });
+
     // In-App Chat Listeners
     socket!.on('ride:chat_message', (data) {
       if (data != null && onChatMessage != null) {
@@ -84,6 +91,7 @@ class SocketService {
     });
   }
 
+  Function(Map<String, dynamic>)? onRideCancelled;
   Function(Map<String, dynamic>)? onChatMessage;
   Function(Map<String, dynamic>)? onIncomingCall;
   Function(Map<String, dynamic>)? onCallConnected;

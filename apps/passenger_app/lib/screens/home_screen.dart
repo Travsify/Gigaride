@@ -12,6 +12,7 @@ import 'activity_screen.dart';
 import 'profile_screen.dart';
 import 'support_help_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../services/routing_service.dart';
@@ -347,9 +348,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: bookingMsg));
                           Navigator.pop(ctx);
+                          final uri = Uri.parse('sms:+2348000000000?body=${Uri.encodeComponent(bookingMsg)}');
+                          launchUrl(uri, mode: LaunchMode.externalApplication);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Booking text copied! Ready to dispatch via SMS.'),
+                              content: Text('Opening SMS app to dispatch zero-data ride...'),
                               backgroundColor: AppConstants.successColor,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -388,17 +391,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(side: const BorderSide(color: AppConstants.accentColor)),
                         icon: const Icon(Icons.call, color: AppConstants.accentColor, size: 16),
-                        label: const Text('Copy USSD Code *384*234#', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                        label: const Text('Dial USSD Code *384*234#', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
                         onPressed: () {
                           Clipboard.setData(const ClipboardData(text: '*384*234#'));
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('USSD *384*234# copied! Open your phone dialer to book instantly.'),
-                              backgroundColor: AppConstants.primaryColor,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          final uri = Uri.parse('tel:${Uri.encodeComponent("*384*234#")}');
+                          launchUrl(uri, mode: LaunchMode.externalApplication);
                         },
                       ),
                     ),

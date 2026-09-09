@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 
 class SupportHelpScreen extends StatefulWidget {
@@ -11,16 +13,33 @@ class SupportHelpScreen extends StatefulWidget {
 }
 
 class _SupportHelpScreenState extends State<SupportHelpScreen> {
-  final List<Map<String, dynamic>> _myTickets = [
-    {
-      'id': 'TCK-94812',
-      'category': 'Trip & Fare',
-      'subject': 'Fare calculation clarification',
-      'status': 'RESOLVED',
-      'date': 'Yesterday',
-      'response': 'Your Living Wallet was adjusted accordingly. Thank you for choosing Giga Ride.',
-    }
-  ];
+  List<Map<String, dynamic>> _myTickets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedTickets();
+  }
+
+  Future<void> _loadSavedTickets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('giga_passenger_tickets');
+      if (raw != null && raw.isNotEmpty && mounted) {
+        final List decoded = jsonDecode(raw);
+        setState(() {
+          _myTickets = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveTickets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('giga_passenger_tickets', jsonEncode(_myTickets));
+    } catch (_) {}
+  }
 
   void _showNewComplaintModal(String category, {String? defaultSubject}) {
     final subjectCtrl = TextEditingController(text: defaultSubject ?? '');
@@ -154,6 +173,7 @@ class _SupportHelpScreenState extends State<SupportHelpScreen> {
                         'response': 'Assigned to Giga Safety & Dispatch Desk. A resolution agent is reviewing your incident.',
                       });
                     });
+                    _saveTickets();
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -301,51 +321,72 @@ class _SupportHelpScreenState extends State<SupportHelpScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._myTickets.map((t) => Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppConstants.cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white10),
-                  ),
+            if (_myTickets.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppConstants.cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: const Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Text(t['id'], style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: t['status'] == 'RESOLVED' ? Colors.green.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  t['status'],
-                                  style: TextStyle(
-                                    color: t['status'] == 'RESOLVED' ? Colors.greenAccent : Colors.amberAccent,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(t['date'], style: const TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(t['subject'], style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 4),
-                      Text(t['response'], style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                      Icon(Icons.check_circle_outline_rounded, color: AppConstants.successColor, size: 32),
+                      SizedBox(height: 8),
+                      Text('No Open Complaints', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 4),
+                      Text('All your trips and wallet transactions are in good standing.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11), textAlign: TextAlign.center),
                     ],
                   ),
-                )),
+                ),
+              )
+            else
+              ..._myTickets.map((t) => Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppConstants.cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(t['id'], style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: t['status'] == 'RESOLVED' ? Colors.green.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    t['status'],
+                                    style: TextStyle(
+                                      color: t['status'] == 'RESOLVED' ? Colors.greenAccent : Colors.amberAccent,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(t['date'], style: const TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(t['subject'], style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 4),
+                        Text(t['response'], style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  )),
 
             const SizedBox(height: 20),
 
