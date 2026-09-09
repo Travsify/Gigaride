@@ -46,6 +46,7 @@ dependencies:
   local_auth: ^3.0.2
   onesignal_flutter: ^5.2.5
   google_sign_in: ^6.2.2
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

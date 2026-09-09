@@ -382,6 +382,27 @@ class PassengerProvider with ChangeNotifier {
       final list = await api.getRiderHistory();
       pastRides = list.where((r) => r['is_scheduled'] != true && r['status'] == 'COMPLETED').toList();
       scheduledTrips = list.where((r) => r['is_scheduled'] == true || r['scheduled_for'] != null).toList();
+
+      // Detect and restore any active ride in progress
+      final activeList = list.where((r) => ['REQUESTED', 'NEGOTIATING', 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT'].contains(r['status'])).toList();
+      if (activeList.isNotEmpty) {
+        final active = activeList.first;
+        currentRide = active;
+        tripStatus = active['status'];
+        if (active['driver'] != null) {
+          selectedDriverBid = {
+            'driverName': active['driver']['full_name'] ?? 'Driver',
+            'driverPhone': active['driver']['phone_number'] ?? '',
+            'vehicleModel': active['driverProfile']?['vehicle_model'] ?? 'Verified Vehicle',
+            'vehicleMake': active['driverProfile']?['vehicle_make'] ?? '',
+            'vehicleColor': active['driverProfile']?['vehicle_color'] ?? '',
+            'licensePlate': active['driverProfile']?['license_plate'] ?? '',
+            'rating': active['driverProfile']?['rating_average'] ?? 4.9,
+            'counterFareNgn': active['agreed_fare_ngn'] ?? active['rider_offer_ngn'],
+            'rideId': active['id'],
+          };
+        }
+      }
     } catch (_) {
       // Graceful fallback to avoid app interruption
     } finally {

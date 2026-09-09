@@ -1364,10 +1364,15 @@ export class DatabaseService {
     return ride;
   }
 
-  public async getRiderHistory(riderId: string): Promise<RideRow[]> {
+  public async getRiderHistory(riderId: string): Promise<any[]> {
     return this.store.rides
       .filter((r) => r.rider_id === riderId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map((r) => ({
+        ...r,
+        driver: r.driver_id ? this.store.users.find((u) => u.id === r.driver_id) : null,
+        driverProfile: r.driver_id ? this.store.driver_profiles.find((d) => d.driver_id === r.driver_id) : null,
+      }));
   }
 
   public async getDriverHistory(driverId: string): Promise<RideRow[]> {

@@ -7,6 +7,8 @@ import '../providers/passenger_provider.dart';
 import 'home_screen.dart';
 import 'in_app_call_screen.dart';
 import 'ride_chat_sheet.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
 import '../widgets/interactive_ride_map.dart';
 
@@ -184,21 +186,43 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     );
   }
 
-  void _shareLiveTrackingLink(BuildContext context, String rideId, Map<String, dynamic>? driver) {
+  void _shareLiveTrackingLink(BuildContext context, String rideId, Map<String, dynamic>? driver) async {
     final driverName = driver?['driverName'] ?? 'Driver';
-    final vehicle = '${driver?['vehicleModel'] ?? 'Vehicle'} (${driver?['licensePlate'] ?? ''})';
-    final link = 'https://gigaride.ng/track/$rideId';
-    final shareMsg = "I'm riding with Giga Ride! Track my trip live: $link\nDriver: $driverName ($vehicle)\n256-bit encrypted & NDPR protected.";
+    final vehicle = '${driver?['vehicleModel'] ?? 'Vehicle'} (${driver?['licensePlate'] ?? ''})'.trim();
+    final link = 'https://engine.getgigaride.com/track/$rideId';
+    final shareMsg = "🚗 I'm on a Giga Ride! Track my trip live:\n"
+        "🔗 $link\n"
+        "Driver: $driverName ($vehicle)\n"
+        "🛡️ 256-bit encrypted & NDPR protected.";
 
-    Clipboard.setData(ClipboardData(text: shareMsg));
+    Clipboard.setData(ClipboardData(text: link));
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Live Tracking link copied to clipboard! Share with family on WhatsApp/SMS.'),
-        backgroundColor: AppConstants.primaryColor,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+
+    try {
+      // Auto-open native Android / iOS share dialog (WhatsApp, Messages, Telegram, etc.)
+      await Share.share(shareMsg, subject: 'Live Giga Ride Tracking');
+    } catch (_) {
+      // Fallback: Open WhatsApp directly
+      try {
+        final waUri = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(shareMsg)}');
+        if (await canLaunchUrl(waUri)) {
+          await launchUrl(waUri, mode: LaunchMode.externalApplication);
+        } else {
+          final webWaUri = Uri.parse('https://api.whatsapp.com/send?text=${Uri.encodeComponent(shareMsg)}');
+          await launchUrl(webWaUri, mode: LaunchMode.externalApplication);
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tracking link copied to clipboard! Share on WhatsApp or SMS.'),
+              backgroundColor: AppConstants.primaryColor,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _triggerEmergencySosDialog(BuildContext context, PassengerProvider provider) {

@@ -16,6 +16,8 @@ import '../services/routing_service.dart';
 import '../services/places_service.dart';
 import '../widgets/interactive_ride_map.dart';
 import '../widgets/places_search_modal.dart';
+import '../widgets/fare_offer_sheet.dart';
+import 'tracking_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -700,12 +702,67 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _adjustOffer(int delta) {
-    final current = int.tryParse(_offerCtrl.text.replaceAll(',', '').trim()) ?? 2000;
-    final updated = (current + delta).clamp(1000, 200000);
-    setState(() {
-      _offerCtrl.text = updated.toString();
-    });
+
+  String? _assembleNotes() {
+    final provider = context.read<PassengerProvider>();
+    final List<String> notesList = [];
+    if (_riderType == 'FRIEND' && _friendName != null && _friendPhone != null) {
+      notesList.add('[Rider: $_friendName • Phone: $_friendPhone]');
+    }
+    if (_stopCtrl.text.trim().isNotEmpty) {
+      notesList.add('[Intermediate Stop: ${_stopCtrl.text.trim()}]');
+    }
+    if (_gatePassCtrl.text.trim().isNotEmpty) {
+      notesList.add('[Estate Gate Pass: ${_gatePassCtrl.text.trim()}]');
+    }
+    if (provider.alwaysAcOn) {
+      notesList.add('[❄️ AC: Must Be ON]');
+    }
+    if (provider.preferQuiet) {
+      notesList.add('[🤫 Quiet Ride]');
+    }
+    if (provider.luggageAssistance) {
+      notesList.add('[🧳 Luggage Assistance]');
+    }
+    if (_notesCtrl.text.trim().isNotEmpty) {
+      notesList.add(_notesCtrl.text.trim());
+    }
+    return notesList.isNotEmpty ? notesList.join(' • ') : null;
+  }
+
+  void _openFareOfferSheet() {
+    final dropoffText = _dropoffCtrl.text.trim();
+    if (dropoffText.isEmpty) {
+      _showSnack('Please enter your destination first.');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: FareOfferSheet(
+          pickupAddress: _pickupCtrl.text.trim(),
+          dropoffAddress: dropoffText,
+          pickupLat: _pickupLat,
+          pickupLng: _pickupLng,
+          dropoffLat: _dropoffLat,
+          dropoffLng: _dropoffLng,
+          distanceKm: _distanceKm > 0 ? _distanceKm : 5.0,
+          durationMins: _durationMins > 0 ? _durationMins : 15,
+          notes: _assembleNotes(),
+          isBusiness: _isCorporateMode,
+          riderName: _friendName,
+          riderPhone: _friendPhone,
+          riderType: _riderType,
+          selectedCategory: _selectedCategory,
+        ),
+      ),
+    );
   }
 
   void _findDrivers() async {
@@ -901,7 +958,171 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ProfileScreen(onOfflineBookingPressed: () => _showOfflineBookingModal(context)),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildActiveTripHud(),
+          _buildBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // PERSISTENT ACTIVE TRIP FLOATING HUD
+  // Visible across all tabs whenever a ride is active
+  // ==========================================
+  Widget _buildActiveTripHud() {
+    final provider = context.watch<PassengerProvider>();
+    final ride = provider.currentRide;
+    if (ride == null) return const SizedBox.shrink();
+
+    final status = provider.tripStatus ?? ride['status'] ?? 'REQUESTED';
+    if (status == 'COMPLETED' || status == 'CANCELLED') return const SizedBox.shrink();
+
+    final isAssigned = (status == 'ACCEPTED' || status == 'ARRIVED' || status == 'IN_TRANSIT');
+    final driver = provider.selectedDriverBid;
+    final driverName = driver?['driverName'] ?? 'Driver';
+    final vehicle = driver?['vehicleModel'] ?? 'Verified Vehicle';
+    final fare = provider.finalFarePaid ?? driver?['counterFareNgn'] ?? ride['riderOfferNgn'] ?? ride['rider_offer_ngn'] ?? 2500;
+    final bidsCount = provider.incomingBids.length;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isAssigned
+              ? [const Color(0xFF064E3B), const Color(0xFF0D9488)]
+              : [const Color(0xFF1E293B), const Color(0xFF0F172A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isAssigned ? AppConstants.primaryLight : AppConstants.accentColor.withOpacity(0.6),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isAssigned ? AppConstants.primaryLight : AppConstants.accentColor).withOpacity(0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            if (isAssigned) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RideTrackingScreen()),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OfferRoomScreen()),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Animated pulsing icon
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: (isAssigned ? AppConstants.successColor : AppConstants.accentColor).withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isAssigned ? Icons.directions_car_filled_rounded : Icons.wifi_tethering_rounded,
+                    color: isAssigned ? AppConstants.successColor : AppConstants.accentColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            isAssigned ? 'Active Trip in Progress' : 'Offer Room Active',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isAssigned ? AppConstants.successColor : AppConstants.accentColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isAssigned ? status : (bidsCount > 0 ? '$bidsCount BIDS' : 'SEARCHING'),
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isAssigned
+                            ? '$driverName • $vehicle • ${currencyFormat.format(fare)}'
+                            : 'Broadcast active • Tap to view driver bids',
+                        style: const TextStyle(
+                          color: AppConstants.textLight,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'OPEN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1610,7 +1831,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ] else ...[
-                    // ACTIVE PROPOSED FARE CARD
+                    // CLEAN ROUTE SUMMARY & REVIEW FARE CTA
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
@@ -1621,8 +1842,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           border: Border.all(color: AppConstants.primaryLight.withOpacity(0.4)),
                           boxShadow: [
                             BoxShadow(
-                              color: AppConstants.primaryLight.withOpacity(0.1),
-                              blurRadius: 16,
+                              color: AppConstants.primaryLight.withOpacity(0.12),
+                              blurRadius: 18,
                               offset: const Offset(0, 4),
                             ),
                           ],
@@ -1633,15 +1854,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'Your Proposed Fare',
-                                  style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppConstants.primaryColor.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(Icons.route_rounded, color: AppConstants.primaryLight, size: 22),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${_distanceKm > 0 ? _distanceKm.toStringAsFixed(1) : "5.0"} km Route',
+                                          style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          'Estimated ~${_durationMins > 0 ? _durationMins : 15} mins',
+                                          style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: AppConstants.accentColor.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     'PMS: ₦${estimate?['petrolPriceNgn'] ?? 1050}/L',
@@ -1651,120 +1894,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ],
                             ),
 
-                            const SizedBox(height: 14),
-
-                            // Vehicle Tier Selector (Economy, Comfort AC, XL SUV)
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppConstants.surfaceBg,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  _buildVehicleTierPill('ECONOMY', 'Economy', Icons.directions_car_rounded),
-                                  _buildVehicleTierPill('COMFORT', 'Comfort AC', Icons.airline_seat_recline_extra_rounded),
-                                  _buildVehicleTierPill('XL_SUV', 'XL SUV (6)', Icons.airport_shuttle_rounded),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Offer Stepper Row
-                            Row(
-                              children: [
-                                _buildStepperBtn('-₦500', () => _adjustOffer(-500)),
-                                const SizedBox(width: 8),
-                                _buildStepperBtn('-₦200', () => _adjustOffer(-200)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: AppConstants.darkBg,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: AppConstants.primaryLight.withOpacity(0.5)),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Text('₦', style: TextStyle(color: AppConstants.primaryLight, fontSize: 20, fontWeight: FontWeight.bold)),
-                                        const SizedBox(width: 4),
-                                        IntrinsicWidth(
-                                          child: TextField(
-                                            controller: _offerCtrl,
-                                            keyboardType: TextInputType.number,
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              color: AppConstants.textLight,
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                            decoration: const InputDecoration(
-                                              hintText: '2,500',
-                                              hintStyle: TextStyle(color: AppConstants.textMuted),
-                                              border: InputBorder.none,
-                                              isDense: true,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                _buildStepperBtn('+₦200', () => _adjustOffer(200)),
-                                const SizedBox(width: 8),
-                                _buildStepperBtn('+₦500', () => _adjustOffer(500)),
-                              ],
-                            ),
-
-                            if (estimate != null) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                'Recommended: ${currencyFormat.format(estimate['recommendedFareNgn'] ?? 2500)} • Minimum Floor: ${currencyFormat.format(estimate['minimumBidFloorNgn'] ?? 1200)}',
-                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                              ),
-                            ],
-
                             const SizedBox(height: 18),
 
-                            // CTA: Request Drivers
+                            // Review Fare & Broadcast Button
                             SizedBox(
                               width: double.infinity,
-                              height: 52,
+                              height: 54,
                               child: ElevatedButton(
-                                onPressed: provider.isLoading ? null : _findDrivers,
+                                onPressed: _selectedCategory == 'CITY'
+                                    ? _openFareOfferSheet
+                                    : (provider.isLoading ? null : _findDrivers),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppConstants.primaryColor,
                                   foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  elevation: 6,
                                   shadowColor: AppConstants.primaryColor.withOpacity(0.4),
                                 ),
-                                child: provider.isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            _selectedCategory == 'CITY'
-                                                ? 'Broadcast Offer to Drivers'
-                                                : _selectedCategory == 'AIRPORT'
-                                                    ? 'Schedule Airport VIP Transfer'
-                                                    : 'Book Advance Interstate Ride',
-                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Icon(Icons.arrow_forward_rounded, size: 18),
-                                        ],
-                                      ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _selectedCategory == 'CITY' ? Icons.tune_rounded : Icons.calendar_month_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      _selectedCategory == 'CITY'
+                                          ? 'Review Fare & Choose Vehicle'
+                                          : _selectedCategory == 'AIRPORT'
+                                              ? 'Schedule Airport VIP Transfer'
+                                              : 'Book Advance Interstate Ride',
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.arrow_forward_rounded, size: 18),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -1882,58 +2048,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildVehicleTierPill(String id, String label, IconData icon) {
-    final isSelected = _selectedVehicleTier == id;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() => _selectedVehicleTier = id);
-          _calculateFareEstimate();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppConstants.primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: isSelected ? Colors.white : AppConstants.textMuted),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : AppConstants.textMuted,
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepperBtn(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppConstants.surfaceBg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppConstants.textLight,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
 }

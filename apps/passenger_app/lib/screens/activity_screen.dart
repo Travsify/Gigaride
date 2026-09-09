@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
+import 'tracking_screen.dart';
+import 'offer_room_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
   final VoidCallback onBookRidePressed;
@@ -252,11 +254,17 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
       );
     }
 
+    final hasActive = activeRide != null && !['COMPLETED', 'CANCELLED'].contains(activeRide['status']);
+    final totalCount = rides.length + (hasActive ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: rides.length,
+      itemCount: totalCount,
       itemBuilder: (ctx, index) {
-        final r = rides[index];
+        if (hasActive && index == 0) {
+          return _buildActiveRideCard(ctx, activeRide, provider);
+        }
+        final r = rides[hasActive ? index - 1 : index];
         final fare = r['agreed_fare_ngn'] ?? r['suggested_fare_ngn'] ?? 2500;
         final pickup = r['pickup_address'] ?? 'Lagos';
         final dropoff = r['dropoff_address'] ?? 'Lagos';
@@ -466,6 +474,167 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActiveRideCard(BuildContext context, dynamic ride, PassengerProvider provider) {
+    final status = provider.tripStatus ?? ride['status'] ?? 'REQUESTED';
+    final isAssigned = (status == 'ACCEPTED' || status == 'ARRIVED' || status == 'IN_TRANSIT');
+    final driver = provider.selectedDriverBid;
+    final driverName = driver?['driverName'] ?? 'Driver';
+    final vehicle = driver?['vehicleModel'] ?? 'Verified Vehicle';
+    final fare = provider.finalFarePaid ?? driver?['counterFareNgn'] ?? ride['riderOfferNgn'] ?? ride['rider_offer_ngn'] ?? 2500;
+    final pickup = ride['pickupAddress'] ?? ride['pickup_address'] ?? 'Pickup Point';
+    final dropoff = ride['dropoffAddress'] ?? ride['dropoff_address'] ?? 'Dropoff Point';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isAssigned
+              ? [const Color(0xFF064E3B), const Color(0xFF0D9488)]
+              : [const Color(0xFF1E293B), const Color(0xFF0F172A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isAssigned ? AppConstants.primaryLight : AppConstants.accentColor,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isAssigned ? AppConstants.primaryLight : AppConstants.accentColor).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: isAssigned ? AppConstants.successColor : AppConstants.accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isAssigned ? 'ACTIVE TRIP IN PROGRESS' : 'BROADCASTING OFFER',
+                    style: TextStyle(
+                      color: isAssigned ? AppConstants.successColor : AppConstants.accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (isAssigned ? AppConstants.successColor : AppConstants.accentColor).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    color: isAssigned ? AppConstants.successColor : AppConstants.accentColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Route
+          Row(
+            children: [
+              const Icon(Icons.trip_origin_rounded, color: AppConstants.successColor, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  pickup,
+                  style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.location_on_rounded, color: AppConstants.accentColor, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  dropoff,
+                  style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 12),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isAssigned ? '$driverName • $vehicle' : 'Fare Offered',
+                    style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    currencyFormat.format(fare),
+                    style: const TextStyle(color: AppConstants.accentColor, fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isAssigned ? AppConstants.primaryColor : AppConstants.accentColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                icon: Icon(isAssigned ? Icons.navigation_rounded : Icons.wifi_tethering_rounded, size: 16),
+                label: Text(
+                  isAssigned ? 'Track Live Ride' : 'View Offer Room',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                onPressed: () {
+                  if (isAssigned) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const RideTrackingScreen()));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const OfferRoomScreen()));
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
