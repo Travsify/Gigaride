@@ -11,6 +11,14 @@ import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../widgets/driver_interactive_map.dart';
 
+String _formatFare(dynamic amount) {
+  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString() ?? '0') ?? 0);
+  return val.toString().replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]},',
+  );
+}
+
 class RadarScreen extends StatefulWidget {
   const RadarScreen({super.key});
 
@@ -507,8 +515,8 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('Rider Offer', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
-                                  Text('₦${fare.toLocaleString()}', style: const TextStyle(color: AppConstants.accentColor, fontSize: 20, fontWeight: FontWeight.w900)),
+                                  const Text('Passenger Offer', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
+                                  Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.accentColor, fontSize: 22, fontWeight: FontWeight.w900)),
                                 ],
                               ),
                             ],
@@ -563,66 +571,107 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
 
                           const SizedBox(height: 16),
 
-                          // Quick Bidding Chips
+                          // Primary 1-Tap Accept Button (Full Width)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppConstants.successColor,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 3,
+                              ),
+                              onPressed: () {
+                                provider.submitCounterOffer(req['rideId'], fare, 5);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('✓ Accepted ₦${_formatFare(fare)}! Waiting for passenger confirmation.'),
+                                    backgroundColor: AppConstants.successColor,
+                                  ),
+                                );
+                              },
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'ACCEPT ₦${_formatFare(fare)} (KEEP 100%)',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          // Quick Counter-Offer Chips & Actions
                           Row(
                             children: [
-                              // Accept Rider's Exact Offer
-                              Expanded(
-                                flex: 2,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppConstants.successColor,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                  ),
-                                  onPressed: () {
-                                    provider.submitCounterOffer(req['rideId'], fare, 5);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('✓ Accepted ₦$fare offer! Waiting for passenger confirmation.'), backgroundColor: AppConstants.successColor),
-                                    );
-                                  },
-                                  child: const Text('Accept 100%', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-
-                              // Quick Raise +₦300
+                              // +₦500
                               Expanded(
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.white24),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                   onPressed: () {
-                                    provider.submitCounterOffer(req['rideId'], fare + 300, 6);
+                                    provider.submitCounterOffer(req['rideId'], fare + 500, 7);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Sent counter-offer: ₦${_formatFare(fare + 500)}'), backgroundColor: AppConstants.primaryColor),
+                                    );
                                   },
-                                  child: const Text('+₦300', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 11)),
+                                  child: Text('+₦500\n(₦${_formatFare(fare + 500)})', textAlign: TextAlign.center, style: const TextStyle(color: AppConstants.textLight, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                               const SizedBox(width: 6),
 
-                              // Quick Raise +₦500
+                              // +₦1,000
                               Expanded(
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.white24),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                   onPressed: () {
-                                    provider.submitCounterOffer(req['rideId'], fare + 500, 7);
+                                    provider.submitCounterOffer(req['rideId'], fare + 1000, 8);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Sent counter-offer: ₦${_formatFare(fare + 1000)}'), backgroundColor: AppConstants.primaryColor),
+                                    );
                                   },
-                                  child: const Text('+₦500', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 11)),
+                                  child: Text('+₦1,000\n(₦${_formatFare(fare + 1000)})', textAlign: TextAlign.center, style: const TextStyle(color: AppConstants.textLight, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                               const SizedBox(width: 6),
 
                               // Custom Offer Dialog
                               IconButton(
-                                style: IconButton.styleFrom(backgroundColor: AppConstants.surfaceBg),
-                                icon: const Icon(Icons.tune_rounded, color: AppConstants.primaryLight, size: 18),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: AppConstants.surfaceBg,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.tune_rounded, color: AppConstants.primaryLight, size: 20),
+                                tooltip: 'Custom Offer',
                                 onPressed: () => _showCustomBidDialog(req),
+                              ),
+                              const SizedBox(width: 6),
+
+                              // Decline Button
+                              IconButton(
+                                style: IconButton.styleFrom(
+                                  backgroundColor: AppConstants.dangerColor.withOpacity(0.15),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.close_rounded, color: AppConstants.dangerColor, size: 20),
+                                tooltip: 'Decline',
+                                onPressed: () {
+                                  setState(() {
+                                    provider.incomingRequests.removeWhere((r) => r['rideId'] == req['rideId']);
+                                  });
+                                },
                               ),
                             ],
                           ),

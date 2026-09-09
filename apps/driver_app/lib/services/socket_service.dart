@@ -56,7 +56,16 @@ class SocketService {
         onSubscriptionExhausted(Map<String, dynamic>.from(data));
       }
     });
+
+    // In-App Chat Listeners
+    socket!.on('ride:chat_message', (data) {
+      if (data != null && onChatMessage != null) {
+        onChatMessage!(Map<String, dynamic>.from(data));
+      }
+    });
   }
+
+  Function(Map<String, dynamic>)? onChatMessage;
 
   void updateLocation({required double latitude, required double longitude, bool isOnline = true}) {
     socket?.emit('driver:location', {
@@ -78,6 +87,14 @@ class SocketService {
     socket?.emit('driver:update_status', {
       'rideId': rideId,
       'status': status,
+    });
+  }
+
+  void sendChatMessage({required String rideId, required String receiverId, required String text}) {
+    socket?.emit('ride:chat_send', {
+      'rideId': rideId,
+      'receiverId': receiverId,
+      'text': text,
     });
   }
 

@@ -8,6 +8,15 @@ import '../services/routing_service.dart';
 import '../services/navigation_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/driver_interactive_map.dart';
+import 'driver_chat_sheet.dart';
+
+String _formatFare(dynamic amount) {
+  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString() ?? '0') ?? 0);
+  return val.toString().replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]},',
+  );
+}
 
 class ActiveTripScreen extends StatefulWidget {
   final Map<String, dynamic> trip;
@@ -111,7 +120,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Trip Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
-                        Text('₦${fare.toLocaleString()}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -127,7 +136,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('You Keep (100%)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-                        Text('₦${fare.toLocaleString()}', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.w900, fontSize: 18)),
+                        Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.w900, fontSize: 18)),
                       ],
                     ),
                   ],
@@ -261,6 +270,21 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.accentColor, size: 24),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (ctx) => DriverChatSheet(
+                  rideId: (widget.trip['rideId'] ?? widget.trip['id'] ?? '').toString(),
+                  passengerId: (widget.trip['riderId'] ?? widget.trip['passengerId'] ?? widget.trip['rider_id'] ?? '').toString(),
+                  passengerName: riderName,
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.sos_rounded, color: AppConstants.dangerColor, size: 28),
             onPressed: _triggerSos,
           ),
@@ -292,7 +316,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                           ],
                         ),
                         Text(
-                          '₦${fare.toLocaleString()}',
+                          '₦${_formatFare(fare)}',
                           style: const TextStyle(color: AppConstants.accentColor, fontSize: 24, fontWeight: FontWeight.w900),
                         ),
                       ],
@@ -658,8 +682,15 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                           );
                         }),
                         _buildAction(Icons.chat_bubble_outline_rounded, 'In-App Chat', () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('In-App chat active with passenger.')),
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => DriverChatSheet(
+                              rideId: (widget.trip['rideId'] ?? widget.trip['id'] ?? '').toString(),
+                              passengerId: (widget.trip['riderId'] ?? widget.trip['passengerId'] ?? widget.trip['rider_id'] ?? '').toString(),
+                              passengerName: riderName,
+                            ),
                           );
                         }),
                       ],
