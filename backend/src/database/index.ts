@@ -936,7 +936,22 @@ export class DatabaseService {
   }
 
   public async findUserByPhone(phone: string): Promise<UserRow | undefined> {
-    return this.store.users.find((u) => u.phone_number === phone);
+    const clean = phone.replace(/[\s\-\(\)]/g, '');
+    const variants = new Set<string>([clean]);
+    if (clean.startsWith('0') && clean.length === 11) {
+      variants.add('+234' + clean.slice(1));
+      variants.add('234' + clean.slice(1));
+    } else if (clean.startsWith('+234') && clean.length === 14) {
+      variants.add('0' + clean.slice(4));
+      variants.add(clean.slice(1));
+    } else if (clean.startsWith('234') && clean.length === 13) {
+      variants.add('+' + clean);
+      variants.add('0' + clean.slice(3));
+    }
+    return this.store.users.find((u) => {
+      const uClean = u.phone_number.replace(/[\s\-\(\)]/g, '');
+      return variants.has(uClean);
+    });
   }
 
   public async findUserByEmail(email: string): Promise<UserRow | undefined> {
