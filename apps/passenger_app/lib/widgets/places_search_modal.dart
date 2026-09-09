@@ -48,12 +48,14 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
   late final TextEditingController _searchCtrl;
   Timer? _debounceTimer;
   List<PlaceSuggestion> _suggestions = [];
+  List<PlaceSuggestion> _popularHubs = [];
   bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController(text: widget.initialQuery);
+    _popularHubs = PlacesService.getPopularHubs(widget.userLocation);
     if (widget.initialQuery.isNotEmpty) {
       _performSearch(widget.initialQuery);
     }
@@ -256,7 +258,7 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
           ),
           const Divider(color: Colors.white10),
 
-          // 3. Search Results or Empty State
+          // 3. Search Results or Popular Landmarks / Empty State
           Expanded(
             child: _suggestions.isNotEmpty
                 ? ListView.separated(
@@ -286,25 +288,67 @@ class _PlacesSearchModalState extends State<PlacesSearchModal> {
                       );
                     },
                   )
-                : Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.travel_explore_rounded, size: 40, color: AppConstants.textMuted.withOpacity(0.4)),
-                          const SizedBox(height: 10),
-                          Text(
-                            _searchCtrl.text.isEmpty
-                                ? 'Type an address or set directly on map'
-                                : 'No locations found. Try setting directly on map.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                : (_searchCtrl.text.isEmpty && _popularHubs.isNotEmpty)
+                    ? ListView.separated(
+                        itemCount: _popularHubs.length + 1,
+                        separatorBuilder: (_, _) => const Divider(color: Colors.white10, height: 1),
+                        itemBuilder: (ctx, idx) {
+                          if (idx == 0) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'POPULAR NEARBY LANDMARKS',
+                                style: TextStyle(
+                                  color: AppConstants.primaryLight,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            );
+                          }
+                          final item = _popularHubs[idx - 1];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppConstants.primaryColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.star_rounded, color: AppConstants.primaryLight, size: 18),
+                            ),
+                            title: Text(
+                              item.title,
+                              style: const TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              item.subtitle,
+                              style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                            ),
+                            onTap: () => Navigator.pop(context, item),
+                          );
+                        },
+                      )
+                    : Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.travel_explore_rounded, size: 40, color: AppConstants.textMuted.withOpacity(0.4)),
+                              const SizedBox(height: 10),
+                              Text(
+                                _searchCtrl.text.isEmpty
+                                    ? 'Type an address or set directly on map'
+                                    : 'No locations found for "${_searchCtrl.text}". Try "Set Location on Map".',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
           ),
         ],
       ),

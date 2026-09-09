@@ -120,6 +120,25 @@ class PlacesService {
     {'name': 'Kuto Central Motor Park', 'city': 'Kuto, Abeokuta, Ogun', 'lat': 7.1420, 'lng': 3.3590, 'tags': 'kuto motor park market roundabout express terminal'},
   ];
 
+  /// Returns top popular city landmarks sorted closest to the user
+  static List<PlaceSuggestion> getPopularHubs(LatLng userLocation) {
+    const distanceCalc = Distance();
+    final sorted = List<Map<String, dynamic>>.from(_curatedLandmarks);
+    sorted.sort((a, b) {
+      final locA = LatLng(a['lat'] as double, a['lng'] as double);
+      final locB = LatLng(b['lat'] as double, b['lng'] as double);
+      return distanceCalc.as(LengthUnit.Kilometer, userLocation, locA)
+          .compareTo(distanceCalc.as(LengthUnit.Kilometer, userLocation, locB));
+    });
+    return sorted.take(8).map((lm) {
+      return PlaceSuggestion(
+        title: lm['name'] as String,
+        subtitle: lm['city'] as String,
+        location: LatLng(lm['lat'] as double, lm['lng'] as double),
+      );
+    }).toList();
+  }
+
   /// High-Converting 4-Tier Resilient Geocoding Cascade:
   /// Tier 1: 0ms Curated Offline Dictionary (Instant local search)
   /// Tier 2: Google Places API (Auto-engages when billing is connected)
@@ -169,61 +188,134 @@ class PlacesService {
     }
 
     // ----------------------------------------------------
-    // Tier 2: Google Places API (Auto-fallback to Tier 3 if disabled)
+    // Tier 2: Google Places API (New) Engine
+    // Authorized on giga-508114 with live billing & strict GPS LocationBias
     // ----------------------------------------------------
-    if (results.length < 8) {
+    if (results.length < 15) {
       try {
-        final googleUrl = Uri.parse(
-          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-          '?input=${Uri.encodeComponent(cleanQuery)}'
-          '&components=country:ng'
-          '&location=${center.latitude},${center.longitude}'
-          '&radius=50000'
-          '&key=$googleMapsApiKey',
-        );
+        // 2A: Direct SearchText (Full text & Point-of-Interest matching)
+        final googleUrl = Uri.parse('https://places.googleapis.com/v1/places:searchText');
+        final requestBody = jsonEncode({
+          'textQuery': cleanQuery,
+          'locationBias': {
+            'circle': {
+              'center': {
+                'latitude': center.latitude,
+                'longitude': center.longitude,
+              },
+              'radius': isInterstate ? 150000.0 : 35000.0,
+            },
+          },
+        });
 
-        final gResp = await http.get(
+        final gResp = await http.post(
           googleUrl,
-          headers: {'User-Agent': 'GigaRide/1.0'},
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': googleMapsApiKey,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location',
+          },
+          body: requestBody,
         ).timeout(const Duration(seconds: 4));
 
         if (gResp.statusCode == 200) {
           final gData = jsonDecode(gResp.body);
-          if (gData['status'] == 'OK') {
-            final predictions = gData['predictions'] as List<dynamic>? ?? [];
-            for (final pred in predictions) {
-              final desc = (pred['description'] ?? '').toString();
-              final mainText = pred['structured_formatting']?['main_text'] ?? desc;
-              final secondaryText = pred['structured_formatting']?['secondary_text'] ?? 'Nigeria';
-              final placeId = pred['place_id'];
-
-              if (placeId != null) {
-                final detUrl = Uri.parse(
-                  'https://maps.googleapis.com/maps/api/place/details/json'
-                  '?place_id=$placeId'
-                  '&fields=geometry'
-                  '&key=$googleMapsApiKey',
-                );
-                final detResp = await http.get(detUrl).timeout(const Duration(seconds: 3));
-                if (detResp.statusCode == 200) {
-                  final detData = jsonDecode(detResp.body);
-                  final locData = detData['result']?['geometry']?['location'];
-                  if (locData != null) {
-                    final lat = (locData['lat'] as num).toDouble();
-                    final lng = (locData['lng'] as num).toDouble();
-                    final loc = LatLng(lat, lng);
-                    final key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
-                    if (!seenKeys.contains(key)) {
-                      seenKeys.add(key);
-                      results.add(PlaceSuggestion(
-                        title: mainText.toString(),
-                        subtitle: secondaryText.toString(),
-                        location: loc,
-                      ));
-                    }
-                  }
-                }
+          final places = gData['places'] as List<dynamic>? ?? [];
+          for (final p in places) {
+            final name = p['displayName']?['text']?.toString() ?? '';
+            final address = p['formattedAddress']?.toString() ?? 'Nigeria';
+            final locData = p['location'];
+            if (locData != null && name.isNotEmpty) {
+              final lat = (locData['latitude'] as num).toDouble();
+              final lng = (locData['longitude'] as num).toDouble();
+              final loc = LatLng(lat, lng);
+              final key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
+              if (!seenKeys.contains(key)) {
+                seenKeys.add(key);
+                results.add(PlaceSuggestion(
+                  title: name,
+                  subtitle: address,
+                  location: loc,
+                ));
               }
+            }
+          }
+        }
+
+        // 2B: Predictive Autocomplete (For prefix/partial keystrokes)
+        if (results.length < 5 && cleanQuery.length >= 3) {
+          final autoUrl = Uri.parse('https://places.googleapis.com/v1/places:autocomplete');
+          final autoBody = jsonEncode({
+            'input': cleanQuery,
+            'includedRegionCodes': ['ng'],
+            'locationBias': {
+              'circle': {
+                'center': {
+                  'latitude': center.latitude,
+                  'longitude': center.longitude,
+                },
+                'radius': 35000.0,
+              },
+            },
+          });
+
+          final autoResp = await http.post(
+            autoUrl,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': googleMapsApiKey,
+            },
+            body: autoBody,
+          ).timeout(const Duration(seconds: 3));
+
+          if (autoResp.statusCode == 200) {
+            final autoData = jsonDecode(autoResp.body);
+            final suggs = autoData['suggestions'] as List<dynamic>? ?? [];
+            final List<Future<void>> detailFutures = [];
+
+            for (final s in suggs.take(4)) {
+              final pred = s['placePrediction'];
+              final placeId = pred?['placeId']?.toString();
+              if (placeId != null && placeId.isNotEmpty) {
+                detailFutures.add(() async {
+                  try {
+                    final detUrl = Uri.parse('https://places.googleapis.com/v1/places/$placeId');
+                    final detResp = await http.get(
+                      detUrl,
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': googleMapsApiKey,
+                        'X-Goog-FieldMask': 'displayName,formattedAddress,location',
+                      },
+                    ).timeout(const Duration(seconds: 2));
+
+                    if (detResp.statusCode == 200) {
+                      final detData = jsonDecode(detResp.body);
+                      final name = detData['displayName']?['text']?.toString() ?? '';
+                      final address = detData['formattedAddress']?.toString() ?? 'Nigeria';
+                      final locData = detData['location'];
+                      if (locData != null && name.isNotEmpty) {
+                        final lat = (locData['latitude'] as num).toDouble();
+                        final lng = (locData['longitude'] as num).toDouble();
+                        final loc = LatLng(lat, lng);
+                        final key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
+                        if (!seenKeys.contains(key)) {
+                          seenKeys.add(key);
+                          results.add(PlaceSuggestion(
+                            title: name,
+                            subtitle: address,
+                            location: loc,
+                          ));
+                        }
+                      }
+                    }
+                  } catch (_) {}
+                }());
+              }
+            }
+
+            if (detailFutures.isNotEmpty) {
+              await Future.wait(detailFutures);
             }
           }
         }
@@ -346,8 +438,33 @@ class PlacesService {
     return results;
   }
 
-  /// Reverse geocode LatLng to human-readable street/estate name via Mapbox
+  /// Reverse geocode LatLng to human-readable street/estate name via Google first, then Mapbox
   static Future<String> reverseGeocode(LatLng location) async {
+    // 1. Google Geocoding API (Primary ground truth in Nigeria)
+    if (googleMapsApiKey.isNotEmpty) {
+      try {
+        final gUrl = Uri.parse(
+          'https://maps.googleapis.com/maps/api/geocode/json'
+          '?latlng=${location.latitude},${location.longitude}'
+          '&key=$googleMapsApiKey',
+        );
+        final gResp = await http.get(gUrl, headers: {'User-Agent': 'GigaRide/1.0'}).timeout(const Duration(seconds: 4));
+        if (gResp.statusCode == 200) {
+          final gData = jsonDecode(gResp.body);
+          if (gData['status'] == 'OK') {
+            final results = gData['results'] as List<dynamic>? ?? [];
+            if (results.isNotEmpty) {
+              final addr = results[0]['formatted_address']?.toString();
+              if (addr != null && addr.isNotEmpty) {
+                return addr;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Mapbox Fallback
     final token = AppConstants.mapboxPublicToken;
     final url = Uri.parse(
       'https://api.mapbox.com/geocoding/v5/mapbox.places/${location.longitude},${location.latitude}.json'
@@ -361,7 +478,7 @@ class PlacesService {
       final response = await http.get(
         url,
         headers: {'User-Agent': 'GigaRide/1.0'},
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
