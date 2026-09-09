@@ -21,11 +21,20 @@ export class PremblyService {
 
     if (apiKey && appId && !apiKey.includes('mock')) {
       try {
-        const response = await axios.post(
-          `${this.baseUrl}/nin`,
-          { number_nin: nin, number: nin, firstname: firstName, surname: lastName, dob },
-          { headers: { 'x-api-key': apiKey, 'app-id': appId, 'Content-Type': 'application/json' } }
-        );
+        let response;
+        try {
+          response = await axios.post(
+            `https://api.prembly.com/verification/vnin`,
+            { number_nin: nin, number: nin, firstname: firstName, surname: lastName, dob },
+            { headers: { 'x-api-key': apiKey, 'app-id': appId, 'Content-Type': 'application/json' }, timeout: 8000 }
+          );
+        } catch (vninErr) {
+          response = await axios.post(
+            `${this.baseUrl}/nin`,
+            { number_nin: nin, number: nin, firstname: firstName, surname: lastName, dob },
+            { headers: { 'x-api-key': apiKey, 'app-id': appId, 'Content-Type': 'application/json' }, timeout: 8000 }
+          );
+        }
         payload = response.data;
         isSuccess = response.data?.status === true;
       } catch (err: any) {

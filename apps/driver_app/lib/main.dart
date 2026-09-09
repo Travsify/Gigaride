@@ -9,10 +9,14 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize OneSignal Push Notification Engine
-  OneSignal.Debug.setLogLevel(OSLogLevel.none);
-  OneSignal.initialize(AppConstants.oneSignalAppId);
-  OneSignal.Notifications.requestPermission(true);
+  // Initialize OneSignal Push Notification Engine safely
+  try {
+    OneSignal.Debug.setLogLevel(OSLogLevel.none);
+    OneSignal.initialize(AppConstants.oneSignalAppId);
+    OneSignal.Notifications.requestPermission(true);
+  } catch (e) {
+    debugPrint('[Push Notification] OneSignal init deferred: $e');
+  }
 
   runApp(const GigaDriverApp());
 }
