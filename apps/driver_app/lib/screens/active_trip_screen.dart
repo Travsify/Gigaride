@@ -6,9 +6,9 @@ import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../services/routing_service.dart';
 import '../services/navigation_helper.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../widgets/driver_interactive_map.dart';
 import 'driver_chat_sheet.dart';
+import 'in_app_call_screen.dart';
 
 int _extractFare(dynamic req) {
   if (req is! Map) return 3000;
@@ -62,6 +62,98 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final provider = context.read<DriverProvider>();
     _currentStep = provider.tripStep ?? 'ACCEPTED';
     _fetchDriverLocationAndRoute();
+
+    // 📞 Listen for incoming in-app call from rider
+    provider.socket.onIncomingCall = (callData) {
+      if (mounted) {
+        _showIncomingCallSheet(callData);
+      }
+    };
+  }
+
+  void _showIncomingCallSheet(Map<String, dynamic> callData) {
+    final callerName = callData['callerName']?.toString() ?? 'Passenger';
+    final callerId = callData['callerId']?.toString() ?? '';
+    final rideId = callData['rideId']?.toString() ?? (widget.trip['id'] ?? widget.trip['rideId'] ?? '').toString();
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: const Color(0xFF071210),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.ring_volume_rounded, color: AppConstants.accentColor, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Incoming Call from $callerName',
+                  style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '256-Bit Encrypted In-App Audio • Zero Phone Leak',
+                  style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.dangerColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.call_end_rounded, color: Colors.white),
+                      label: const Text('Decline', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        context.read<DriverProvider>().socket.endCall(
+                          rideId: rideId,
+                          targetId: callerId,
+                          reason: 'Declined',
+                        );
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.successColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.call_rounded, color: Colors.white),
+                      label: const Text('Answer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InAppCallScreen(
+                              rideId: rideId,
+                              riderId: callerId,
+                              riderName: callerName,
+                              isIncoming: true,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
 
@@ -801,23 +893,25 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildAction(Icons.phone_in_talk_rounded, isFriend ? 'Call Friend' : 'Call Rider', () async {
-                          if (riderPhone != null && riderPhone.toString().isNotEmpty) {
-                            final uri = Uri.parse('tel:${riderPhone.toString().replaceAll(RegExp(r'[^0-9+]'), '')}');
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            } else {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Cannot launch phone dialer for $riderPhone')),
-                                );
-                              }
-                            }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('No passenger phone number provided.')),
-                            );
-                          }
+                        _buildAction(Icons.phone_in_talk_rounded, isFriend ? 'Call Friend' : 'Call Rider', () {
+                          final rId = (widget.trip['passengerId'] ??
+                                  widget.trip['userId'] ??
+                                  widget.trip['riderId'] ??
+                                  widget.trip['passenger']?['id'] ??
+                                  '')
+                              .toString();
+                          final rRideId = (widget.trip['id'] ?? widget.trip['rideId'] ?? '').toString();
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InAppCallScreen(
+                                rideId: rRideId,
+                                riderId: rId,
+                                riderName: riderName,
+                              ),
+                            ),
+                          );
                         }),
                         _buildAction(Icons.navigation_rounded, 'Google Maps', () {
                           final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;

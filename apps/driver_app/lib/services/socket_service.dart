@@ -63,9 +63,54 @@ class SocketService {
         onChatMessage!(Map<String, dynamic>.from(data));
       }
     });
+
+    // In-App Secure Calling & Signaling Listeners
+    socket!.on('call:incoming', (data) {
+      if (data != null && onIncomingCall != null) {
+        onIncomingCall!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:connected', (data) {
+      if (data != null && onCallConnected != null) {
+        onCallConnected!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:ended', (data) {
+      if (data != null && onCallEnded != null) {
+        onCallEnded!(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
   Function(Map<String, dynamic>)? onChatMessage;
+  Function(Map<String, dynamic>)? onIncomingCall;
+  Function(Map<String, dynamic>)? onCallConnected;
+  Function(Map<String, dynamic>)? onCallEnded;
+
+  // In-App Calling Actions
+  void initiateCall({required String rideId, required String receiverId}) {
+    socket?.emit('call:initiate', {
+      'rideId': rideId,
+      'receiverId': receiverId,
+    });
+  }
+
+  void answerCall({required String rideId, required String callerId}) {
+    socket?.emit('call:answer', {
+      'rideId': rideId,
+      'callerId': callerId,
+    });
+  }
+
+  void endCall({required String rideId, required String targetId, String? reason}) {
+    socket?.emit('call:end', {
+      'rideId': rideId,
+      'targetId': targetId,
+      'reason': reason ?? 'Call ended',
+    });
+  }
 
   void updateLocation({
     required double latitude,

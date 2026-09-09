@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import 'phone_auth_screen.dart';
+import 'support_help_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onOfflineBookingPressed;
@@ -13,6 +15,75 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  String _homeAddress = '';
+  String _workAddress = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPlaces();
+  }
+
+  Future<void> _loadSavedPlaces() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _homeAddress = prefs.getString('saved_home_address') ?? '';
+        _workAddress = prefs.getString('saved_work_address') ?? '';
+      });
+    }
+  }
+
+  Future<void> _savePlace(String key, String address) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, address);
+    _loadSavedPlaces();
+  }
+
+  void _showEditPlaceDialog(String label, String prefKey, String currentVal) {
+    final ctrl = TextEditingController(text: currentVal);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppConstants.cardBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(left: 24, right: 24, top: 24, bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Set $label Location', style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Save this location for one-tap destination selection on your home screen.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+              decoration: _inputDeco('$label Address (e.g. 15 Admiralty Way, Lekki)', label == 'Home' ? Icons.home_rounded : Icons.work_rounded),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                onPressed: () {
+                  final text = ctrl.text.trim();
+                  if (text.isNotEmpty) {
+                    _savePlace(prefKey, text);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✓ $label location saved!'), backgroundColor: AppConstants.successColor));
+                  }
+                },
+                child: const Text('Save Location', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showPrivacyPolicy(BuildContext context) {
     showModalBottomSheet(
@@ -358,12 +429,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text(phone, style: const TextStyle(color: AppConstants.textMuted, fontSize: 13)),
                         const SizedBox(height: 2),
                         Text(email, style: const TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.amber.withOpacity(0.4), width: 1),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                                  SizedBox(width: 4),
+                                  Text('4.95 Rider Rating', style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppConstants.successColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.verified_rounded, color: AppConstants.successColor, size: 12),
+                                  SizedBox(width: 3),
+                                  Text('Verified Rider', style: TextStyle(color: AppConstants.successColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, color: AppConstants.primaryLight, size: 20),
                     onPressed: () => _showEditProfile(context, provider),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Saved Places (Home & Work)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: AppConstants.cardBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Saved Places', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text('Quick destinations for faster pickup & drop-off booking', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.15), shape: BoxShape.circle),
+                      child: const Icon(Icons.home_rounded, color: Colors.blueAccent, size: 20),
+                    ),
+                    title: const Text('Home', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_homeAddress.isNotEmpty ? _homeAddress : 'Set home location', style: TextStyle(color: _homeAddress.isNotEmpty ? AppConstants.textMuted : AppConstants.primaryLight, fontSize: 11)),
+                    trailing: Icon(_homeAddress.isNotEmpty ? Icons.edit_outlined : Icons.add_circle_outline, color: AppConstants.textMuted, size: 18),
+                    onTap: () => _showEditPlaceDialog('Home', 'saved_home_address', _homeAddress),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.amberAccent.withOpacity(0.15), shape: BoxShape.circle),
+                      child: const Icon(Icons.work_rounded, color: Colors.amberAccent, size: 20),
+                    ),
+                    title: const Text('Work', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text(_workAddress.isNotEmpty ? _workAddress : 'Set work location', style: TextStyle(color: _workAddress.isNotEmpty ? AppConstants.textMuted : AppConstants.primaryLight, fontSize: 11)),
+                    trailing: Icon(_workAddress.isNotEmpty ? Icons.edit_outlined : Icons.add_circle_outline, color: AppConstants.textMuted, size: 18),
+                    onTap: () => _showEditPlaceDialog('Work', 'saved_work_address', _workAddress),
                   ),
                 ],
               ),
@@ -378,13 +530,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Ride Comfort Preferences', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Ride & Cabin Comfort Preferences', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: AppConstants.primaryColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                        child: const Text('Auto-Applied', style: TextStyle(color: AppConstants.primaryLight, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.volume_off_rounded, color: Colors.purpleAccent, size: 20),
+                    title: const Text('Quiet Ride (Silent Cabin)', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Minimal driver chat & peaceful travel', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    value: provider.preferQuiet,
+                    activeColor: Colors.purpleAccent,
+                    onChanged: (val) => provider.setPreference('preferQuiet', val),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
                   SwitchListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     secondary: const Icon(Icons.ac_unit_rounded, color: Colors.cyanAccent, size: 20),
                     title: const Text('Always AC On', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Cool cabin air conditioning on every trip', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                     value: provider.alwaysAcOn,
                     activeColor: Colors.cyanAccent,
                     onChanged: (val) => provider.setPreference('alwaysAcOn', val),
@@ -393,11 +567,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SwitchListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    secondary: const Icon(Icons.volume_off_rounded, color: Colors.purpleAccent, size: 20),
-                    title: const Text('Quiet Ride', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
-                    value: provider.preferQuiet,
-                    activeColor: Colors.purpleAccent,
-                    onChanged: (val) => provider.setPreference('preferQuiet', val),
+                    secondary: const Icon(Icons.luggage_rounded, color: Colors.amberAccent, size: 20),
+                    title: const Text('Luggage Assistance', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Trunk space and help with heavy bags', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    value: provider.luggageAssistance,
+                    activeColor: Colors.amberAccent,
+                    onChanged: (val) => provider.setPreference('luggageAssistance', val),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.music_off_rounded, color: Colors.indigoAccent, size: 20),
+                    title: const Text('No Music / Radio Off', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Keep sound system and radio powered off', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    value: provider.noMusic,
+                    activeColor: Colors.indigoAccent,
+                    onChanged: (val) => provider.setPreference('noMusic', val),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.pets_rounded, color: Colors.greenAccent, size: 20),
+                    title: const Text('Pet-Friendly Vehicle', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Traveling with a domestic pet or guide animal', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    value: provider.petFriendly,
+                    activeColor: Colors.greenAccent,
+                    onChanged: (val) => provider.setPreference('petFriendly', val),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.accessible_forward_rounded, color: AppConstants.primaryLight, size: 20),
+                    title: const Text('Accessibility Support', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Space for folding wheelchair or mobility aid', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    value: provider.accessibilitySupport,
+                    activeColor: AppConstants.primaryLight,
+                    onChanged: (val) => provider.setPreference('accessibilitySupport', val),
                   ),
                 ],
               ),
@@ -444,11 +652,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // Legal, Privacy, Safety & Settings List
+            // Safety Center & Rapid Emergency Services
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppConstants.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppConstants.dangerColor.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.shield_outlined, color: AppConstants.dangerColor, size: 20),
+                      SizedBox(width: 8),
+                      Text('Emergency Safety Toolkit', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('24/7 Rapid response hotlines & live GPS broadcast protection', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          decoration: BoxDecoration(color: AppConstants.surfaceBg, borderRadius: BorderRadius.circular(10)),
+                          child: const Column(
+                            children: [
+                              Text('112', style: TextStyle(color: AppConstants.dangerColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 2),
+                              Text('National Police/EMS', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          decoration: BoxDecoration(color: AppConstants.surfaceBg, borderRadius: BorderRadius.circular(10)),
+                          child: const Column(
+                            children: [
+                              Text('767', style: TextStyle(color: Colors.amber, fontSize: 16, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 2),
+                              Text('LASEMA Emergency', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          decoration: BoxDecoration(color: AppConstants.surfaceBg, borderRadius: BorderRadius.circular(10)),
+                          child: const Column(
+                            children: [
+                              Text('122', style: TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 2),
+                              Text('FRSC Highway', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Legal, Privacy, Support & Settings List
             Container(
               decoration: BoxDecoration(color: AppConstants.cardBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
               child: Column(
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.support_agent_rounded, color: AppConstants.primaryLight),
+                    title: const Text('Complaints & Support Center', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Trip disputes, lost items, safety & fare refunds', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_right, color: AppConstants.textMuted),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportHelpScreen())),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
                   ListTile(
                     leading: const Icon(Icons.privacy_tip_outlined, color: AppConstants.primaryLight),
                     title: const Text('Privacy Policy (NDPA & NDPR)', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.w600)),
@@ -466,16 +754,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   ListTile(
-                    leading: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.successColor),
-                    title: const Text('24/7 WhatsApp Concierge', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Instant support for booking & dispute resolution', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                    trailing: const Icon(Icons.chevron_right, color: AppConstants.textMuted),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connecting to 24/7 Giga Concierge...'), backgroundColor: AppConstants.successColor));
-                    },
-                  ),
-                  const Divider(color: Colors.white10, height: 1),
-                  ListTile(
                     leading: const Icon(Icons.delete_forever_outlined, color: AppConstants.dangerColor),
                     title: const Text('Delete Account', style: TextStyle(color: AppConstants.dangerColor, fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Request permanent erasure of your account', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
@@ -488,6 +766,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: const Text('Sign Out', style: TextStyle(color: AppConstants.dangerColor, fontSize: 14, fontWeight: FontWeight.bold)),
                     trailing: const Icon(Icons.chevron_right, color: AppConstants.dangerColor),
                     onTap: () => _showLogoutDialog(context, provider),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // App Version & Platform Build Details
+            Center(
+              child: Column(
+                children: const [
+                  Text(
+                    'Giga Ride v2.5.0 (Build 42)',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '100% Zero Driver Commission • Lagos, NG',
+                    style: TextStyle(color: Colors.white24, fontSize: 10),
                   ),
                 ],
               ),

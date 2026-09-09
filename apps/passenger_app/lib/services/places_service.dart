@@ -195,18 +195,20 @@ class PlacesService {
       try {
         // 2A: Direct SearchText (Full text & Point-of-Interest matching)
         final googleUrl = Uri.parse('https://places.googleapis.com/v1/places:searchText');
-        final requestBody = jsonEncode({
+        final Map<String, dynamic> bodyMap = {
           'textQuery': cleanQuery,
-          'locationBias': {
+        };
+        if (!isInterstate) {
+          bodyMap['locationBias'] = {
             'circle': {
               'center': {
                 'latitude': center.latitude,
                 'longitude': center.longitude,
               },
-              'radius': isInterstate ? 150000.0 : 35000.0,
+              'radius': 45000.0,
             },
-          },
-        });
+          };
+        }
 
         final gResp = await http.post(
           googleUrl,
@@ -215,7 +217,7 @@ class PlacesService {
             'X-Goog-Api-Key': googleMapsApiKey,
             'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location',
           },
-          body: requestBody,
+          body: jsonEncode(bodyMap),
         ).timeout(const Duration(seconds: 4));
 
         if (gResp.statusCode == 200) {
@@ -241,85 +243,40 @@ class PlacesService {
             }
           }
         }
+      } catch (_) {}
 
-        // 2B: Predictive Autocomplete (For prefix/partial keystrokes)
-        if (results.length < 5 && cleanQuery.length >= 3) {
-          final autoUrl = Uri.parse('https://places.googleapis.com/v1/places:autocomplete');
-          final autoBody = jsonEncode({
-            'input': cleanQuery,
-            'includedRegionCodes': ['ng'],
-            'locationBias': {
-              'circle': {
-                'center': {
-                  'latitude': center.latitude,
-                  'longitude': center.longitude,
-                },
-                'radius': 35000.0,
-              },
-            },
-          });
-
-          final autoResp = await http.post(
-            autoUrl,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Goog-Api-Key': googleMapsApiKey,
-            },
-            body: autoBody,
-          ).timeout(const Duration(seconds: 3));
-
-          if (autoResp.statusCode == 200) {
-            final autoData = jsonDecode(autoResp.body);
-            final suggs = autoData['suggestions'] as List<dynamic>? ?? [];
-            final List<Future<void>> detailFutures = [];
-
-            for (final s in suggs.take(4)) {
-              final pred = s['placePrediction'];
-              final placeId = pred?['placeId']?.toString();
-              if (placeId != null && placeId.isNotEmpty) {
-                detailFutures.add(() async {
-                  try {
-                    final detUrl = Uri.parse('https://places.googleapis.com/v1/places/$placeId');
-                    final detResp = await http.get(
-                      detUrl,
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'X-Goog-Api-Key': googleMapsApiKey,
-                        'X-Goog-FieldMask': 'displayName,formattedAddress,location',
-                      },
-                    ).timeout(const Duration(seconds: 2));
-
-                    if (detResp.statusCode == 200) {
-                      final detData = jsonDecode(detResp.body);
-                      final name = detData['displayName']?['text']?.toString() ?? '';
-                      final address = detData['formattedAddress']?.toString() ?? 'Nigeria';
-                      final locData = detData['location'];
-                      if (locData != null && name.isNotEmpty) {
-                        final lat = (locData['latitude'] as num).toDouble();
-                        final lng = (locData['longitude'] as num).toDouble();
-                        final loc = LatLng(lat, lng);
-                        final key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
-                        if (!seenKeys.contains(key)) {
-                          seenKeys.add(key);
-                          results.add(PlaceSuggestion(
-                            title: name,
-                            subtitle: address,
-                            location: loc,
-                          ));
-                        }
-                      }
-                    }
-                  } catch (_) {}
-                }());
+      // 2B: Backend High-Speed Proxy Fallback (Guarantees 100% uptime if phone DNS/ISP fails)
+      if (results.isEmpty) {
+        try {
+          final proxyUrl = Uri.parse(
+            '${AppConstants.defaultApiUrl}/api/places/search'
+            '?query=${Uri.encodeComponent(cleanQuery)}'
+            '&lat=${center.latitude}&lng=${center.longitude}'
+            '&isInterstate=$isInterstate',
+          );
+          final pResp = await http.get(proxyUrl).timeout(const Duration(seconds: 4));
+          if (pResp.statusCode == 200) {
+            final pData = jsonDecode(pResp.body);
+            final items = pData['data'] as List<dynamic>? ?? [];
+            for (final item in items) {
+              final title = item['title']?.toString() ?? '';
+              final subtitle = item['subtitle']?.toString() ?? 'Nigeria';
+              final lat = (item['latitude'] as num?)?.toDouble() ?? center.latitude;
+              final lng = (item['longitude'] as num?)?.toDouble() ?? center.longitude;
+              final loc = LatLng(lat, lng);
+              final key = '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
+              if (!seenKeys.contains(key)) {
+                seenKeys.add(key);
+                results.add(PlaceSuggestion(
+                  title: title,
+                  subtitle: subtitle,
+                  location: loc,
+                ));
               }
             }
-
-            if (detailFutures.isNotEmpty) {
-              await Future.wait(detailFutures);
-            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
 
     // ----------------------------------------------------

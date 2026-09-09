@@ -11,6 +11,7 @@ import { adminRouter } from './modules/admin/admin.controller';
 import { kycRouter } from './modules/kyc/kyc.controller';
 import { notificationRouter } from './modules/notifications/notification.controller';
 import { trackingRouter } from './modules/tracking/tracking.controller';
+import { placesRouter } from './modules/places/places.controller';
 import { setupBiddingGateway } from './modules/bidding/bidding.gateway';
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/payments', paymentRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/kyc', kycRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/places', placesRouter);
 app.use('/api/track', trackingRouter);
 app.use('/track', trackingRouter);
 

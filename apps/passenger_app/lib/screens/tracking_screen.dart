@@ -24,6 +24,8 @@ class RideTrackingScreen extends StatefulWidget {
 
 class _RideTrackingScreenState extends State<RideTrackingScreen> {
   bool _walletPaymentSuccess = false;
+  bool _cashPaymentConfirmed = false;
+  int _selectedPaymentTab = 0; // 0 = Living Wallet, 1 = Cash / Bank Transfer
   bool _isSettlingWallet = false;
   bool _sosDispatched = false;
   int _driverRating = 5;
@@ -34,6 +36,105 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   List<LatLng> _liveRoutePoints = [];
   bool _isLoadingRoute = false;
   String? _lastRoutedStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<PassengerProvider>();
+      provider.socket.onIncomingCall = (callData) {
+        if (mounted) {
+          _showIncomingCallSheet(callData);
+        }
+      };
+    });
+  }
+
+  void _showIncomingCallSheet(Map<String, dynamic> callData) {
+    final callerName = callData['callerName']?.toString() ?? 'Driver';
+    final callerId = callData['callerId']?.toString() ?? '';
+    final rideId = callData['rideId']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: const Color(0xFF071210),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.ring_volume_rounded, color: AppConstants.accentColor, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Incoming Call from $callerName',
+                  style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '256-Bit Encrypted In-App Audio • Zero Phone Leak',
+                  style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.dangerColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.call_end_rounded, color: Colors.white),
+                      label: const Text('Decline', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        context.read<PassengerProvider>().socket.endCall(
+                          rideId: rideId,
+                          targetId: callerId,
+                          reason: 'Declined',
+                        );
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.successColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.call_rounded, color: Colors.white),
+                      label: const Text('Answer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InAppCallScreen(
+                              rideId: rideId,
+                              driverId: callerId,
+                              driverName: callerName,
+                              isIncoming: true,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _fetchLiveRoadPolyline(PassengerProvider provider) async {
     if (_isLoadingRoute) return;
@@ -679,262 +780,490 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final rideId = provider.currentRide?['id'] ?? driver?['rideId'] ?? 'active-ride';
 
     if (status == 'COMPLETED') {
-      return Scaffold(
-        backgroundColor: AppConstants.darkBg,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(28.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.check_circle, size: 80, color: AppConstants.successColor),
-                const SizedBox(height: 16),
-                const Text('You Have Arrived!', style: TextStyle(color: AppConstants.textLight, fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                const Text('Hope you enjoyed your ride.', style: TextStyle(color: AppConstants.textMuted, fontSize: 14)),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppConstants.cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _walletPaymentSuccess ? AppConstants.successColor : Colors.white12),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('Total Agreed Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
-                      const SizedBox(height: 4),
-                      Text(
-                        currencyFormat.format(provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0),
-                        style: const TextStyle(color: AppConstants.accentColor, fontSize: 32, fontWeight: FontWeight.bold),
-                      ),
-                      const Divider(color: Colors.white12, height: 24),
-                      if (_walletPaymentSuccess) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
-                            SizedBox(width: 8),
-                            Text('Paid via Giga Living Wallet', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                          ],
-                        ),
+      final isPaid = _walletPaymentSuccess || _cashPaymentConfirmed;
+
+      return GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: AppConstants.darkBg,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle, size: 70, color: AppConstants.successColor),
+                  const SizedBox(height: 12),
+                  const Text('You Have Arrived!', style: TextStyle(color: AppConstants.textLight, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text('Hope you enjoyed your ride.', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                  const SizedBox(height: 18),
+
+                  // Fare Summary Card
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppConstants.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isPaid ? AppConstants.successColor : Colors.white12),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('Total Agreed Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
                         const SizedBox(height: 4),
-                        const Text('Driver received 100% directly into their payout wallet.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                      ] else ...[
-                        const Text(
-                          'Settle with driver directly via cash/transfer or pay instantly with your Living Wallet.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                        Text(
+                          currencyFormat.format(provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0),
+                          style: const TextStyle(color: AppConstants.accentColor, fontSize: 32, fontWeight: FontWeight.bold),
+                        ),
+                        const Divider(color: Colors.white12, height: 20),
+                        if (isPaid) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                _walletPaymentSuccess ? 'Paid via Giga Living Wallet' : 'Paid via Cash / Bank Transfer',
+                                style: const TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('Driver received 100% directly without commission.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                        ] else ...[
+                          const Text(
+                            'Choose your preferred payment option below: Instant Living Wallet or Cash/Transfer directly to driver.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 💳 Settlement Method Selection (Zero Concealment)
+                  if (!isPaid) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Choose How to Pay', style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // Tab 0: Living Wallet
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() => _selectedPaymentTab = 0);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedPaymentTab == 0 ? AppConstants.primaryColor.withOpacity(0.25) : AppConstants.cardBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedPaymentTab == 0 ? AppConstants.accentColor : Colors.white10,
+                                  width: _selectedPaymentTab == 0 ? 2 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.account_balance_wallet_rounded, color: _selectedPaymentTab == 0 ? AppConstants.accentColor : Colors.white70, size: 24),
+                                  const SizedBox(height: 6),
+                                  const Text('Living Wallet', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Bal: ${currencyFormat.format(provider.walletBalance)}',
+                                    style: const TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Tab 1: Cash / Direct Bank Transfer
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() => _selectedPaymentTab = 1);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedPaymentTab == 1 ? Colors.green.withOpacity(0.2) : AppConstants.cardBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedPaymentTab == 1 ? Colors.greenAccent : Colors.white10,
+                                  width: _selectedPaymentTab == 1 ? 2 : 1,
+                                ),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(Icons.payments_rounded, color: Colors.greenAccent, size: 24),
+                                  SizedBox(height: 6),
+                                  Text('Cash / Transfer', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  SizedBox(height: 3),
+                                  Text('Direct to Driver', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
+                    ),
 
-                // Rating & Zero-Commission Driver Tip Card
-                Container(
-                  margin: const EdgeInsets.only(top: 14),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppConstants.cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('Rate your Trip Experience', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(5, (index) {
-                          final star = index + 1;
-                          return IconButton(
-                            icon: Icon(
-                              star <= _driverRating ? Icons.star_rounded : Icons.star_border_rounded,
-                              color: star <= _driverRating ? Colors.amberAccent : AppConstants.textMuted,
-                              size: 28,
+                    const SizedBox(height: 14),
+
+                    // Tab 0 Content: Living Wallet Action Card
+                    if (_selectedPaymentTab == 0) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppConstants.cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppConstants.accentColor.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Available Living Wallet:', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                                Text(
+                                  currencyFormat.format(provider.walletBalance),
+                                  style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ],
                             ),
-                            onPressed: () => setState(() => _driverRating = star),
-                          );
-                        }),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConstants.accentColor,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: _isSettlingWallet
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                    : const Icon(Icons.flash_on_rounded, size: 18),
+                                label: Text(
+                                  _isSettlingWallet ? 'Processing Wallet Transfer...' : 'Pay Fare with Living Wallet',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                onPressed: _isSettlingWallet ? null : () => _handleWalletPayment(provider),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const Divider(color: Colors.white10, height: 16),
-                      const Text('Add 100% Zero-Commission Driver Tip', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [200, 500, 1000].map((tipAmt) {
-                          final isSelected = _selectedTip == tipAmt;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: ActionChip(
-                              backgroundColor: isSelected ? AppConstants.primaryColor : AppConstants.surfaceBg,
-                              label: Text('+₦$tipAmt', style: TextStyle(color: isSelected ? Colors.white : AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.bold)),
-                              onPressed: () {
-                                setState(() => _selectedTip = isSelected ? null : tipAmt);
-                                if (!isSelected) {
+                    ] else ...[
+                      // Tab 1 Content: Cash / Bank Transfer Details Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppConstants.cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.account_balance_rounded, color: Colors.greenAccent, size: 18),
+                                SizedBox(width: 8),
+                                Text('Driver NUBAN Bank Details', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(driver?['bankName'] ?? 'Access Bank / GTBank', style: const TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        driver?['accountNumber'] ?? driver?['driverNuban'] ?? '9928371625',
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(driver?['driverName'] ?? 'Driver Partner', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                    ],
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.copy_rounded, color: AppConstants.accentColor, size: 20),
+                                    tooltip: 'Copy Account Number',
+                                    onPressed: () {
+                                      Clipboard.setData(ClipboardData(text: (driver?['accountNumber'] ?? driver?['driverNuban'] ?? '9928371625').toString()));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Account number copied to clipboard!'), behavior: SnackBarBehavior.floating),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+                                label: const Text(
+                                  'I Have Paid Cash / Transferred to Driver',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  FocusScope.of(context).unfocus();
+                                  setState(() => _cashPaymentConfirmed = true);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Added ₦$tipAmt tip! 100% will go directly to your driver.'),
+                                    const SnackBar(
+                                      content: Text('✅ Cash/Transfer payment confirmed! Thank you.'),
                                       backgroundColor: AppConstants.successColor,
-                                      duration: const Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                     ),
                                   );
-                                }
-                              },
+                                },
+                              ),
                             ),
-                          );
-                        }).toList(),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                ),
+                  ] else ...[
+                    // Payment Confirmed Banner
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppConstants.successColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppConstants.successColor),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.verified_rounded, color: AppConstants.successColor, size: 22),
+                          const SizedBox(width: 8),
+                          Text(
+                            _walletPaymentSuccess ? 'Payment Settled via Living Wallet' : 'Payment Settled via Cash / Direct Transfer',
+                            style: const TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
-                // 💰 Cash Change Rollover to Living Wallet
-                if (!_walletPaymentSuccess) ...[
+                  // Rating & Zero-Commission Driver Tip Card
                   Container(
                     margin: const EdgeInsets.only(top: 14),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: AppConstants.cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _changeSettled ? AppConstants.successColor : Colors.white10),
+                      border: Border.all(color: Colors.white10),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.savings_outlined, color: AppConstants.accentColor, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'No Change? Deposit to Living Wallet',
-                                style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
+                        const Text('Rate your Trip Experience', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Handed ₦5,000 for a ₦3,500 ride? Have the ₦1,500 change credited to your Living Wallet balance instantly.',
-                          style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
-                        ),
-                        const SizedBox(height: 10),
-                        if (_changeSettled) ...[
-                          Row(
-                            children: const [
-                              Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
-                              SizedBox(width: 6),
-                              Text('Change queued for deposit into your Living Wallet!', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ],
-                          ),
-                        ] else ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _changeTenderedCtrl,
-                                  keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
-                                  decoration: InputDecoration(
-                                    hintText: 'Cash handed (e.g. 5000)',
-                                    hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
-                                    filled: true,
-                                    fillColor: AppConstants.surfaceBg,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                  ),
-                                ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            final star = index + 1;
+                            return IconButton(
+                              icon: Icon(
+                                star <= _driverRating ? Icons.star_rounded : Icons.star_border_rounded,
+                                color: star <= _driverRating ? Colors.amberAccent : AppConstants.textMuted,
+                                size: 28,
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppConstants.primaryColor,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
+                              onPressed: () => setState(() => _driverRating = star),
+                            );
+                          }),
+                        ),
+                        const Divider(color: Colors.white10, height: 16),
+                        const Text('Add 100% Zero-Commission Driver Tip', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [200, 500, 1000].map((tipAmt) {
+                            final isSelected = _selectedTip == tipAmt;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: ActionChip(
+                                backgroundColor: isSelected ? AppConstants.primaryColor : AppConstants.surfaceBg,
+                                label: Text('+₦$tipAmt', style: TextStyle(color: isSelected ? Colors.white : AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.bold)),
                                 onPressed: () {
-                                  final tendered = int.tryParse(_changeTenderedCtrl.text.replaceAll(',', '').trim()) ?? 0;
-                                  final agreed = ((provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0) as num).toInt();
-                                  if (tendered <= agreed) {
+                                  setState(() => _selectedTip = isSelected ? null : tipAmt);
+                                  if (!isSelected) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Cash handed must be greater than agreed fare to compute change.'),
-                                        backgroundColor: AppConstants.dangerColor,
+                                      SnackBar(
+                                        content: Text('Added ₦$tipAmt tip! 100% will go directly to your driver.'),
+                                        backgroundColor: AppConstants.successColor,
+                                        duration: const Duration(seconds: 2),
                                         behavior: SnackBarBehavior.floating,
                                       ),
                                     );
-                                    return;
                                   }
-                                  provider.settleCashChange(tenderedNgn: tendered, agreedFareNgn: agreed);
-                                  setState(() => _changeSettled = true);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('✅ ₦${(tendered - agreed).toString()} change queued for deposit to your Living Wallet!'),
-                                      backgroundColor: AppConstants.successColor,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
                                 },
-                                child: const Text('Credit Change', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                               ),
-                            ],
-                          ),
-                        ],
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ),
                   ),
-                ],
 
-                const SizedBox(height: 18),
+                  // 💰 Cash Change Rollover to Living Wallet (Keyboard-Safe)
+                  if (!_walletPaymentSuccess) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppConstants.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _changeSettled ? AppConstants.successColor : Colors.white10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.savings_outlined, color: AppConstants.accentColor, size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'No Change? Deposit to Living Wallet',
+                                  style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Handed ₦5,000 for a ₦3,500 ride? Have the ₦1,500 change credited to your Living Wallet balance instantly.',
+                            style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                          ),
+                          const SizedBox(height: 10),
+                          if (_changeSettled) ...[
+                            Row(
+                              children: const [
+                                Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
+                                SizedBox(width: 6),
+                                Text('Change queued for deposit into your Living Wallet!', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ],
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _changeTenderedCtrl,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                                    style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText: 'Cash handed (e.g. 5000)',
+                                      hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                      filled: true,
+                                      fillColor: AppConstants.surfaceBg,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppConstants.primaryColor,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () {
+                                    // Auto-dismiss keyboard immediately
+                                    FocusScope.of(context).unfocus();
+                                    final tendered = int.tryParse(_changeTenderedCtrl.text.replaceAll(',', '').trim()) ?? 0;
+                                    final agreed = ((provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0) as num).toInt();
+                                    if (tendered <= agreed) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Cash handed must be greater than agreed fare to compute change.'),
+                                          backgroundColor: AppConstants.dangerColor,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    provider.settleCashChange(tenderedNgn: tendered, agreedFareNgn: agreed);
+                                    setState(() => _changeSettled = true);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('✅ ₦${(tendered - agreed).toString()} change queued for deposit to your Living Wallet!'),
+                                        backgroundColor: AppConstants.successColor,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('Credit Change', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
 
-                // Pay With Living Wallet Button (if not already settled)
-                if (!_walletPaymentSuccess) ...[
+                  const SizedBox(height: 18),
+
+                  // Finish / Book Another Ride Button
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-                    child: ElevatedButton.icon(
+                    child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppConstants.accentColor,
-                        foregroundColor: Colors.black,
+                        backgroundColor: isPaid ? AppConstants.primaryColor : AppConstants.surfaceBg,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: _isSettlingWallet
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                          : const Icon(Icons.account_balance_wallet_rounded, size: 20),
-                      label: Text(
-                        _isSettlingWallet ? 'Processing Wallet Transfer...' : 'Pay with Living Wallet',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      onPressed: () {
+                        provider.resetTrip();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          (r) => false,
+                        );
+                      },
+                      child: Text(
+                        isPaid ? 'Complete Trip & Return Home' : 'Dismiss / Back to Home',
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                       ),
-                      onPressed: _isSettlingWallet ? null : () => _handleWalletPayment(provider),
                     ),
                   ),
-                  const SizedBox(height: 12),
                 ],
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _walletPaymentSuccess ? AppConstants.primaryColor : AppConstants.surfaceBg,
-                    ),
-                    onPressed: () {
-                      provider.resetTrip();
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        (r) => false,
-                      );
-                    },
-                    child: Text(
-                      _walletPaymentSuccess ? 'Book Another Ride' : 'Paid Driver Cash / Transfer Done',
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

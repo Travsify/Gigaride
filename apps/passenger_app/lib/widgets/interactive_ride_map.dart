@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import '../core/constants.dart';
 
 class InteractiveRideMap extends StatefulWidget {
@@ -158,11 +158,10 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
   @override
   Widget build(BuildContext context) {
     final effectiveHeight = widget.isExpanded ? MediaQuery.of(context).size.height * 0.65 : widget.height;
-    final token = AppConstants.mapboxPublicToken;
 
     final tileUrl = _isSatelliteMode
-        ? 'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token'
-        : 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token';
+        ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -177,14 +176,14 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // FlutterMap Mapbox Streets / Satellite Layer (Watermark-Free)
+          // FlutterMap Google Roadmap / Hybrid Satellite Layer (High-Resolution)
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: widget.currentLocation,
               initialZoom: 16.0,
               minZoom: 4.0,
-              maxZoom: 19.0,
+              maxZoom: 20.0,
               onMapReady: () {
                 _mapController.move(widget.currentLocation, 16.0);
               },
@@ -193,9 +192,10 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
               TileLayer(
                 key: ValueKey(_isSatelliteMode),
                 urlTemplate: tileUrl,
-                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['0', '1', '2', '3'],
+                fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
                 userAgentPackageName: 'ng.giga.passengerApp',
-                maxZoom: 19,
+                maxZoom: 20,
               ),
               // Route Polyline Layer
               if (widget.routePoints.isNotEmpty)
@@ -354,53 +354,17 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
                       );
                     }),
 
-                  // 🚗 Smooth Animated Assigned Driver Vehicle Marker (with Heading Rotation)
+                  // 🚗 Smooth Animated Assigned Driver Vehicle Marker (Top-down 3D Rideshare Vehicle)
                   if (widget.assignedDriverLocation != null)
                     Marker(
                       point: _interpolatedDriverPos,
-                      width: 64,
-                      height: 64,
+                      width: 80,
+                      height: 80,
                       child: Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Glowing radar aura around driver vehicle
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppConstants.accentColor.withOpacity(0.22),
-                              ),
-                            ),
-                            // Heading-rotated Navigation Pointer & Vehicle Disc
-                            Transform.rotate(
-                              angle: (_interpolatedDriverHeading * math.pi) / 180.0,
-                              child: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: AppConstants.accentColor, width: 2.5),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black54,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.navigation_rounded,
-                                    size: 22,
-                                    color: AppConstants.accentColor,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: TopDownCarMarker(
+                          heading: _interpolatedDriverHeading,
+                          model: widget.driverVehicleModel,
+                          isAssigned: true,
                         ),
                       ),
                     ),
@@ -409,22 +373,12 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
                   ...widget.nearbyDrivers.map((driverPos) {
                     return Marker(
                       point: driverPos,
-                      width: 32,
-                      height: 32,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppConstants.cardBg,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppConstants.accentColor, width: 1.5),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black45, blurRadius: 4),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.directions_car_filled_rounded,
-                          size: 16,
-                          color: AppConstants.accentColor,
+                      width: 40,
+                      height: 40,
+                      child: const Center(
+                        child: TopDownCarMarker(
+                          heading: 0,
+                          isAssigned: false,
                         ),
                       ),
                     );
@@ -551,4 +505,156 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProv
       ),
     );
   }
+}
+
+class TopDownCarMarker extends StatelessWidget {
+  final double heading;
+  final String? model;
+  final bool isAssigned;
+
+  const TopDownCarMarker({
+    super.key,
+    required this.heading,
+    this.model,
+    this.isAssigned = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (model != null && model!.isNotEmpty && isAssigned)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            margin: const EdgeInsets.only(bottom: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.92),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppConstants.accentColor, width: 1),
+              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
+            ),
+            child: Text(
+              model!,
+              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+            ),
+          ),
+        Transform.rotate(
+          angle: (heading * math.pi) / 180.0,
+          child: CustomPaint(
+            size: const Size(28, 48),
+            painter: _RideshareVehiclePainter(isAssigned: isAssigned),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RideshareVehiclePainter extends CustomPainter {
+  final bool isAssigned;
+  _RideshareVehiclePainter({required this.isAssigned});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // 1. Headlight beam (translucent amber cone pointing forward/upward)
+    if (isAssigned) {
+      final beamPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.amber.withOpacity(0.4),
+            Colors.amber.withOpacity(0.0),
+          ],
+        ).createShader(Rect.fromLTWH(0, 0, w, h * 0.40));
+
+      final beamPath = Path()
+        ..moveTo(w * 0.25, h * 0.3)
+        ..lineTo(w * 0.05, 0)
+        ..lineTo(w * 0.95, 0)
+        ..lineTo(w * 0.75, h * 0.3)
+        ..close();
+      canvas.drawPath(beamPath, beamPaint);
+    }
+
+    // 2. Wheels (4 black rounded rectangles)
+    final wheelPaint = Paint()..color = const Color(0xFF1E293B);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.04, h * 0.36, w * 0.16, h * 0.14), const Radius.circular(2)), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.80, h * 0.36, w * 0.16, h * 0.14), const Radius.circular(2)), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.04, h * 0.74, w * 0.16, h * 0.14), const Radius.circular(2)), wheelPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.80, h * 0.74, w * 0.16, h * 0.14), const Radius.circular(2)), wheelPaint);
+
+    // 3. Main Car Body
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.14, h * 0.28, w * 0.72, h * 0.66),
+      const Radius.circular(7),
+    );
+
+    // Drop shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black54
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    canvas.drawRRect(bodyRect.shift(const Offset(0, 2)), shadowPaint);
+
+    // Body gradient
+    final bodyPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+      ).createShader(bodyRect.outerRect);
+    canvas.drawRRect(bodyRect, bodyPaint);
+
+    // Body border
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..color = isAssigned ? AppConstants.accentColor : Colors.white60;
+    canvas.drawRRect(bodyRect, borderPaint);
+
+    // 4. Front Windshield (glossy cyan tint)
+    final windshieldPaint = Paint()..color = const Color(0xFF38BDF8).withOpacity(0.85);
+    final windshieldPath = Path()
+      ..moveTo(w * 0.24, h * 0.46)
+      ..lineTo(w * 0.30, h * 0.36)
+      ..lineTo(w * 0.70, h * 0.36)
+      ..lineTo(w * 0.76, h * 0.46)
+      ..close();
+    canvas.drawPath(windshieldPath, windshieldPaint);
+
+    // 5. Roof
+    final roofPaint = Paint()..color = const Color(0xFF090D16);
+    final roofRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.26, h * 0.48, w * 0.48, h * 0.22),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(roofRect, roofPaint);
+
+    // 6. Rear Window
+    final rearWindowPaint = Paint()..color = const Color(0xFF38BDF8).withOpacity(0.65);
+    final rearWindowPath = Path()
+      ..moveTo(w * 0.28, h * 0.72)
+      ..lineTo(w * 0.72, h * 0.72)
+      ..lineTo(w * 0.68, h * 0.80)
+      ..lineTo(w * 0.32, h * 0.80)
+      ..close();
+    canvas.drawPath(rearWindowPath, rearWindowPaint);
+
+    // 7. Headlights
+    final headlightPaint = Paint()..color = Colors.amberAccent;
+    canvas.drawCircle(Offset(w * 0.25, h * 0.30), 2.0, headlightPaint);
+    canvas.drawCircle(Offset(w * 0.75, h * 0.30), 2.0, headlightPaint);
+
+    // 8. Taillights
+    final taillightPaint = Paint()..color = const Color(0xFFEF4444);
+    canvas.drawCircle(Offset(w * 0.23, h * 0.92), 1.8, taillightPaint);
+    canvas.drawCircle(Offset(w * 0.77, h * 0.92), 1.8, taillightPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RideshareVehiclePainter oldDelegate) => oldDelegate.isAssigned != isAssigned;
 }

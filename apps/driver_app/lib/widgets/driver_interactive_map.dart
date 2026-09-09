@@ -136,10 +136,9 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
 
   @override
   Widget build(BuildContext context) {
-    final token = AppConstants.mapboxPublicToken;
     final tileUrl = _isSatelliteMode
-        ? 'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token'
-        : 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=$token';
+        ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 
     return Container(
       height: widget.height,
@@ -152,14 +151,14 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Mapbox Map Layer (Watermark-Free)
+          // Google Roadmap / Hybrid Satellite Map Layer (High-Resolution)
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: widget.driverLocation,
               initialZoom: 16.0,
               minZoom: 4.0,
-              maxZoom: 19.0,
+              maxZoom: 20.0,
               onMapReady: () {
                 _mapController.move(widget.driverLocation, 16.0);
               },
@@ -168,9 +167,10 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
               TileLayer(
                 key: ValueKey(_isSatelliteMode),
                 urlTemplate: tileUrl,
-                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['0', '1', '2', '3'],
+                fallbackUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
                 userAgentPackageName: 'ng.giga.driverApp',
-                maxZoom: 19,
+                maxZoom: 20,
               ),
               // Route Polyline Layer (Active trip)
               if (widget.routePoints.isNotEmpty)

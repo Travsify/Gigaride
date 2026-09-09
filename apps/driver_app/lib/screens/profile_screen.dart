@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import 'phone_auth_screen.dart';
 import 'kyc_screen.dart';
+import 'support_help_screen.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -436,13 +437,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   ListTile(
-                    leading: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.successColor),
-                    title: const Text('24/7 Driver Support Concierge', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Direct WhatsApp and priority emergency dispatch', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                    leading: const Icon(Icons.support_agent_rounded, color: AppConstants.primaryLight),
+                    title: const Text('Complaints & Partner Support Center', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Fare disputes, passenger conduct, subscriptions & payout issues', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                     trailing: const Icon(Icons.chevron_right, color: AppConstants.textMuted),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connecting to 24/7 Driver Concierge...'), backgroundColor: AppConstants.successColor));
-                    },
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverSupportHelpScreen())),
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   ListTile(

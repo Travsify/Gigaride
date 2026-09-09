@@ -10,6 +10,8 @@ import 'offer_room_screen.dart';
 import 'wallet_screen.dart';
 import 'activity_screen.dart';
 import 'profile_screen.dart';
+import 'support_help_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../services/routing_service.dart';
@@ -189,6 +191,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _applySavedPlace(String label, String prefKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedAddr = prefs.getString(prefKey);
+    if (savedAddr != null && savedAddr.trim().isNotEmpty) {
+      final query = savedAddr.trim();
+      setState(() {
+        _dropoffCtrl.text = query;
+      });
+      try {
+        final results = await PlacesService.searchPlaces(query, proximity: _currentLocation);
+        if (results.isNotEmpty && mounted) {
+          setState(() {
+            _dropoffLocation = results.first.location;
+          });
+          _fetchRouteAndCalculateFare();
+          return;
+        }
+      } catch (_) {}
+      _calculateFareEstimate();
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No $label address saved yet. Open Account tab to set it.'),
+          action: SnackBarAction(
+            label: 'Set Now',
+            textColor: Colors.amber,
+            onPressed: () => setState(() => _currentIndex = 4),
+          ),
+          backgroundColor: AppConstants.cardBg,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _openPickupSearch() async {
     final place = await PlacesSearchModal.show(
       context,
@@ -279,40 +317,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 20),
 
-              // WhatsApp AI Dispatcher
+              // Direct SMS Dispatch
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppConstants.surfaceBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.chat_bubble_outline_rounded, color: Colors.greenAccent, size: 18),
+                        Icon(Icons.sms_outlined, color: AppConstants.primaryLight, size: 18),
                         SizedBox(width: 8),
-                        Text('WhatsApp AI Automated Dispatch', style: TextStyle(color: Colors.greenAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                        Text('Direct SMS Dispatch', style: TextStyle(color: AppConstants.primaryLight, fontSize: 14, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text('Transmits your trip request directly to Giga WhatsApp AI Dispatcher (+234 810 000 GIGA) for automated driver matching.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                    const Text('Transmits your trip request via native carrier SMS to Giga Automated Dispatch Gateway for zero-data matching.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
-                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
-                        label: const Text('Copy Booking Text for WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                        label: const Text('Dispatch via Carrier SMS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: bookingMsg));
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Copied booking request! Paste in WhatsApp to +234 810 000 GIGA'),
-                              backgroundColor: Color(0xFF25D366),
+                              content: Text('Booking text copied! Ready to dispatch via SMS.'),
+                              backgroundColor: AppConstants.successColor,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -734,14 +772,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (_gatePassCtrl.text.trim().isNotEmpty) {
       notesList.add('[Estate Gate Pass: ${_gatePassCtrl.text.trim()}]');
     }
-    if (provider.alwaysAcOn) {
-      notesList.add('[❄️ AC: Must Be ON]');
-    }
     if (provider.preferQuiet) {
       notesList.add('[🤫 Quiet Ride]');
     }
+    if (provider.alwaysAcOn) {
+      notesList.add('[❄️ AC: Must Be ON]');
+    }
     if (provider.luggageAssistance) {
       notesList.add('[🧳 Luggage Assistance]');
+    }
+    if (provider.noMusic) {
+      notesList.add('[🔇 No Music]');
+    }
+    if (provider.petFriendly) {
+      notesList.add('[🐾 Pet Friendly]');
+    }
+    if (provider.accessibilitySupport) {
+      notesList.add('[♿ Accessibility]');
     }
     if (_notesCtrl.text.trim().isNotEmpty) {
       notesList.add(_notesCtrl.text.trim());
@@ -814,14 +861,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       notesList.add('[Estate Gate Pass: ${_gatePassCtrl.text.trim()}]');
     }
     // Ride Comfort Preferences & Vehicle Tier
-    if (provider.alwaysAcOn) {
-      notesList.add('[❄️ AC: Must Be ON]');
-    }
     if (provider.preferQuiet) {
       notesList.add('[🤫 Quiet Ride]');
     }
+    if (provider.alwaysAcOn) {
+      notesList.add('[❄️ AC: Must Be ON]');
+    }
     if (provider.luggageAssistance) {
       notesList.add('[🧳 Luggage Assistance]');
+    }
+    if (provider.noMusic) {
+      notesList.add('[🔇 No Music]');
+    }
+    if (provider.petFriendly) {
+      notesList.add('[🐾 Pet Friendly]');
+    }
+    if (provider.accessibilitySupport) {
+      notesList.add('[♿ Accessibility]');
     }
     if (_selectedVehicleTier == 'COMFORT') {
       notesList.add('[✨ Comfort AC Tier]');
@@ -980,6 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _buildRidesTab(),
           const WalletScreen(isTab: true),
           ActivityScreen(onBookRidePressed: () => setState(() => _currentIndex = 0)),
+          const SupportHelpScreen(isTab: true),
           ProfileScreen(onOfflineBookingPressed: () => _showOfflineBookingModal(context)),
         ],
       ),
@@ -1169,14 +1226,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.directions_car_filled_rounded, 'Rides'),
               _buildNavItem(1, Icons.account_balance_wallet_rounded, 'Wallet'),
               _buildNavItem(2, Icons.receipt_long_rounded, 'Activity'),
-              _buildNavItem(3, Icons.person_rounded, 'Account'),
+              _buildNavItem(3, Icons.support_agent_rounded, 'Support'),
+              _buildNavItem(4, Icons.person_rounded, 'Account'),
             ],
           ),
         ),
@@ -1194,7 +1252,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppConstants.primaryLight.withOpacity(0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -1205,14 +1263,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Icon(
               icon,
               color: isSelected ? AppConstants.primaryLight : AppConstants.textMuted,
-              size: 22,
+              size: 21,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? AppConstants.primaryLight : AppConstants.textMuted,
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
@@ -1531,8 +1589,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ],
                           ),
 
+                          // Quick Saved Destinations: Home & Work
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 2),
+                            child: Row(
+                              children: [
+                                InkWell(
+                                  onTap: () => _applySavedPlace('Home', 'saved_home_address'),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueAccent.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.blueAccent.withOpacity(0.35)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.home_rounded, color: Colors.blueAccent, size: 14),
+                                        SizedBox(width: 4),
+                                        Text('Home', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => _applySavedPlace('Work', 'saved_work_address'),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amberAccent.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.amberAccent.withOpacity(0.35)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.work_rounded, color: Colors.amberAccent, size: 14),
+                                        SizedBox(width: 4),
+                                        Text('Work', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                           // Extra actions under inputs: Add Stop, Gate Pass, Driver Notes
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
                               if (!_showStopField)

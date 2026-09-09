@@ -3,22 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
-import '../providers/passenger_provider.dart';
+import '../providers/driver_provider.dart';
 
 class InAppCallScreen extends StatefulWidget {
   final String rideId;
-  final String driverId;
-  final String driverName;
-  final String? vehicleInfo;
-
+  final String riderId;
+  final String riderName;
   final bool isIncoming;
 
   const InAppCallScreen({
     super.key,
     required this.rideId,
-    required this.driverId,
-    required this.driverName,
-    this.vehicleInfo,
+    required this.riderId,
+    required this.riderName,
     this.isIncoming = false,
   });
 
@@ -37,13 +34,13 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   @override
   void initState() {
     super.initState();
-    final provider = context.read<PassengerProvider>();
+    final provider = context.read<DriverProvider>();
 
     if (!widget.isIncoming) {
       // Outgoing Call: emit call initiate over WebSockets
       provider.socket.initiateCall(
         rideId: widget.rideId,
-        receiverId: widget.driverId,
+        receiverId: widget.riderId,
       );
 
       // Ringing timeout (35 seconds)
@@ -52,7 +49,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
           _endCall(reason: 'No answer');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No answer from driver. You can also send a chat message.'),
+              content: Text('No answer from rider. You can also send an in-app chat message.'),
               backgroundColor: AppConstants.cardBg,
               behavior: SnackBarBehavior.floating,
             ),
@@ -61,7 +58,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       });
     }
 
-    // Listen for connection (when driver answers)
+    // Listen for connection (when rider answers)
     provider.socket.onCallConnected = (_) {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
@@ -109,10 +106,10 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   void _answerCall() {
     HapticFeedback.heavyImpact();
     _ringTimeoutTimer?.cancel();
-    final provider = context.read<PassengerProvider>();
+    final provider = context.read<DriverProvider>();
     provider.socket.answerCall(
       rideId: widget.rideId,
-      callerId: widget.driverId,
+      callerId: widget.riderId,
     );
     setState(() {
       _isConnected = true;
@@ -124,10 +121,10 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
     HapticFeedback.mediumImpact();
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
-    final provider = context.read<PassengerProvider>();
+    final provider = context.read<DriverProvider>();
     provider.socket.endCall(
       rideId: widget.rideId,
-      targetId: widget.driverId,
+      targetId: widget.riderId,
       reason: reason,
     );
     if (mounted) {
@@ -173,7 +170,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                 ),
               ),
 
-              // Driver Information & Visual Caller Area
+              // Rider Information & Visual Caller Area
               Column(
                 children: [
                   const SizedBox(height: 20),
@@ -204,7 +201,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                         radius: 54,
                         backgroundColor: AppConstants.cardBg,
                         child: Text(
-                          widget.driverName.isNotEmpty ? widget.driverName[0].toUpperCase() : 'D',
+                          widget.riderName.isNotEmpty ? widget.riderName[0].toUpperCase() : 'R',
                           style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppConstants.accentColor),
                         ),
                       ),
@@ -212,22 +209,20 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    widget.driverName,
+                    widget.riderName,
                     style: const TextStyle(color: AppConstants.textLight, fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  if (widget.vehicleInfo != null && widget.vehicleInfo!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.vehicleInfo!,
-                      style: const TextStyle(color: AppConstants.textMuted, fontSize: 14),
-                    ),
-                  ],
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Giga Verified Passenger',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 14),
+                  ),
                   const SizedBox(height: 12),
                   // Status or Call Duration
                   Text(
                     _isConnected
                         ? _formatDuration(_callSeconds)
-                        : (widget.isIncoming ? 'Incoming Call from Driver...' : 'Ringing driver via Giga Secure Line...'),
+                        : (widget.isIncoming ? 'Incoming Call from Rider...' : 'Ringing rider via Giga Secure Line...'),
                     style: TextStyle(
                       color: _isConnected ? AppConstants.accentColor : AppConstants.textMuted,
                       fontSize: _isConnected ? 22 : 14,
@@ -256,7 +251,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                         children: [
                           Text('NDPR Shield Active', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
                           SizedBox(height: 2),
-                          Text('Your personal phone number is 100% hidden from the driver.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                          Text('Rider\'s personal phone number is 100% hidden. Call routes securely in-app.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                         ],
                       ),
                     ),

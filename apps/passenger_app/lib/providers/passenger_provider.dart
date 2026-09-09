@@ -48,7 +48,17 @@ class PassengerProvider with ChangeNotifier {
   bool preferQuiet = false;
   bool alwaysAcOn = true;
   bool luggageAssistance = false;
+  bool petFriendly = false;
+  bool accessibilitySupport = false;
+  bool noMusic = false;
   String? token;
+
+  int get walletBalance {
+    final bal = vba?['balance_ngn'] ?? user?['walletBalance'] ?? user?['wallet_balance'] ?? 0;
+    if (bal is num) return bal.toInt();
+    if (bal is String) return int.tryParse(bal) ?? 0;
+    return 0;
+  }
 
   Future<bool> checkAuth() async {
     final t = await api.getToken();
@@ -613,9 +623,12 @@ class PassengerProvider with ChangeNotifier {
   Future<void> loadPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      preferQuiet = prefs.getBool('pref_prefer_quiet') ?? false;
-      alwaysAcOn = prefs.getBool('pref_always_ac_on') ?? true;
-      luggageAssistance = prefs.getBool('pref_luggage_assistance') ?? false;
+      preferQuiet = prefs.getBool('pref_prefer_quiet') ?? prefs.getBool('pref_preferQuiet') ?? false;
+      alwaysAcOn = prefs.getBool('pref_always_ac_on') ?? prefs.getBool('pref_alwaysAcOn') ?? true;
+      luggageAssistance = prefs.getBool('pref_luggage_assistance') ?? prefs.getBool('pref_luggageAssistance') ?? false;
+      petFriendly = prefs.getBool('pref_pet_friendly') ?? prefs.getBool('pref_petFriendly') ?? false;
+      accessibilitySupport = prefs.getBool('pref_accessibility_support') ?? prefs.getBool('pref_accessibilitySupport') ?? false;
+      noMusic = prefs.getBool('pref_no_music') ?? prefs.getBool('pref_noMusic') ?? false;
       notifyListeners();
     } catch (_) {}
   }
@@ -624,9 +637,33 @@ class PassengerProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('pref_$key', val);
-      if (key == 'prefer_quiet') preferQuiet = val;
-      if (key == 'always_ac_on') alwaysAcOn = val;
-      if (key == 'luggage_assistance') luggageAssistance = val;
+      final normalizedKey = key.replaceAll('_', '').toLowerCase();
+
+      if (normalizedKey == 'preferquiet') {
+        preferQuiet = val;
+        await prefs.setBool('pref_prefer_quiet', val);
+        await prefs.setBool('pref_preferQuiet', val);
+      } else if (normalizedKey == 'alwaysacon') {
+        alwaysAcOn = val;
+        await prefs.setBool('pref_always_ac_on', val);
+        await prefs.setBool('pref_alwaysAcOn', val);
+      } else if (normalizedKey == 'luggageassistance') {
+        luggageAssistance = val;
+        await prefs.setBool('pref_luggage_assistance', val);
+        await prefs.setBool('pref_luggageAssistance', val);
+      } else if (normalizedKey == 'petfriendly') {
+        petFriendly = val;
+        await prefs.setBool('pref_pet_friendly', val);
+        await prefs.setBool('pref_petFriendly', val);
+      } else if (normalizedKey == 'accessibilitysupport') {
+        accessibilitySupport = val;
+        await prefs.setBool('pref_accessibility_support', val);
+        await prefs.setBool('pref_accessibilitySupport', val);
+      } else if (normalizedKey == 'nomusic') {
+        noMusic = val;
+        await prefs.setBool('pref_no_music', val);
+        await prefs.setBool('pref_noMusic', val);
+      }
       notifyListeners();
     } catch (_) {}
   }
