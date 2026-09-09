@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -125,13 +125,15 @@ class RideReceiptDialog extends StatelessWidget {
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(6),
+                                        width: 32,
+                                        height: 32,
                                         decoration: BoxDecoration(
-                                          color: AppConstants.primaryColor,
                                           borderRadius: BorderRadius.circular(8),
                                         ),
-                                        child: const Icon(Icons.directions_car_filled_rounded,
-                                            color: Colors.white, size: 20),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       const Text(

@@ -461,6 +461,32 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            Center(
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset('assets/images/logo.png', width: 40, height: 40),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Giga Driver Cockpit v2.5.0 (Build 42)',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Giga is a Product of Pickpadi Global Ltd',
+                    style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    '100% Zero Driver Commission • Lagos, NG',
+                    style: TextStyle(color: Colors.white24, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 30),
           ],
         ),

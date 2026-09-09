@@ -309,6 +309,35 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                         ),
                       ),
 
+                      // Giga Driver Logo Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryLight.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppConstants.primaryLight.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset('assets/images/logo.png', width: 16, height: 16),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'GIGA DRIVER',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.1,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Subscription Rides Pill
                       GestureDetector(
                         onTap: () {

@@ -1311,11 +1311,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.shield_rounded, color: AppConstants.accentColor, size: 16),
-                          SizedBox(width: 6),
-                          Text(
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.asset('assets/images/logo.png', width: 18, height: 18),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
                             'GIGA RIDE',
                             style: TextStyle(
                               color: Colors.white,

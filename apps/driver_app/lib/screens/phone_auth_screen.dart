@@ -712,7 +712,10 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppConstants.accentColor.withOpacity(0.3)),
                     ),
-                    child: const Icon(Icons.directions_car_filled_rounded, color: AppConstants.accentColor, size: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Column(

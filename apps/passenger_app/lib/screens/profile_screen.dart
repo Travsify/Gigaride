@@ -775,13 +775,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // App Version & Platform Build Details
             Center(
               child: Column(
-                children: const [
-                  Text(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset('assets/images/logo.png', width: 40, height: 40),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
                     'Giga Ride v2.5.0 (Build 42)',
                     style: TextStyle(color: AppConstants.textMuted, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Giga is a Product of Pickpadi Global Ltd',
+                    style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
                     '100% Zero Driver Commission • Lagos, NG',
                     style: TextStyle(color: Colors.white24, fontSize: 10),
                   ),

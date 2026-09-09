@@ -106,10 +106,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.local_taxi_rounded,
-                    color: Colors.white,
-                    size: 52,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(50),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
