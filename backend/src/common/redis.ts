@@ -45,8 +45,8 @@ class MemoryGeoStore {
         continue;
       }
 
-      // Check if driver location is fresh (within last 10 minutes)
-      if (Date.now() - loc.updatedAt > 10 * 60 * 1000) {
+      // Check if driver location is fresh (within last 60 minutes for high resilience)
+      if (Date.now() - loc.updatedAt > 60 * 60 * 1000) {
         continue;
       }
 

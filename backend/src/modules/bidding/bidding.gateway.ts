@@ -69,6 +69,21 @@ export function setupBiddingGateway(io: SocketIOServer) {
         await db.updateDriverOnlineStatus(user.userId, true);
         const subStatus = await subscriptionService.getDriverSubscriptionStatus(user.userId);
         socket.emit('subscription:status', subStatus);
+
+        // Pre-register online driver presence in geo session store if not yet set
+        const existingLoc = geoSessionManager.getDriverLocation(user.userId);
+        if (!existingLoc) {
+          geoSessionManager.updateDriverLocation({
+            driverId: user.userId,
+            latitude: 6.5244,
+            longitude: 3.3792,
+            isOnline: true,
+            hasActiveSubscription: subStatus.canReceiveRides,
+            remainingRides: subStatus.remainingRides,
+            updatedAt: Date.now(),
+          });
+        }
+        console.log(`[Driver Socket] Driver ${user.userId} joined driver pool. Online=true, Sub=${subStatus.canReceiveRides}`);
       }
     } else if (user.role === 'PASSENGER') {
       socket.join('passengers_pool');
@@ -80,17 +95,20 @@ export function setupBiddingGateway(io: SocketIOServer) {
     socket.on('driver:location', async (data: { latitude: number; longitude: number; isOnline?: boolean; activeRideId?: string; speedKmh?: number }) => {
       if (user.role !== 'DRIVER') return;
 
+      const isOnline = data.isOnline ?? true;
       const subStatus = await subscriptionService.getDriverSubscriptionStatus(user.userId);
 
       geoSessionManager.updateDriverLocation({
         driverId: user.userId,
         latitude: data.latitude,
         longitude: data.longitude,
-        isOnline: data.isOnline ?? true,
+        isOnline: isOnline,
         hasActiveSubscription: subStatus.canReceiveRides,
         remainingRides: subStatus.remainingRides,
         updatedAt: Date.now(),
       });
+
+      console.log(`[Driver Location] Driver ${user.userId} updated coordinates (${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}), isOnline=${isOnline}`);
 
       // Record high-resolution breadcrumb if driver is currently on an active ride
       if (data.activeRideId) {
@@ -114,16 +132,39 @@ export function setupBiddingGateway(io: SocketIOServer) {
         }
 
         const settings = await db.getPlatformSettings();
-        const radius = settings.search_radius_km || 7.0;
+        const baseRadius = settings.search_radius_km || 7.0;
 
-        // Find nearby eligible drivers (has active subscription and remaining rides)
-        const nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+        // Tier 1: Search standard local radius (e.g. 7km)
+        let nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
           ride.pickup_lat,
           ride.pickup_lng,
-          radius
+          baseRadius
         );
 
-        console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible nearby drivers.`);
+        // Tier 2: If no drivers in immediate 7km, expand to 35km (metropolitan area)
+        if (nearbyDrivers.length === 0) {
+          console.log(`[Ride Dispatch] No drivers within ${baseRadius}km of (${ride.pickup_lat}, ${ride.pickup_lng}). Expanding to 35km metro radius...`);
+          nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+            ride.pickup_lat,
+            ride.pickup_lng,
+            35.0
+          );
+        }
+
+        // Tier 3: If still 0, expand to 150km (regional / testing fallback)
+        if (nearbyDrivers.length === 0) {
+          console.log(`[Ride Dispatch] Expanding to 150km regional radius to ensure test devices / nearby city drivers are matched...`);
+          nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+            ride.pickup_lat,
+            ride.pickup_lng,
+            150.0
+          );
+        }
+
+        console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible drivers. Pickup: (${ride.pickup_lat}, ${ride.pickup_lng}) "${ride.pickup_address}"`);
+        for (const candidate of nearbyDrivers) {
+          console.log(` -> Driver matched: ${candidate.driverId}, Distance: ${candidate.distanceKm.toFixed(2)}km`);
+        }
 
         // Notify each nearby driver individually with their pickup distance
         for (const candidate of nearbyDrivers) {

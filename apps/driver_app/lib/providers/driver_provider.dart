@@ -1,11 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 import '../services/socket_service.dart';
 
 class DriverProvider with ChangeNotifier {
   final ApiService api = ApiService();
   final SocketService socket = SocketService();
+
+  StreamSubscription<Position>? _gpsStreamSub;
+  Timer? _gpsBroadcastTimer;
 
   bool isLoading = false;
   Map<String, dynamic>? user;
@@ -317,24 +324,80 @@ class DriverProvider with ChangeNotifier {
       },
     );
 
-    // Broadcast default coordinates (Lagos Yaba area)
-    socket.updateLocation(latitude: 6.518, longitude: 3.379, isOnline: true);
+    // Broadcast initial live coordinates and start continuous GPS tracking
+    LocationService.getCurrentLocation().then((pos) {
+      socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: isOnline);
+    }).catchError((_) {
+      socket.updateLocation(latitude: 6.5244, longitude: 3.3792, isOnline: isOnline);
+    });
+
+    if (isOnline) {
+      _startGpsStreaming();
+    }
+  }
+
+  void _startGpsStreaming() {
+    _stopGpsStreaming();
+    // 1. High-precision movement stream
+    _gpsStreamSub = LocationService.getPositionStream().listen((Position pos) {
+      if (isOnline) {
+        socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: true);
+      }
+    });
+
+    // 2. Periodic heartbeat every 10 seconds to maintain radar freshness
+    _gpsBroadcastTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (isOnline) {
+        try {
+          final pos = await LocationService.getCurrentLocation();
+          socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: true);
+        } catch (_) {}
+      }
+    });
+  }
+
+  void _stopGpsStreaming() {
+    _gpsStreamSub?.cancel();
+    _gpsStreamSub = null;
+    _gpsBroadcastTimer?.cancel();
+    _gpsBroadcastTimer = null;
+  }
+
+  void updateLocation(double latitude, double longitude) {
+    if (isOnline) {
+      socket.updateLocation(latitude: latitude, longitude: longitude, isOnline: true);
+    }
   }
 
   bool toggleOnline() {
     final kyc = driverProfile?['kyc_status'];
     if (kyc != 'APPROVED') {
       isOnline = false;
+      _stopGpsStreaming();
       notifyListeners();
       return false;
     }
     isOnline = !isOnline;
-    socket.updateLocation(
-      latitude: 6.518,
-      longitude: 3.379,
-      isOnline: isOnline,
-    );
-    if (!isOnline) {
+    if (isOnline) {
+      LocationService.getCurrentLocation().then((pos) {
+        socket.updateLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          isOnline: true,
+        );
+      }).catchError((_) {
+        socket.updateLocation(latitude: 6.5244, longitude: 3.3792, isOnline: true);
+      });
+      _startGpsStreaming();
+    } else {
+      _stopGpsStreaming();
+      LocationService.getCurrentLocation().then((pos) {
+        socket.updateLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          isOnline: false,
+        );
+      }).catchError((_) {});
       incomingRequests.clear();
     }
     notifyListeners();
@@ -370,6 +433,7 @@ class DriverProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _stopGpsStreaming();
     OneSignal.logout();
     await api.clearAuth();
     socket.disconnect();

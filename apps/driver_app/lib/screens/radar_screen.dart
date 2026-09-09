@@ -51,6 +51,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     final pos = await LocationService.getCurrentLocation();
     if (mounted) {
       setState(() => _driverLocation = pos);
+      context.read<DriverProvider>().updateLocation(pos.latitude, pos.longitude);
     }
 
     // 3. Keep driver location live as vehicle moves
@@ -58,6 +59,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     _driverLocationSub = LocationService.getPositionStream().listen((Position newPos) {
       if (!mounted) return;
       setState(() => _driverLocation = LatLng(newPos.latitude, newPos.longitude));
+      context.read<DriverProvider>().updateLocation(newPos.latitude, newPos.longitude);
     });
   }
 
