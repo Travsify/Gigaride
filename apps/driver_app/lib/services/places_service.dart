@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../core/constants.dart';
+import 'location_service.dart';
 
 class PlaceSuggestion {
   final String title;
@@ -135,8 +136,9 @@ class PlacesService {
     final cleanQuery = query.trim();
     if (cleanQuery.length < 2) return [];
 
-    // Use live user location, or default to center
-    final center = proximity ?? const LatLng(7.3607, 3.8364);
+    // Use live user location if available; otherwise resolve via IP geolocation
+    // so proximity sort always reflects the user's real city, not a hardcoded default
+    final center = proximity ?? await LocationService.getApproximateLocation();
     final lowerQuery = cleanQuery.toLowerCase();
     final List<PlaceSuggestion> results = [];
     final Set<String> seenKeys = {};

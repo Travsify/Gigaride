@@ -41,9 +41,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _gatePassCtrl = TextEditingController();
   final _corporateTagCtrl = TextEditingController();
 
-  // Coordinates & Map State
-  LatLng _currentLocation = LocationService.defaultLagosLocation;
-  LatLng _pickupLocation = LocationService.defaultLagosLocation;
+  // Coordinates & Map State — Nigeria center until real location resolves
+  LatLng _currentLocation = LocationService.defaultNigeriaCenter;
+  LatLng _pickupLocation = LocationService.defaultNigeriaCenter;
   LatLng? _dropoffLocation;
   List<LatLng> _routePoints = [];
   List<LatLng> _nearbyDrivers = [];
@@ -93,6 +93,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<Position>? _positionSub;
 
   void _initLocationAndDrivers() async {
+    // 0. Approximate location immediately — IP-based, works even with GPS OFF
+    //    This ensures the map never shows Lagos when user is in Ibadan/Abuja/PH
+    final approx = await LocationService.getApproximateLocation();
+    if (mounted && _currentLocation == LocationService.defaultNigeriaCenter) {
+      setState(() {
+        _currentLocation = approx;
+        if (_pickupCtrl.text.isEmpty || _pickupCtrl.text == 'Current Location') {
+          _pickupLocation = approx;
+        }
+        _updateNearbyDrivers(approx);
+      });
+      _reverseGeocodePickup(approx);
+    }
+
     // 1. Instant check for cached last known position (0ms)
     final cached = await LocationService.getLastKnownLocation();
     if (cached != null && mounted) {
