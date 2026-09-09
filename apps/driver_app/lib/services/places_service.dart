@@ -16,8 +16,8 @@ class PlaceSuggestion {
 }
 
 class PlacesService {
-  // Google API Key from project 420082575516 (auto-activated once billing is connected)
-  static const String googleMapsApiKey = 'AIzaSyAcg6dLSG3HqfyXIEoV7vrj00HLAWyY-CA';
+  // Google API Key — project giga-508114 (billing active, Places API (New) + Geocoding + Routes enabled)
+  static const String googleMapsApiKey = 'AIzaSyBocaieybQzVpYXhPtXGkU1y88QIQMdfyg';
 
   /// Massive offline-curated dictionary of 250+ top Nigerian landmarks,
   /// transit interchanges, markets, estates, and institutions.
