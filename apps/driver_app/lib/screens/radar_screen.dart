@@ -164,10 +164,11 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                 onPressed: () {
                   final fare = int.tryParse(fareCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 3000;
                   final eta = int.tryParse(etaCtrl.text) ?? 5;
-                  context.read<DriverProvider>().submitCounterOffer(req['rideId'], fare, eta);
+                  final targetRideId = (req['rideId'] ?? req['ride_id'] ?? req['id'] ?? '').toString();
+                  context.read<DriverProvider>().submitCounterOffer(targetRideId, fare, eta);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('✓ Counter-offer of ₦$fare submitted to rider!'), backgroundColor: AppConstants.successColor),
+                    SnackBar(content: Text('✓ Counter-offer of ₦${_formatFare(fare)} submitted to rider!'), backgroundColor: AppConstants.successColor),
                   );
                 },
                 child: const Text('Submit Counter-Offer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
@@ -474,6 +475,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                   itemCount: requests.length,
                   itemBuilder: (ctx, idx) {
                     final req = requests[idx];
+                    final rideId = (req['rideId'] ?? req['ride_id'] ?? req['id'] ?? '').toString();
                     final fare = _extractFare(req);
                     final pickup = req['pickupAddress'] ?? 'Pickup Address';
                     final dropoff = req['dropoffAddress'] ?? 'Destination Address';
@@ -607,7 +609,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                 elevation: 3,
                               ),
                               onPressed: () {
-                                provider.submitCounterOffer(req['rideId'], fare, 5);
+                                provider.submitCounterOffer(rideId, fare, 5);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text('✓ Accepted ₦${_formatFare(fare)}! Waiting for passenger confirmation.'),
@@ -643,7 +645,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                     padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                   onPressed: () {
-                                    provider.submitCounterOffer(req['rideId'], fare + 500, 7);
+                                    provider.submitCounterOffer(rideId, fare + 500, 7);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text('Sent counter-offer: ₦${_formatFare(fare + 500)}'), backgroundColor: AppConstants.primaryColor),
                                     );
@@ -662,7 +664,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                     padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                   onPressed: () {
-                                    provider.submitCounterOffer(req['rideId'], fare + 1000, 8);
+                                    provider.submitCounterOffer(rideId, fare + 1000, 8);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text('Sent counter-offer: ₦${_formatFare(fare + 1000)}'), backgroundColor: AppConstants.primaryColor),
                                     );
@@ -694,7 +696,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                 tooltip: 'Decline',
                                 onPressed: () {
                                   setState(() {
-                                    provider.incomingRequests.removeWhere((r) => r['rideId'] == req['rideId']);
+                                    provider.incomingRequests.removeWhere((r) => (r['rideId'] ?? r['id'] ?? r['ride_id']) == rideId);
                                   });
                                 },
                               ),

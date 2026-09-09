@@ -10,9 +10,30 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/driver_interactive_map.dart';
 import 'driver_chat_sheet.dart';
 
+int _extractFare(dynamic req) {
+  if (req is! Map) return 3000;
+  final val = req['agreedFareNgn'] ??
+              req['agreed_fare_ngn'] ??
+              req['counterFareNgn'] ??
+              req['counter_fare_ngn'] ??
+              req['riderOfferNgn'] ??
+              req['rider_offer_ngn'] ??
+              req['suggestedFareNgn'] ??
+              req['suggested_fare_ngn'] ??
+              req['fareNgn'] ??
+              req['fare'];
+  if (val is num && val > 0) return val.toInt();
+  if (val is String) {
+    final parsed = int.tryParse(val.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 3000;
+}
+
 String _formatFare(dynamic amount) {
-  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString() ?? '0') ?? 0);
-  return val.toString().replaceAllMapped(
+  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0);
+  final displayVal = val > 0 ? val : 3000;
+  return displayVal.toString().replaceAllMapped(
     RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
     (Match m) => '${m[1]},',
   );
@@ -88,96 +109,228 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   void _showCompletionDialog() {
-    final fare = widget.trip['agreedFareNgn'] ?? widget.trip['counterFareNgn'] ?? 3500;
+    final fare = _extractFare(widget.trip);
+    final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
+    int tenderedCash = fare;
+    bool changeRolledOver = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => AlertDialog(
-          backgroundColor: AppConstants.cardBg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: AppConstants.successColor, size: 28),
-              SizedBox(width: 10),
-              Text('Trip Completed!', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppConstants.darkBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppConstants.successColor.withOpacity(0.3)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        builder: (dialogCtx, setDialogState) {
+          final changeAmount = tenderedCash > fare ? tenderedCash - fare : 0;
+
+          return AlertDialog(
+            backgroundColor: AppConstants.cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppConstants.successColor, size: 28),
+                SizedBox(width: 10),
+                Text('Trip Completed!', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppConstants.darkBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppConstants.successColor.withOpacity(0.3)),
+                    ),
+                    child: Column(
                       children: [
-                        const Text('Trip Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
-                        Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Trip Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                            Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Giga Commission (0%)', style: TextStyle(color: AppConstants.successColor, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text('₦0.00', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                          ],
+                        ),
+                        const Divider(color: Colors.white10, height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('You Keep (100%)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                            Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.w900, fontSize: 18)),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Cash Change Rollover to Living Wallet ──
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppConstants.surfaceBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: changeAmount > 0 ? Colors.amber.withOpacity(0.4) : Colors.white10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Giga Commission (0%)', style: TextStyle(color: AppConstants.successColor, fontSize: 13, fontWeight: FontWeight.bold)),
-                        Text('₦0.00', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                        const Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet_rounded, color: AppConstants.primaryLight, size: 18),
+                            SizedBox(width: 8),
+                            Text('Cash Tendered & Change', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Exact', style: TextStyle(fontSize: 11)),
+                              selected: tenderedCash == fare,
+                              selectedColor: AppConstants.primaryColor,
+                              backgroundColor: AppConstants.darkBg,
+                              onSelected: (_) {
+                                setDialogState(() => tenderedCash = fare);
+                              },
+                            ),
+                            if (fare < 5000)
+                              ChoiceChip(
+                                label: const Text('₦5,000 Note', style: TextStyle(fontSize: 11)),
+                                selected: tenderedCash == 5000,
+                                selectedColor: AppConstants.primaryColor,
+                                backgroundColor: AppConstants.darkBg,
+                                onSelected: (_) {
+                                  setDialogState(() => tenderedCash = 5000);
+                                },
+                              ),
+                            if (fare < 10000)
+                              ChoiceChip(
+                                label: const Text('₦10,000 Note', style: TextStyle(fontSize: 11)),
+                                selected: tenderedCash == 10000,
+                                selectedColor: AppConstants.primaryColor,
+                                backgroundColor: AppConstants.darkBg,
+                                onSelected: (_) {
+                                  setDialogState(() => tenderedCash = 10000);
+                                },
+                              ),
+                          ],
+                        ),
+                        if (changeAmount > 0) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Change Due:', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
+                                    Text('₦${_formatFare(changeAmount)}', style: const TextStyle(color: Colors.amberAccent, fontSize: 15, fontWeight: FontWeight.w900)),
+                                  ],
+                                ),
+                                if (!changeRolledOver)
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppConstants.primaryColor,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    icon: const Icon(Icons.send_to_mobile_rounded, size: 13, color: Colors.white),
+                                    label: const Text('Roll to Wallet', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    onPressed: () {
+                                      final provider = context.read<DriverProvider>();
+                                      provider.socket.socket?.emit('ride:settle_change_to_wallet', {
+                                        'rideId': rideId,
+                                        'tenderedNgn': tenderedCash,
+                                        'agreedFareNgn': fare,
+                                      });
+                                      setDialogState(() => changeRolledOver = true);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('✓ ₦${_formatFare(changeAmount)} rolled over to passenger wallet! Keep cash.'),
+                                          backgroundColor: AppConstants.successColor,
+                                        ),
+                                      );
+                                    },
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(color: AppConstants.successColor.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, color: AppConstants.successColor, size: 14),
+                                        SizedBox(width: 4),
+                                        Text('Rolled Over', style: TextStyle(color: AppConstants.successColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                    const Divider(color: Colors.white10, height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('You Keep (100%)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-                        Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.w900, fontSize: 18)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Rate Passenger:', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (idx) {
-                  return IconButton(
-                    icon: Icon(
-                      idx < _passengerRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                      color: AppConstants.accentColor,
-                      size: 32,
-                    ),
-                    onPressed: () {
-                      setDialogState(() => _passengerRating = idx + 1);
-                      setState(() => _passengerRating = idx + 1);
-                    },
-                  );
-                }),
-              ),
-            ],
-          ),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                },
-                child: const Text('Return to Radar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Text('Rate Passenger:', style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (idx) {
+                      return IconButton(
+                        icon: Icon(
+                          idx < _passengerRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: AppConstants.accentColor,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setDialogState(() => _passengerRating = idx + 1);
+                          setState(() => _passengerRating = idx + 1);
+                        },
+                      );
+                    }),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Return to Radar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -206,10 +359,11 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               final provider = context.read<DriverProvider>();
+              final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
               provider.socket.socket?.emit('ride:sos_trigger', {
-                'rideId': widget.trip['rideId'],
-                'latitude': 6.518,
-                'longitude': 3.379,
+                'rideId': rideId,
+                'latitude': _driverLocation.latitude,
+                'longitude': _driverLocation.longitude,
                 'notes': 'Driver emergency button tapped',
               });
               ScaffoldMessenger.of(context).showSnackBar(
@@ -225,7 +379,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fare = widget.trip['agreedFareNgn'] ?? widget.trip['counterFareNgn'] ?? 3500;
+    final fare = _extractFare(widget.trip);
     final pickup = widget.trip['pickupAddress'] ?? 'Pickup Location';
     final dropoff = widget.trip['dropoffAddress'] ?? 'Destination Location';
     final gateCode = widget.trip['gateCode'] ?? widget.trip['estateGateCode'];

@@ -158,6 +158,21 @@ class _KycScreenState extends State<KycScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppConstants.textLight, size: 20),
+                onPressed: () => Navigator.pop(context),
+              )
+            : IconButton(
+                icon: const Icon(Icons.dashboard_customize_rounded, color: AppConstants.textLight, size: 22),
+                tooltip: 'Driver Home',
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DriverShell()),
+                  );
+                },
+              ),
         title: const Text('Identity & Driver KYC', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(
@@ -225,58 +240,81 @@ class _KycScreenState extends State<KycScreen> {
               ),
             ),
 
-            if (isApproved && vba != null) ...[
+            if (isApproved) ...[
               const SizedBox(height: 16),
-              // Dedicated Virtual Account Card
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F766E), Color(0xFF134E4A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              if (vba != null) ...[
+                // Dedicated Virtual Account Card
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F766E), Color(0xFF134E4A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppConstants.primaryColor.withOpacity(0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppConstants.primaryColor.withOpacity(0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            vba['bank_name'] ?? 'Wema Bank (Giga Dedicated)',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(6)),
+                            child: const Text('NIP DVA Active', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Dedicated Driver NUBAN Number', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Text(
+                        vba['account_number'] ?? '9988776655',
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        vba['account_name'] ?? 'Driver Account',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          vba['bank_name'] ?? 'Wema Bank (Giga Dedicated)',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppConstants.cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppConstants.primaryLight)),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          'Provisioning your dedicated NUBAN virtual account with NIBSS settlement network...',
+                          style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(6)),
-                          child: const Text('NIP DVA Active', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Dedicated Driver NUBAN Number', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                    const SizedBox(height: 4),
-                    Text(
-                      vba['account_number'] ?? '9988776655',
-                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      vba['account_name'] ?? 'Driver Account',
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
 
               const SizedBox(height: 24),
               SizedBox(
@@ -422,6 +460,22 @@ class _KycScreenState extends State<KycScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ],
+
+            if (!isApproved) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DriverShell()),
+                    );
+                  },
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: AppConstants.textMuted),
+                  label: const Text('Explore Driver Dashboard (View Only)', style: TextStyle(color: AppConstants.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],

@@ -167,6 +167,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 onPressed: () {
+                  final newName = nameCtrl.text.trim();
+                  final newEmail = emailCtrl.text.trim();
+                  if (newName.isNotEmpty) {
+                    provider.updateProfileLocally(
+                      fullName: newName,
+                      email: newEmail.isNotEmpty ? newEmail : null,
+                    );
+                  }
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Profile updated successfully!'), backgroundColor: AppConstants.successColor));
                 },

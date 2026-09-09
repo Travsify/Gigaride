@@ -234,18 +234,24 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          vba?['account_number'] ?? '9928371625',
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3),
+                          vba != null ? (vba['account_number'] ?? 'Provisioning...') : 'Provisioning...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: vba != null ? 24 : 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: vba != null ? 3 : 1,
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
-                          onPressed: () => _copyToClipboard(vba?['account_number'] ?? '9928371625', 'NUBAN Account Number'),
-                        ),
+                        if (vba != null && vba['account_number'] != null)
+                          IconButton(
+                            icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                            onPressed: () => _copyToClipboard(vba['account_number'], 'NUBAN Account Number'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      vba?['account_name'] ?? 'Driver Name',
+                      vba?['account_name'] ?? (provider.user?['fullName'] ?? provider.user?['full_name'] ?? 'Driver Account'),
                       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ],

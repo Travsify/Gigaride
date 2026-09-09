@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double get _dropoffLng => _dropoffLocation?.longitude ?? 3.4219;
 
   String _selectedCategory = 'CITY'; // 'CITY', 'AIRPORT', 'INTERSTATE'
-  String _selectedVehicleTier = 'ECONOMY'; // 'ECONOMY', 'COMFORT', 'XL_SUV'
+  final String _selectedVehicleTier = 'ECONOMY'; // 'ECONOMY', 'COMFORT', 'XL_SUV'
   DateTime? _scheduledDateTime;
   final bool _isCorporateMode = false;
   bool _showNotesField = false;

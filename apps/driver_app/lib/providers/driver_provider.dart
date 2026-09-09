@@ -58,6 +58,19 @@ class DriverProvider with ChangeNotifier {
     }
   }
 
+  void updateProfileLocally({String? fullName, String? email}) {
+    if (user != null) {
+      if (fullName != null && fullName.trim().isNotEmpty) {
+        user!['fullName'] = fullName.trim();
+        user!['full_name'] = fullName.trim();
+      }
+      if (email != null && email.trim().isNotEmpty) {
+        user!['email'] = email.trim();
+      }
+      notifyListeners();
+    }
+  }
+
   Future<void> login(String identifier, String password) async {
     isLoading = true;
     notifyListeners();
