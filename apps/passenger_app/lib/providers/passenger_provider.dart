@@ -54,7 +54,7 @@ class PassengerProvider with ChangeNotifier {
   String? token;
 
   int get walletBalance {
-    final bal = vba?['balance_ngn'] ?? user?['walletBalance'] ?? user?['wallet_balance'] ?? 0;
+    final bal = user?['walletBalance'] ?? user?['wallet_balance'] ?? user?['balance'] ?? 0;
     if (bal is num) return bal.toInt();
     if (bal is String) return int.tryParse(bal) ?? 0;
     return 0;
