@@ -67,11 +67,21 @@ class SocketService {
 
   Function(Map<String, dynamic>)? onChatMessage;
 
-  void updateLocation({required double latitude, required double longitude, bool isOnline = true}) {
+  void updateLocation({
+    required double latitude,
+    required double longitude,
+    bool isOnline = true,
+    String? activeRideId,
+    double? heading,
+    double? speedKmh,
+  }) {
     socket?.emit('driver:location', {
       'latitude': latitude,
       'longitude': longitude,
       'isOnline': isOnline,
+      'activeRideId': ?activeRideId,
+      'heading': ?heading,
+      'speedKmh': ?speedKmh,
     });
   }
 

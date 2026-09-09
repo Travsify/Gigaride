@@ -34,7 +34,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
   }
 
   void _showReceiptModal(BuildContext context, dynamic ride) {
-    final fare = ride['agreed_fare_ngn'] ?? ride['suggested_fare_ngn'] ?? ride['rider_offer_ngn'] ?? 2500;
+    final fare = ride['agreed_fare_ngn'] ?? ride['suggested_fare_ngn'] ?? ride['rider_offer_ngn'] ?? 0;
     final pickup = ride['pickup_address'] ?? 'Pickup Point';
     final dropoff = ride['dropoff_address'] ?? 'Dropoff Point';
     final date = ride['created_at']?.toString().split('T')[0] ?? 'Today';
@@ -265,7 +265,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
           return _buildActiveRideCard(ctx, activeRide, provider);
         }
         final r = rides[hasActive ? index - 1 : index];
-        final fare = r['agreed_fare_ngn'] ?? r['suggested_fare_ngn'] ?? 2500;
+        final fare = r['agreed_fare_ngn'] ?? r['suggested_fare_ngn'] ?? r['rider_offer_ngn'] ?? 0;
         final pickup = r['pickup_address'] ?? 'Lagos';
         final dropoff = r['dropoff_address'] ?? 'Lagos';
         final date = r['created_at']?.toString().split('T')[0] ?? 'Recent';
@@ -483,7 +483,7 @@ class _ActivityScreenState extends State<ActivityScreen> with SingleTickerProvid
     final driver = provider.selectedDriverBid;
     final driverName = driver?['driverName'] ?? 'Driver';
     final vehicle = driver?['vehicleModel'] ?? 'Verified Vehicle';
-    final fare = provider.finalFarePaid ?? driver?['counterFareNgn'] ?? ride['riderOfferNgn'] ?? ride['rider_offer_ngn'] ?? 2500;
+    final fare = provider.finalFarePaid ?? driver?['counterFareNgn'] ?? ride['riderOfferNgn'] ?? ride['rider_offer_ngn'] ?? 0;
     final pickup = ride['pickupAddress'] ?? ride['pickup_address'] ?? 'Pickup Point';
     final dropoff = ride['dropoffAddress'] ?? ride['dropoff_address'] ?? 'Dropoff Point';
 

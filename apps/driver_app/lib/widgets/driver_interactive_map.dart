@@ -4,6 +4,38 @@ import 'package:latlong2/latlong.dart';
 import '../core/constants.dart';
 import '../services/navigation_helper.dart';
 
+int _extractFare(dynamic req) {
+  if (req is! Map) return 3000;
+  final val = req['riderOfferNgn'] ??
+              req['rider_offer_ngn'] ??
+              req['suggestedFareNgn'] ??
+              req['suggested_fare_ngn'] ??
+              req['agreedFareNgn'] ??
+              req['agreed_fare_ngn'] ??
+              req['counterFareNgn'] ??
+              req['fareNgn'] ??
+              req['fare'];
+  if (val is num) {
+    final intVal = val.toInt();
+    if (intVal > 0) return intVal;
+  }
+  if (val is String) {
+    final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+    final parsed = int.tryParse(clean);
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 3000;
+}
+
+String _formatFare(dynamic amount) {
+  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0);
+  final displayVal = val > 0 ? val : 3000;
+  return displayVal.toString().replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]},',
+  );
+}
+
 class DriverInteractiveMap extends StatefulWidget {
   final LatLng driverLocation;
   final bool isOnline;
@@ -136,7 +168,8 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
               TileLayer(
                 key: ValueKey(_isSatelliteMode),
                 urlTemplate: tileUrl,
-                userAgentPackageName: 'com.gigaride.driver',
+                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'ng.giga.driverApp',
                 maxZoom: 19,
               ),
               // Route Polyline Layer (Active trip)
@@ -189,11 +222,11 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
                   ...widget.incomingRequests.map((req) {
                     final lat = (req['pickupLat'] as num?)?.toDouble() ?? (widget.driverLocation.latitude + 0.005);
                     final lng = (req['pickupLng'] as num?)?.toDouble() ?? (widget.driverLocation.longitude + 0.005);
-                    final fare = req['riderOfferNgn'] ?? 3000;
+                    final fare = _extractFare(req);
 
                     return Marker(
                       point: LatLng(lat, lng),
-                      width: 80,
+                      width: 84,
                       height: 48,
                       child: GestureDetector(
                         onTap: () {
@@ -214,7 +247,7 @@ class _DriverInteractiveMapState extends State<DriverInteractiveMap> {
                                 ],
                               ),
                               child: Text(
-                                '₦$fare',
+                                '₦${_formatFare(fare)}',
                                 style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 10,

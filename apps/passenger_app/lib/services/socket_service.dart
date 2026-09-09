@@ -50,6 +50,20 @@ class SocketService {
       }
     });
 
+    // 🚗 Live Driver GPS & Heading Stream
+    socket!.on('ride:driver_location', (data) {
+      if (data != null && onDriverLocationUpdate != null) {
+        onDriverLocationUpdate!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // ⚡ Driver Approaching Milestone (< 500m)
+    socket!.on('ride:approaching', (data) {
+      if (data != null && onDriverApproaching != null) {
+        onDriverApproaching!(Map<String, dynamic>.from(data));
+      }
+    });
+
     // In-App Calling & Secure Signaling Listeners
     socket!.on('call:incoming', (data) {
       if (data != null && onIncomingCall != null) {
@@ -75,13 +89,39 @@ class SocketService {
         onChatMessage!(Map<String, dynamic>.from(data));
       }
     });
+
+    // 🚫 Ride Cancellation Listener
+    socket!.on('ride:cancelled', (data) {
+      if (data != null && onRideCancelled != null) {
+        onRideCancelled!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // ⚠️ Real-Time Issue Logged
+    socket!.on('ride:issue_logged', (data) {
+      if (data != null && onIssueLogged != null) {
+        onIssueLogged!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // 💵 Cash Change Credited to Living Wallet
+    socket!.on('wallet:change_credited', (data) {
+      if (data != null && onWalletChangeCredited != null) {
+        onWalletChangeCredited!(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
-  // Call & Chat event callbacks
+  // Telemetry, Call & Chat event callbacks
+  Function(Map<String, dynamic>)? onDriverLocationUpdate;
+  Function(Map<String, dynamic>)? onDriverApproaching;
   Function(Map<String, dynamic>)? onIncomingCall;
   Function(Map<String, dynamic>)? onCallConnected;
   Function(Map<String, dynamic>)? onCallEnded;
   Function(Map<String, dynamic>)? onChatMessage;
+  Function(Map<String, dynamic>)? onRideCancelled;
+  Function(Map<String, dynamic>)? onIssueLogged;
+  Function(Map<String, dynamic>)? onWalletChangeCredited;
 
   void broadcastRide(String rideId) {
     socket?.emit('ride:request', {'rideId': rideId});
@@ -91,6 +131,40 @@ class SocketService {
     socket?.emit('passenger:accept_bid', {
       'rideId': rideId,
       'driverId': driverId,
+      'agreedFareNgn': agreedFareNgn,
+    });
+  }
+
+  // 🚫 Cancel Active Ride
+  void cancelRide({required String rideId, String? reason}) {
+    socket?.emit('ride:cancel', {
+      'rideId': rideId,
+      'reason': reason ?? 'Passenger cancelled',
+    });
+  }
+
+  // ⚠️ Report In-Trip Safety / Quality Issue
+  void reportRideIssue({
+    required String rideId,
+    required String issueType,
+    required String description,
+  }) {
+    socket?.emit('ride:report_issue', {
+      'rideId': rideId,
+      'issueType': issueType,
+      'description': description,
+    });
+  }
+
+  // 💵 Settle Cash Change into Living Wallet
+  void settleChangeToWallet({
+    required String rideId,
+    required int tenderedNgn,
+    required int agreedFareNgn,
+  }) {
+    socket?.emit('ride:settle_change_to_wallet', {
+      'rideId': rideId,
+      'tenderedNgn': tenderedNgn,
       'agreedFareNgn': agreedFareNgn,
     });
   }
@@ -118,12 +192,20 @@ class SocketService {
     });
   }
 
-  // In-App Chat Actions
-  void sendChatMessage({required String rideId, required String receiverId, required String text}) {
+  // In-App Chat Actions (with Hands-Free Voice Note / Audio Walkie-Talkie Support)
+  void sendChatMessage({
+    required String rideId,
+    required String receiverId,
+    required String text,
+    bool isVoiceMemo = false,
+    int? durationSecs,
+  }) {
     socket?.emit('ride:chat_send', {
       'rideId': rideId,
       'receiverId': receiverId,
       'text': text,
+      'isVoiceMemo': isVoiceMemo,
+      'durationSecs': durationSecs,
     });
   }
 

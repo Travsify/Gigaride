@@ -11,9 +11,33 @@ import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../widgets/driver_interactive_map.dart';
 
+int _extractFare(dynamic req) {
+  if (req is! Map) return 3000;
+  final val = req['riderOfferNgn'] ??
+              req['rider_offer_ngn'] ??
+              req['suggestedFareNgn'] ??
+              req['suggested_fare_ngn'] ??
+              req['agreedFareNgn'] ??
+              req['agreed_fare_ngn'] ??
+              req['counterFareNgn'] ??
+              req['fareNgn'] ??
+              req['fare'];
+  if (val is num) {
+    final intVal = val.toInt();
+    if (intVal > 0) return intVal;
+  }
+  if (val is String) {
+    final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+    final parsed = int.tryParse(clean);
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 3000;
+}
+
 String _formatFare(dynamic amount) {
-  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString() ?? '0') ?? 0);
-  return val.toString().replaceAllMapped(
+  final val = (amount is num ? amount.toInt() : int.tryParse(amount?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0);
+  final displayVal = val > 0 ? val : 3000;
+  return displayVal.toString().replaceAllMapped(
     RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
     (Match m) => '${m[1]},',
   );
@@ -79,7 +103,8 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
   }
 
   void _showCustomBidDialog(Map<String, dynamic> req) {
-    final fareCtrl = TextEditingController(text: '${req['riderOfferNgn'] ?? 3000}');
+    final originalFare = _extractFare(req);
+    final fareCtrl = TextEditingController(text: '$originalFare');
     final etaCtrl = TextEditingController(text: '7');
 
     showModalBottomSheet(
@@ -100,7 +125,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
           children: [
             const Text('Place Custom Counter-Offer', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text('Passenger offered ₦${req['riderOfferNgn']}. You keep 100% of your counter-offer.', style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+            Text('Passenger offered ₦${_formatFare(originalFare)}. You keep 100% of your counter-offer.', style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
             const SizedBox(height: 20),
             TextField(
               controller: fareCtrl,
@@ -449,7 +474,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                   itemCount: requests.length,
                   itemBuilder: (ctx, idx) {
                     final req = requests[idx];
-                    final fare = req['riderOfferNgn'] ?? 3000;
+                    final fare = _extractFare(req);
                     final pickup = req['pickupAddress'] ?? 'Pickup Address';
                     final dropoff = req['dropoffAddress'] ?? 'Destination Address';
                     final distance = req['driverPickupDistanceKm'] ?? 1.8;

@@ -495,4 +495,33 @@ class PlacesService {
 
     return 'Current Location';
   }
+
+  /// Expose curated landmarks for live environs map rendering
+  static List<Map<String, dynamic>> get curatedLandmarks => _curatedLandmarks;
+
+  /// Find nearest landmark within radius (default 500m) for contextual milestone banners
+  static Map<String, dynamic>? findNearestLandmark(LatLng location, {double maxDistanceKm = 0.5}) {
+    final Distance distance = const Distance();
+    Map<String, dynamic>? nearest;
+    double minDistance = double.infinity;
+
+    for (final l in _curatedLandmarks) {
+      final dKm = distance.as(
+        LengthUnit.Kilometer,
+        location,
+        LatLng((l['lat'] as num).toDouble(), (l['lng'] as num).toDouble()),
+      );
+      if (dKm < minDistance && dKm <= maxDistanceKm) {
+        minDistance = dKm;
+        nearest = {
+          'name': l['name'],
+          'city': l['city'],
+          'lat': l['lat'],
+          'lng': l['lng'],
+          'distanceKm': dKm,
+        };
+      }
+    }
+    return nearest;
+  }
 }

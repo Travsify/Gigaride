@@ -7,9 +7,12 @@ import '../providers/passenger_provider.dart';
 import 'home_screen.dart';
 import 'in_app_call_screen.dart';
 import 'ride_chat_sheet.dart';
+import 'offer_room_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
+import '../services/places_service.dart';
+import '../services/routing_service.dart';
 import '../widgets/interactive_ride_map.dart';
 
 class RideTrackingScreen extends StatefulWidget {
@@ -25,6 +28,47 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   bool _sosDispatched = false;
   int _driverRating = 5;
   int? _selectedTip;
+  final TextEditingController _changeTenderedCtrl = TextEditingController();
+  bool _changeSettled = false;
+
+  List<LatLng> _liveRoutePoints = [];
+  bool _isLoadingRoute = false;
+  String? _lastRoutedStatus;
+
+  Future<void> _fetchLiveRoadPolyline(PassengerProvider provider) async {
+    if (_isLoadingRoute) return;
+    _isLoadingRoute = true;
+
+    try {
+      final status = provider.tripStatus ?? 'ACCEPTED';
+      final driver = provider.selectedDriverBid;
+      final driverLat = provider.liveDriverLocation?.latitude ?? (driver?['driverLat'] as num?)?.toDouble() ?? 7.4443;
+      final driverLng = provider.liveDriverLocation?.longitude ?? (driver?['driverLng'] as num?)?.toDouble() ?? 3.8997;
+      final driverPos = LatLng(driverLat, driverLng);
+
+      final pickupLat = (provider.currentRide?['pickupLat'] as num?)?.toDouble() ?? 7.4443;
+      final pickupLng = (provider.currentRide?['pickupLng'] as num?)?.toDouble() ?? 3.8997;
+      final pickupPos = LatLng(pickupLat, pickupLng);
+
+      final dropoffLat = (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 7.3872;
+      final dropoffLng = (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.8760;
+      final dropoffPos = LatLng(dropoffLat, dropoffLng);
+
+      final startPos = driverPos;
+      final endPos = (status == 'IN_TRANSIT') ? dropoffPos : pickupPos;
+
+      final res = await RoutingService.getDrivingRoute(startPos, endPos);
+      if (res != null && res.polyline.isNotEmpty && mounted) {
+        setState(() {
+          _liveRoutePoints = res.polyline;
+          _lastRoutedStatus = status;
+        });
+      }
+    } catch (_) {
+    } finally {
+      _isLoadingRoute = false;
+    }
+  }
 
   void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver, String rideId) {
     final phone = driver?['driverPhone'] ?? driver?['phone'] ?? '+234 800 000 0000';
@@ -303,6 +347,330 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   }
 
   @override
+  void dispose() {
+    _changeTenderedCtrl.dispose();
+    super.dispose();
+  }
+
+  void _showCancelRideSheet(BuildContext context, PassengerProvider provider) {
+    String selectedReason = 'Driver is taking too long / not moving';
+    bool rematchAfterCancel = true;
+    final reasons = [
+      'Driver is taking too long / not moving',
+      'Driver asked to cancel or pay cash off-app',
+      'Driver vehicle does not match profile',
+      'Driver refused AC / comfort request',
+      'Changed my destination or plans',
+      'Driver called and asked me to cancel',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.cardBg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppConstants.dangerColor.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close_rounded, color: AppConstants.dangerColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Cancel Active Ride', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppConstants.textMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Please select a reason. Giga guarantees zero cancellation fee if the driver has not arrived or is unresponsive.',
+                style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              ...reasons.map((r) {
+                final isSelected = selectedReason == r;
+                return InkWell(
+                  onTap: () => setSheetState(() => selectedReason = r),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppConstants.primaryColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? AppConstants.primaryLight : Colors.white10,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? AppConstants.accentColor : AppConstants.textMuted,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(r, style: TextStyle(color: isSelected ? AppConstants.textLight : AppConstants.textMuted, fontSize: 13, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.bolt_rounded, color: AppConstants.accentColor, size: 20),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        '1-Tap Instant Re-match\nRe-broadcast offer to nearby drivers immediately',
+                        style: TextStyle(color: AppConstants.textLight, fontSize: 12),
+                      ),
+                    ),
+                    Switch(
+                      value: rematchAfterCancel,
+                      activeColor: AppConstants.accentColor,
+                      onChanged: (val) => setSheetState(() => rematchAfterCancel = val),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.dangerColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final oldRide = provider.currentRide;
+                    provider.cancelActiveRide(reason: selectedReason);
+
+                    if (rematchAfterCancel && oldRide != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('⚡ Ride cancelled. Finding you a new driver immediately...'),
+                          backgroundColor: AppConstants.primaryColor,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      try {
+                        await provider.submitRideRequest(
+                          pickupLat: (oldRide['pickupLat'] as num).toDouble(),
+                          pickupLng: (oldRide['pickupLng'] as num).toDouble(),
+                          pickupAddress: oldRide['pickupAddress'] ?? 'Pickup',
+                          dropoffLat: (oldRide['dropoffLat'] as num).toDouble(),
+                          dropoffLng: (oldRide['dropoffLng'] as num).toDouble(),
+                          dropoffAddress: oldRide['dropoffAddress'] ?? 'Dropoff',
+                          riderOfferNgn: (oldRide['riderOfferNgn'] as num?)?.toInt() ?? 2500,
+                          notes: oldRide['notes'],
+                          isBusiness: oldRide['isBusiness'] ?? false,
+                        );
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const OfferRoomScreen()),
+                          );
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HomeScreen()),
+                            (r) => false,
+                          );
+                        }
+                      }
+                    } else {
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          (r) => false,
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('CONFIRM CANCELLATION', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showReportIssueSheet(BuildContext context, PassengerProvider provider) {
+    String selectedCategory = 'AC_NOT_WORKING';
+    final issueCategories = [
+      {'id': 'AC_NOT_WORKING', 'title': 'AC Off / Driver Refuses AC', 'icon': Icons.ac_unit_rounded},
+      {'id': 'RECKLESS_DRIVING', 'title': 'Reckless Driving / Speeding', 'icon': Icons.speed_rounded},
+      {'id': 'WRONG_ROUTE', 'title': 'Route Deviation / Wrong Path', 'icon': Icons.alt_route_rounded},
+      {'id': 'FARE_EXTORTION', 'title': 'Demanding Extra Cash / Off-App', 'icon': Icons.monetization_on_rounded},
+      {'id': 'VEHICLE_MISMATCH', 'title': 'Car or Driver Does Not Match', 'icon': Icons.no_crash_rounded},
+    ];
+    final noteCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.cardBg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.report_problem_rounded, color: Colors.amber, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Report In-Trip Issue', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppConstants.textMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Instant Safety & Service Mediation. Our system flags the driver profile and notifies Ops immediately.',
+                style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              ...issueCategories.map((item) {
+                final isSelected = selectedCategory == item['id'];
+                return InkWell(
+                  onTap: () => setSheetState(() => selectedCategory = item['id'] as String),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppConstants.primaryColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? AppConstants.primaryLight : Colors.white10,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(item['icon'] as IconData, color: isSelected ? AppConstants.accentColor : AppConstants.textMuted, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            item['title'] as String,
+                            style: TextStyle(
+                              color: isSelected ? AppConstants.textLight : AppConstants.textMuted,
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        if (isSelected) const Icon(Icons.check_circle, color: AppConstants.accentColor, size: 18),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteCtrl,
+                style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Add additional details for our Ops desk (optional)...',
+                  hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  filled: true,
+                  fillColor: AppConstants.surfaceBg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    provider.reportInTripIssue(
+                      issueType: selectedCategory,
+                      description: noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : selectedCategory,
+                    );
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('🛡️ Issue logged with Giga Operations. Our response desk is reviewing.'),
+                        backgroundColor: AppConstants.successColor,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: const Text('SUBMIT REPORT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<PassengerProvider>();
     final currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
@@ -423,6 +791,103 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                   ),
                 ),
 
+                // 💰 Cash Change Rollover to Living Wallet
+                if (!_walletPaymentSuccess) ...[
+                  Container(
+                    margin: const EdgeInsets.only(top: 14),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppConstants.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _changeSettled ? AppConstants.successColor : Colors.white10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.savings_outlined, color: AppConstants.accentColor, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No Change? Deposit to Living Wallet',
+                                style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Handed ₦5,000 for a ₦3,500 ride? Have the ₦1,500 change credited to your Living Wallet balance instantly.',
+                          style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                        ),
+                        const SizedBox(height: 10),
+                        if (_changeSettled) ...[
+                          Row(
+                            children: const [
+                              Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
+                              SizedBox(width: 6),
+                              Text('Change queued for deposit into your Living Wallet!', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _changeTenderedCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: 'Cash handed (e.g. 5000)',
+                                    hintStyle: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                                    filled: true,
+                                    fillColor: AppConstants.surfaceBg,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConstants.primaryColor,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () {
+                                  final tendered = int.tryParse(_changeTenderedCtrl.text.replaceAll(',', '').trim()) ?? 0;
+                                  final agreed = ((provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0) as num).toInt();
+                                  if (tendered <= agreed) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Cash handed must be greater than agreed fare to compute change.'),
+                                        backgroundColor: AppConstants.dangerColor,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  provider.settleCashChange(tenderedNgn: tendered, agreedFareNgn: agreed);
+                                  setState(() => _changeSettled = true);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('✅ ₦${(tendered - agreed).toString()} change queued for deposit to your Living Wallet!'),
+                                      backgroundColor: AppConstants.successColor,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                },
+                                child: const Text('Credit Change', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 18),
 
                 // Pay With Living Wallet Button (if not already settled)
@@ -476,6 +941,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       );
     }
 
+    // Fetch real road polyline if not loaded or status changed
+    if (_liveRoutePoints.isEmpty || _lastRoutedStatus != status) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fetchLiveRoadPolyline(provider);
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppConstants.darkBg,
       appBar: AppBar(
@@ -515,26 +987,33 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 ),
               ],
 
-              // Status Header
+              // Status Header & Real-Time Milestone Banner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppConstants.cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppConstants.primaryColor.withOpacity(0.4)),
+                  border: Border.all(
+                    color: status == 'ARRIVED'
+                        ? const Color(0xFFFBBF24)
+                        : AppConstants.primaryColor.withOpacity(0.4),
+                    width: status == 'ARRIVED' ? 1.5 : 1.0,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppConstants.primaryColor.withOpacity(0.2),
+                        color: status == 'ARRIVED'
+                            ? const Color(0xFFFBBF24).withOpacity(0.2)
+                            : AppConstants.primaryColor.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        status == 'ARRIVED' ? Icons.hail : Icons.directions_car,
-                        color: AppConstants.accentColor,
+                        status == 'ARRIVED' ? Icons.hail_rounded : Icons.directions_car_rounded,
+                        color: status == 'ARRIVED' ? const Color(0xFFFBBF24) : AppConstants.accentColor,
                         size: 24,
                       ),
                     ),
@@ -543,21 +1022,58 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            status == 'ACCEPTED'
-                                ? 'Driver is on the way'
-                                : status == 'ARRIVED'
-                                    ? 'Driver has arrived outside!'
-                                    : 'On trip to destination',
-                            style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  status == 'ACCEPTED'
+                                      ? 'Driver is on the way'
+                                      : status == 'ARRIVED'
+                                          ? 'Driver has arrived outside!'
+                                          : 'Trip in Progress',
+                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              if (status == 'ARRIVED') ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFBBF24).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.timer_outlined, size: 14, color: Color(0xFFFBBF24)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${(provider.freeWaitSecondsRemaining ~/ 60).toString().padLeft(2, '0')}:${(provider.freeWaitSecondsRemaining % 60).toString().padLeft(2, '0')}',
+                                        style: const TextStyle(
+                                          color: Color(0xFFFBBF24),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
+                          const SizedBox(height: 4),
                           Text(
-                            status == 'ACCEPTED'
-                                ? 'ETA ~${driver?['etaMinutes'] ?? 4} mins'
-                                : status == 'ARRIVED'
-                                    ? 'Look out for vehicle'
-                                    : 'Heading to dropoff',
-                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 13),
+                            provider.activeMilestoneMessage ??
+                                (status == 'ACCEPTED'
+                                    ? 'ETA ~${driver?['etaMinutes'] ?? 4} mins • En route to pickup'
+                                    : status == 'ARRIVED'
+                                        ? 'Look out for ${driver?['vehicleModel'] ?? 'vehicle'} (${driver?['licensePlate'] ?? ''})'
+                                        : 'Heading to dropoff destination'),
+                            style: TextStyle(
+                              color: status == 'ARRIVED' ? const Color(0xFFFBBF24) : AppConstants.textMuted,
+                              fontSize: 13,
+                              fontWeight: status == 'ARRIVED' ? FontWeight.w600 : FontWeight.normal,
+                            ),
                           ),
                         ],
                       ),
@@ -567,31 +1083,43 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Real-Time Ride Tracking Map
+              // 🗺️ Real-Time Hyper-Realistic Ride Tracking Map
               InteractiveRideMap(
-                currentLocation: LatLng(
-                  (driver?['driverLat'] as num?)?.toDouble() ?? 6.5244,
-                  (driver?['driverLng'] as num?)?.toDouble() ?? 3.3792,
-                ),
+                currentLocation: provider.liveDriverLocation ??
+                    LatLng(
+                      (driver?['driverLat'] as num?)?.toDouble() ?? 7.4443,
+                      (driver?['driverLng'] as num?)?.toDouble() ?? 3.8997,
+                    ),
+                assignedDriverLocation: provider.liveDriverLocation ??
+                    LatLng(
+                      (driver?['driverLat'] as num?)?.toDouble() ?? 7.4443,
+                      (driver?['driverLng'] as num?)?.toDouble() ?? 3.8997,
+                    ),
+                assignedDriverHeading: provider.liveDriverHeading,
+                driverVehicleModel: driver?['vehicleModel'] ?? 'Toyota Corolla',
+                corridorLandmarks: PlacesService.curatedLandmarks,
                 pickupLocation: LatLng(
-                  (provider.currentRide?['pickupLat'] as num?)?.toDouble() ?? 6.5244,
-                  (provider.currentRide?['pickupLng'] as num?)?.toDouble() ?? 3.3792,
+                  (provider.currentRide?['pickupLat'] as num?)?.toDouble() ?? 7.4443,
+                  (provider.currentRide?['pickupLng'] as num?)?.toDouble() ?? 3.8997,
                 ),
                 dropoffLocation: LatLng(
-                  (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 6.4281,
-                  (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.4219,
+                  (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 7.3872,
+                  (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.8760,
                 ),
-                routePoints: [
-                  LatLng(
-                    (driver?['driverLat'] as num?)?.toDouble() ?? 6.5244,
-                    (driver?['driverLng'] as num?)?.toDouble() ?? 3.3792,
-                  ),
-                  LatLng(
-                    (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 6.4281,
-                    (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.4219,
-                  ),
-                ],
-                height: 220,
+                routePoints: _liveRoutePoints.isNotEmpty
+                    ? _liveRoutePoints
+                    : [
+                        provider.liveDriverLocation ??
+                            LatLng(
+                              (driver?['driverLat'] as num?)?.toDouble() ?? 7.4443,
+                              (driver?['driverLng'] as num?)?.toDouble() ?? 3.8997,
+                            ),
+                        LatLng(
+                          (provider.currentRide?['dropoffLat'] as num?)?.toDouble() ?? 7.3872,
+                          (provider.currentRide?['dropoffLng'] as num?)?.toDouble() ?? 3.8760,
+                        ),
+                      ],
+                height: 240,
               ),
               const SizedBox(height: 16),
 
@@ -667,6 +1195,40 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                         ),
                         onPressed: () => _shareLiveTrackingLink(context, rideId, driver),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.amber.withOpacity(0.6)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                            ),
+                            icon: const Icon(Icons.report_problem_outlined, color: Colors.amber, size: 16),
+                            label: const Text(
+                              'Report Issue (AC/Safety)',
+                              style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                            onPressed: () => _showReportIssueSheet(context, provider),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppConstants.dangerColor.withOpacity(0.6)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                          ),
+                          icon: const Icon(Icons.cancel_outlined, color: AppConstants.dangerColor, size: 16),
+                          label: const Text(
+                            'Cancel Ride',
+                            style: TextStyle(color: AppConstants.dangerColor, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                          onPressed: () => _showCancelRideSheet(context, provider),
+                        ),
+                      ],
                     ),
                   ],
                 ),

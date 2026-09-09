@@ -97,6 +97,92 @@ export class OneSignalService {
   }
 
   /**
+   * Helper: Dispatches match alert to passenger when driver is assigned.
+   */
+  public async sendDriverAssignedToPassenger(
+    passengerId: string,
+    driverName: string,
+    vehicleInfo: string,
+    etaMinutes: number,
+    rideId: string
+  ) {
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: '🚗 Driver Confirmed & On the Way!',
+      content: `${driverName} (${vehicleInfo}) is en route to your pickup. ETA ~${etaMinutes} mins.`,
+      data: { type: 'DRIVER_ASSIGNED', rideId },
+    });
+  }
+
+  /**
+   * Helper: Dispatches approaching alert when driver is within ~500m of pickup.
+   */
+  public async sendDriverApproachingAlert(
+    passengerId: string,
+    driverName: string,
+    landmarkName: string | null,
+    rideId: string
+  ) {
+    const nearText = landmarkName ? ` passing ${landmarkName}` : '';
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: '⚡ Driver is Approaching Pickup!',
+      content: `${driverName} is 2 mins away${nearText}. Please head out to your pickup spot.`,
+      data: { type: 'DRIVER_APPROACHING', rideId },
+    });
+  }
+
+  /**
+   * Helper: Dispatches arrival alert when driver arrives at pickup.
+   */
+  public async sendDriverArrivedAlert(
+    passengerId: string,
+    driverName: string,
+    vehicleInfo: string,
+    rideId: string
+  ) {
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: '📍 Driver Has Arrived!',
+      content: `${driverName} is waiting outside in ${vehicleInfo}. Free wait time: 3 mins.`,
+      data: { type: 'DRIVER_ARRIVED', rideId },
+    });
+  }
+
+  /**
+   * Helper: Dispatches trip started alert.
+   */
+  public async sendTripStartedAlert(
+    passengerId: string,
+    dropoffAddress: string,
+    rideId: string
+  ) {
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: 'Trip in Progress 🚗',
+      content: `En route to ${dropoffAddress}. Sit back and enjoy your trip!`,
+      data: { type: 'TRIP_STARTED', rideId },
+    });
+  }
+
+  /**
+   * Helper: Dispatches trip completed alert.
+   */
+  public async sendTripCompletedAlert(
+    passengerId: string,
+    agreedFareNgn: number,
+    dropoffAddress: string,
+    rideId: string
+  ) {
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: '🏁 Trip Completed! Receipt Ready',
+      content: `You arrived at ${dropoffAddress}. ₦${agreedFareNgn.toLocaleString('en-NG')} settled with 0% commission.`,
+      data: { type: 'TRIP_COMPLETED', rideId, fareNgn: agreedFareNgn },
+    });
+  }
+
+  /**
    * Helper: Dispatches SOS security broadcast to response center and contacts.
    */
   public async sendSosAlert(riderName: string, carPlate: string, trackingUrl: string) {

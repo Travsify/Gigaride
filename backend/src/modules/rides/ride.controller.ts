@@ -11,6 +11,8 @@ const estimateSchema = z.object({
   pickupLng: z.number(),
   dropoffLat: z.number(),
   dropoffLng: z.number(),
+  distanceKm: z.number().optional().nullable(),
+  durationMinutes: z.number().optional().nullable(),
 });
 
 const createRideSchema = z.object({
@@ -26,13 +28,22 @@ const createRideSchema = z.object({
   riderType: z.enum(['SELF', 'FRIEND']).optional().nullable(),
   notes: z.string().optional().nullable(),
   isBusiness: z.boolean().optional().nullable(),
+  distanceKm: z.number().optional().nullable(),
+  durationMinutes: z.number().optional().nullable(),
 });
 
 // Calculate fair suggested fare and minimum floor
 rideRouter.post('/estimate', async (req, res: Response): Promise<void> => {
   try {
-    const { pickupLat, pickupLng, dropoffLat, dropoffLng } = estimateSchema.parse(req.body);
-    const estimate = await rideService.getFareEstimate(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const { pickupLat, pickupLng, dropoffLat, dropoffLng, distanceKm, durationMinutes } = estimateSchema.parse(req.body);
+    const estimate = await rideService.getFareEstimate(
+      pickupLat,
+      pickupLng,
+      dropoffLat,
+      dropoffLng,
+      distanceKm ?? undefined,
+      durationMinutes ?? undefined
+    );
     res.status(200).json({ success: true, data: estimate });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });

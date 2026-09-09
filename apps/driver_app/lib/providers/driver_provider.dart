@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -341,7 +340,14 @@ class DriverProvider with ChangeNotifier {
     // 1. High-precision movement stream
     _gpsStreamSub = LocationService.getPositionStream().listen((Position pos) {
       if (isOnline) {
-        socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: true);
+        socket.updateLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          isOnline: true,
+          activeRideId: activeTrip?['rideId'] ?? activeTrip?['id'],
+          heading: pos.heading,
+          speedKmh: pos.speed * 3.6,
+        );
       }
     });
 
@@ -350,7 +356,12 @@ class DriverProvider with ChangeNotifier {
       if (isOnline) {
         try {
           final pos = await LocationService.getCurrentLocation();
-          socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: true);
+          socket.updateLocation(
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            isOnline: true,
+            activeRideId: activeTrip?['rideId'] ?? activeTrip?['id'],
+          );
         } catch (_) {}
       }
     });
@@ -365,7 +376,12 @@ class DriverProvider with ChangeNotifier {
 
   void updateLocation(double latitude, double longitude) {
     if (isOnline) {
-      socket.updateLocation(latitude: latitude, longitude: longitude, isOnline: true);
+      socket.updateLocation(
+        latitude: latitude,
+        longitude: longitude,
+        isOnline: true,
+        activeRideId: activeTrip?['rideId'] ?? activeTrip?['id'],
+      );
     }
   }
 

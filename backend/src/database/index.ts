@@ -2110,6 +2110,169 @@ export class DatabaseService {
     return { transaction: tx, remainingBalance: senderAcc.balance_ngn, recipientName: recipient.full_name };
   }
 
+  // --- Cash Change Rollover: Double-Entry Ledger (Driver Debited, Passenger Credited) ---
+  public async settleCashChangeRollover(
+    driverUserId: string,
+    passengerUserId: string,
+    changeNgn: number,
+    rideId: string
+  ): Promise<{ driverBalance: number; passengerBalance: number }> {
+    // 1. Get or create driver wallet
+    let driverAcc = this.store.virtual_bank_accounts.find((v) => v.user_id === driverUserId);
+    if (!driverAcc) {
+      const driverUser = this.store.users.find((u) => u.id === driverUserId);
+      driverAcc = {
+        id: `va_dr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        user_id: driverUserId,
+        account_reference: `ref_vadr_${Date.now()}`,
+        account_number: `100${Math.floor(1000000 + Math.random() * 9000000)}`,
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: driverUser?.full_name || 'Driver Wallet',
+        provider: 'korapay',
+        balance_ngn: 0,
+        vault_balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(driverAcc);
+    }
+
+    // 2. Anti-bad-debt check: driver must have sufficient balance or be within approved float ceiling (₦3,000)
+    const MAX_ALLOWED_DRIVER_FLOAT = 3000;
+    if (driverAcc.balance_ngn + MAX_ALLOWED_DRIVER_FLOAT < changeNgn) {
+      throw new Error(
+        `Driver has insufficient wallet balance (₦${driverAcc.balance_ngn.toLocaleString()}) to rollover ₦${changeNgn.toLocaleString()} change. Please request physical change or a direct bank transfer.`
+      );
+    }
+
+    // 3. Get or create passenger wallet
+    let passAcc = this.store.virtual_bank_accounts.find((v) => v.user_id === passengerUserId);
+    if (!passAcc) {
+      const passUser = this.store.users.find((u) => u.id === passengerUserId);
+      passAcc = {
+        id: `va_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        user_id: passengerUserId,
+        account_reference: `ref_va_${Date.now()}`,
+        account_number: `100${Math.floor(1000000 + Math.random() * 9000000)}`,
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: passUser?.full_name || 'Passenger Wallet',
+        provider: 'korapay',
+        balance_ngn: 0,
+        vault_balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(passAcc);
+    }
+
+    // 4. Double-Entry execution: Exact Zero Platform Cost
+    driverAcc.balance_ngn = Number((driverAcc.balance_ngn - changeNgn).toFixed(2));
+    passAcc.balance_ngn = Number((passAcc.balance_ngn + changeNgn).toFixed(2));
+
+    const txRef = `CHG_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    // Driver Debit Transaction (Channel: CASH_CHANGE_DEDUCTION)
+    const debitTx: PaymentTransactionRow = {
+      id: `tx_dr_${txRef}`,
+      reference: `${txRef}_DR`,
+      user_id: driverUserId,
+      amount_kobo: Math.round(changeNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'RIDE_PAYMENT',
+      channel: 'CASH_CHANGE_DEDUCTION',
+      meta_data: { rideId, changeNgn, type: 'CASH_CHANGE_DEDUCTION', recipientUserId: passengerUserId },
+      created_at: new Date().toISOString(),
+    };
+
+    // Passenger Credit Transaction (Channel: CASH_CHANGE_ROLLOVER)
+    const creditTx: PaymentTransactionRow = {
+      id: `tx_cr_${txRef}`,
+      reference: `${txRef}_CR`,
+      user_id: passengerUserId,
+      amount_kobo: Math.round(changeNgn * 100),
+      status: 'SUCCESS',
+      payment_type: 'WALLET_FUNDING',
+      channel: 'CASH_CHANGE_ROLLOVER',
+      meta_data: { rideId, changeNgn, type: 'CASH_CHANGE_ROLLOVER', fromDriverUserId: driverUserId },
+      created_at: new Date().toISOString(),
+    };
+
+    this.store.payment_transactions.unshift(debitTx);
+    this.store.payment_transactions.unshift(creditTx);
+    this.saveStore();
+
+    return {
+      driverBalance: driverAcc.balance_ngn,
+      passengerBalance: passAcc.balance_ngn,
+    };
+  }
+
+  // Backward compatible helper
+  public async depositCashChangeToWallet(
+    userId: string,
+    amountNgn: number,
+    rideId: string
+  ): Promise<{ newBalance: number }> {
+    const ride = await this.getRideById(rideId);
+    if (ride && ride.driver_id) {
+      const driver = await this.getDriverProfile(ride.driver_id);
+      const driverUserId = driver ? driver.driver_id : ride.driver_id;
+      const res = await this.settleCashChangeRollover(driverUserId, userId, amountNgn, rideId);
+      return { newBalance: res.passengerBalance };
+    }
+    // Fallback if no driver linked
+    let acc = this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
+    if (acc) {
+      acc.balance_ngn = Number((acc.balance_ngn + amountNgn).toFixed(2));
+      this.saveStore();
+      return { newBalance: acc.balance_ngn };
+    }
+    return { newBalance: amountNgn };
+  }
+
+  // --- Real-Time In-Trip Complaint & Safety Record ---
+  public async recordRideComplaint(
+    rideId: string,
+    reporterId: string,
+    reporterRole: 'PASSENGER' | 'DRIVER',
+    issueType: string,
+    details: string
+  ): Promise<any> {
+    const complaint = {
+      id: `comp_${Date.now()}`,
+      ride_id: rideId,
+      reporter_id: reporterId,
+      reporter_role: reporterRole,
+      issue_type: issueType,
+      details,
+      status: 'OPEN',
+      created_at: new Date().toISOString(),
+    };
+
+    if (!this.store.disputes) {
+      this.store.disputes = [];
+    }
+
+    this.store.disputes.unshift({
+      id: complaint.id,
+      ride_id: rideId,
+      reporter_id: reporterId,
+      reporter_role: reporterRole,
+      dispute_type: issueType,
+      description: details,
+      status: 'OPEN',
+      driver_strike_applied: false,
+      compensation_rides: 0,
+      resolution_notes: `Logged via in-trip instant complaint: ${issueType}`,
+      created_at: new Date().toISOString(),
+    });
+
+    this.saveStore();
+    return complaint;
+  }
+
   // --- Phone OTP Verifications (Twilio) ---
   public async savePhoneOtp(phoneNumber: string, otpCode: string, expiryMinutes = 10): Promise<PhoneVerificationRow> {
     const expiresAt = new Date(Date.now() + expiryMinutes * 60000).toISOString();

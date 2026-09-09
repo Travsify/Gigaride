@@ -7,8 +7,22 @@ export class RideService {
   /**
    * Calculates real fare estimate with floor guardrails.
    */
-  public async getFareEstimate(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number) {
-    return calculateSuggestedFareWithDb(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  public async getFareEstimate(
+    pickupLat: number,
+    pickupLng: number,
+    dropoffLat: number,
+    dropoffLng: number,
+    roadDistanceKm?: number | null,
+    roadDurationMinutes?: number | null
+  ) {
+    return calculateSuggestedFareWithDb(
+      pickupLat,
+      pickupLng,
+      dropoffLat,
+      dropoffLng,
+      roadDistanceKm ?? undefined,
+      roadDurationMinutes ?? undefined
+    );
   }
 
   /**
@@ -19,7 +33,9 @@ export class RideService {
       dto.pickupLat,
       dto.pickupLng,
       dto.dropoffLat,
-      dto.dropoffLng
+      dto.dropoffLng,
+      dto.distanceKm ?? undefined,
+      dto.durationMinutes ?? undefined
     );
 
     // Validate offer against floor
@@ -85,13 +101,17 @@ export class RideService {
       flightNumber?: string;
       isAirport?: boolean;
       isInterstate?: boolean;
+      distanceKm?: number;
+      durationMinutes?: number;
     }
   ): Promise<RideRow> {
     const estimate = await calculateSuggestedFareWithDb(
       data.pickupLat,
       data.pickupLng,
       data.dropoffLat,
-      data.dropoffLng
+      data.dropoffLng,
+      data.distanceKm,
+      data.durationMinutes
     );
 
     const rideId = uuidv4();

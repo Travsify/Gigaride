@@ -679,24 +679,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _calculateFareEstimate() {
     final provider = context.read<PassengerProvider>();
+    final double dist = _distanceKm > 0 ? _distanceKm : 5.0;
+    final int dur = _durationMins > 0 ? _durationMins : 15;
+
+    // Instant offline fallback based on actual road distance so user never sees static 2500
+    final int instantBase = ((1500 + (dist * 350) + (dur * 80)) / 100).round() * 100;
+    num baseRec = instantBase;
+    if (_selectedVehicleTier == 'COMFORT') {
+      baseRec = (baseRec * 1.25).round();
+    } else if (_selectedVehicleTier == 'XL_SUV') {
+      baseRec = (baseRec * 1.70).round();
+    }
+    setState(() {
+      _offerCtrl.text = baseRec.toString();
+    });
+
     provider.calculateEstimate(
       pickupLat: _pickupLat,
       pickupLng: _pickupLng,
       dropoffLat: _dropoffLat,
       dropoffLng: _dropoffLng,
+      distanceKm: dist,
+      durationMinutes: dur,
     ).then((_) {
       if (!mounted) return;
       final estimate = provider.currentEstimate;
       if (estimate != null) {
-        num baseRec = estimate['recommendedFareNgn'] ?? estimate['estimatedFareNgn'] ?? 2500;
-        // Apply vehicle tier multiplier
+        num rec = estimate['suggestedFareNgn'] ??
+            estimate['recommendedFareNgn'] ??
+            estimate['estimatedFareNgn'] ??
+            instantBase;
         if (_selectedVehicleTier == 'COMFORT') {
-          baseRec = (baseRec * 1.25).round();
+          rec = estimate['tiers']?['comfortFareNgn'] ?? (rec * 1.25).round();
         } else if (_selectedVehicleTier == 'XL_SUV') {
-          baseRec = (baseRec * 1.70).round();
+          rec = estimate['tiers']?['xlSuvFareNgn'] ?? (rec * 1.70).round();
         }
         setState(() {
-          _offerCtrl.text = baseRec.toString();
+          _offerCtrl.text = rec.toString();
         });
       }
     });
@@ -907,6 +926,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     // On-Demand City Ride Handling
+    final double dist = _distanceKm > 0 ? _distanceKm : 5.0;
+    final int dur = _durationMins > 0 ? _durationMins : 15;
+    final int dynamicFallbackFare = ((1500 + (dist * 350) + (dur * 80)) / 100).round() * 100;
+
     try {
       await provider.submitRideRequest(
         pickupLat: _pickupLat,
@@ -915,12 +938,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         dropoffLat: _dropoffLat,
         dropoffLng: _dropoffLng,
         dropoffAddress: dropoffText,
-        riderOfferNgn: offer > 0 ? offer : 2500,
+        riderOfferNgn: offer > 0 ? offer : dynamicFallbackFare,
         notes: combinedNotes,
         isBusiness: _isCorporateMode,
         riderName: _friendName,
         riderPhone: _friendPhone,
         riderType: _riderType,
+        distanceKm: dist,
+        durationMinutes: dur,
       );
 
       if (mounted) {

@@ -38,7 +38,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/check-availability'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({if (phoneNumber != null) 'phoneNumber': phoneNumber, if (email != null) 'email': email}),
+      body: jsonEncode({'phoneNumber': ?phoneNumber, 'email': ?email}),
     );
     final data = jsonDecode(response.body);
     // 200 = available, 409 = taken
@@ -88,9 +88,9 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': email,
-        if (fullName != null) 'fullName': fullName,
-        if (googleId != null) 'googleId': googleId,
-        if (photoUrl != null) 'photoUrl': photoUrl,
+        'fullName': ?fullName,
+        'googleId': ?googleId,
+        'photoUrl': ?photoUrl,
         'role': 'PASSENGER',
       }),
     );
@@ -245,6 +245,8 @@ class ApiService {
     required double pickupLng,
     required double dropoffLat,
     required double dropoffLng,
+    double? distanceKm,
+    int? durationMinutes,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/rides/estimate'),
@@ -254,6 +256,8 @@ class ApiService {
         'pickupLng': pickupLng,
         'dropoffLat': dropoffLat,
         'dropoffLng': dropoffLng,
+        'distanceKm': ?distanceKm,
+        'durationMinutes': ?durationMinutes,
       }),
     );
 
@@ -277,6 +281,8 @@ class ApiService {
     String? riderName,
     String? riderPhone,
     String? riderType,
+    double? distanceKm,
+    int? durationMinutes,
   }) async {
     final token = await getToken();
     final response = await http.post(
@@ -293,11 +299,13 @@ class ApiService {
         'dropoffLng': dropoffLng,
         'dropoffAddress': dropoffAddress,
         'riderOfferNgn': riderOfferNgn,
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        'notes': ?(notes != null && notes.isNotEmpty ? notes : null),
         if (isBusiness) 'isBusiness': true,
-        if (riderName != null) 'riderName': riderName,
-        if (riderPhone != null) 'riderPhone': riderPhone,
-        if (riderType != null) 'riderType': riderType,
+        'riderName': ?riderName,
+        'riderPhone': ?riderPhone,
+        'riderType': ?riderType,
+        'distanceKm': ?distanceKm,
+        'durationMinutes': ?durationMinutes,
       }),
     );
 

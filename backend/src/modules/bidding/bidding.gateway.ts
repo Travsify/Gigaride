@@ -17,6 +17,7 @@ interface AuthenticatedSocket extends Socket {
 }
 
 let globalIo: SocketIOServer | null = null;
+const approachingAlertsSent = new Set<string>();
 
 export function broadcastFleetAlert(target: 'ALL' | 'DRIVERS' | 'PASSENGERS', alertData: any) {
   if (!globalIo) return;
@@ -91,8 +92,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
       socket.join('admin_room');
     }
 
-    // --- Driver Location Updates, Entitlement Refresh & Breadcrumbs ---
-    socket.on('driver:location', async (data: { latitude: number; longitude: number; isOnline?: boolean; activeRideId?: string; speedKmh?: number }) => {
+    // --- Driver Location Updates, Entitlement Refresh, Live Stream & Approaching Detection ---
+    socket.on('driver:location', async (data: { latitude: number; longitude: number; isOnline?: boolean; activeRideId?: string; speedKmh?: number; heading?: number }) => {
       if (user.role !== 'DRIVER') return;
 
       const isOnline = data.isOnline ?? true;
@@ -108,9 +109,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
         updatedAt: Date.now(),
       });
 
-      console.log(`[Driver Location] Driver ${user.userId} updated coordinates (${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}), isOnline=${isOnline}`);
-
-      // Record high-resolution breadcrumb if driver is currently on an active ride
+      // 🚗 If driver has an active trip, stream high-res coordinates directly to passenger
       if (data.activeRideId) {
         db.recordRideBreadcrumb({
           ride_id: data.activeRideId,
@@ -119,6 +118,50 @@ export function setupBiddingGateway(io: SocketIOServer) {
           longitude: data.longitude,
           speed_kmh: data.speedKmh || 0,
         }).catch((err) => console.error('Failed to log GPS breadcrumb:', err));
+
+        try {
+          const ride = await db.getRideById(data.activeRideId);
+          if (ride && ride.rider_id) {
+            // Forward live coordinates & heading directly to passenger room
+            io.to(`user:${ride.rider_id}`).emit('ride:driver_location', {
+              rideId: data.activeRideId,
+              driverId: user.userId,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              speedKmh: data.speedKmh || 0,
+              heading: data.heading || 0,
+              timestamp: Date.now(),
+            });
+
+            // Milestone: Driver Approaching (Within 500m / 0.5km of pickup)
+            if (ride.status === 'ACCEPTED' && !approachingAlertsSent.has(ride.id)) {
+              const distKm = calculateHaversineDistanceKm(
+                data.latitude,
+                data.longitude,
+                ride.pickup_lat,
+                ride.pickup_lng
+              );
+              if (distKm <= 0.55) {
+                approachingAlertsSent.add(ride.id);
+                const driverUser = await db.findUserById(user.userId);
+                const driverName = driverUser?.full_name || 'Your driver';
+                io.to(`user:${ride.rider_id}`).emit('ride:approaching', {
+                  rideId: ride.id,
+                  distanceKm: distKm,
+                  etaMinutes: 2,
+                });
+                oneSignalService.sendDriverApproachingAlert(
+                  ride.rider_id,
+                  driverName,
+                  null,
+                  ride.id
+                ).catch(() => {});
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[Driver Location Forward Error]', e);
+        }
       }
     });
 
@@ -161,32 +204,60 @@ export function setupBiddingGateway(io: SocketIOServer) {
           );
         }
 
-        console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible drivers. Pickup: (${ride.pickup_lat}, ${ride.pickup_lng}) "${ride.pickup_address}"`);
+        // Tier 4: Fallback for testing / dev / zero-radius match
+        if (nearbyDrivers.length === 0) {
+          const allOnline = geoSessionManager.getAllOnlineDrivers();
+          console.log(`[Ride Dispatch] Zero drivers within 150km. Fallback to all ${allOnline.length} online drivers.`);
+          for (const d of allOnline) {
+            nearbyDrivers.push({
+              driverId: d.driverId,
+              distanceKm: calculateHaversineDistanceKm(ride.pickup_lat, ride.pickup_lng, d.latitude, d.longitude),
+              location: d,
+            });
+          }
+        }
+
+        const effectiveFare = ride.rider_offer_ngn || ride.suggested_fare_ngn || 3000;
+
+        console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible drivers. Offer: ₦${effectiveFare}. Pickup: (${ride.pickup_lat}, ${ride.pickup_lng}) "${ride.pickup_address}"`);
         for (const candidate of nearbyDrivers) {
           console.log(` -> Driver matched: ${candidate.driverId}, Distance: ${candidate.distanceKm.toFixed(2)}km`);
         }
 
+        const basePayload = {
+          rideId: ride.id,
+          pickupAddress: ride.pickup_address,
+          dropoffAddress: ride.dropoff_address,
+          pickupLat: ride.pickup_lat,
+          pickupLng: ride.pickup_lng,
+          dropoffLat: ride.dropoff_lat,
+          dropoffLng: ride.dropoff_lng,
+          distanceKm: ride.distance_km,
+          riderOfferNgn: effectiveFare,
+          rider_offer_ngn: effectiveFare,
+          suggestedFareNgn: ride.suggested_fare_ngn || effectiveFare,
+          suggested_fare_ngn: ride.suggested_fare_ngn || effectiveFare,
+          fareNgn: effectiveFare,
+          riderType: ride.rider_type || 'SELF',
+          riderName: ride.rider_name || null,
+          riderPhone: ride.rider_phone || null,
+          notes: ride.notes || null,
+          createdAt: ride.created_at,
+        };
+
         // Notify each nearby driver individually with their pickup distance
         for (const candidate of nearbyDrivers) {
           io.to(`user:${candidate.driverId}`).emit('ride:new_request', {
-            rideId: ride.id,
-            pickupAddress: ride.pickup_address,
-            dropoffAddress: ride.dropoff_address,
-            pickupLat: ride.pickup_lat,
-            pickupLng: ride.pickup_lng,
-            dropoffLat: ride.dropoff_lat,
-            dropoffLng: ride.dropoff_lng,
-            distanceKm: ride.distance_km,
-            riderOfferNgn: ride.rider_offer_ngn,
-            suggestedFareNgn: ride.suggested_fare_ngn,
+            ...basePayload,
             driverPickupDistanceKm: candidate.distanceKm,
-            riderType: ride.rider_type || 'SELF',
-            riderName: ride.rider_name || null,
-            riderPhone: ride.rider_phone || null,
-            notes: ride.notes || null,
-            createdAt: ride.created_at,
           });
         }
+
+        // Ambient broadcast to drivers_pool room so all active drivers receive it
+        io.to('drivers_pool').emit('ride:new_request', {
+          ...basePayload,
+          driverPickupDistanceKm: 1.5,
+        });
 
         // High-Priority Push Notification to nearby drivers (even if phone screen is locked or app minimized)
         const driverIds = nearbyDrivers.map(c => c.driverId);
@@ -326,11 +397,39 @@ export function setupBiddingGateway(io: SocketIOServer) {
           meta_data: { rideId: ride.id, agreedFareNgn: data.agreedFareNgn },
         }).catch(() => {});
 
+        // 🚗 Push & In-App Notification to Passenger: Driver Assigned & En Route
+        const driverUser = await db.findUserById(data.driverId);
+        const driverProfile = await db.getDriverProfile(data.driverId);
+        const driverName = driverUser?.full_name || 'Your Driver';
+        const vehicleInfo = driverProfile
+          ? `${driverProfile.vehicle_color || ''} ${driverProfile.vehicle_make} ${driverProfile.vehicle_model} (${driverProfile.license_plate})`.trim()
+          : 'Verified Vehicle';
+
+        oneSignalService.sendDriverAssignedToPassenger(
+          ride.rider_id,
+          driverName,
+          vehicleInfo,
+          4,
+          ride.id
+        ).catch(() => {});
+
+        db.createNotification({
+          user_id: ride.rider_id,
+          title: 'Driver Confirmed & En Route',
+          message: `${driverName} in ${vehicleInfo} is on the way to pick you up.`,
+          type: 'RIDE',
+          meta_data: { rideId: ride.id, driverId: data.driverId },
+        }).catch(() => {});
+
         // Notify passenger with confirmation
         socket.emit('ride:confirmed', {
           rideId: ride.id,
           driverId: data.driverId,
           agreedFareNgn: data.agreedFareNgn,
+          driverName: driverName,
+          vehicleModel: driverProfile ? `${driverProfile.vehicle_make} ${driverProfile.vehicle_model}` : 'Toyota Corolla',
+          licensePlate: driverProfile?.license_plate || '',
+          driverPhone: driverUser?.phone_number || '',
         });
 
         // Broadcast to general pool that this ride is closed
@@ -356,45 +455,65 @@ export function setupBiddingGateway(io: SocketIOServer) {
           status: data.status,
         });
 
+        const driverUser = await db.findUserById(user.userId);
+        const driverProfile = await db.getDriverProfile(user.userId);
+        const driverName = driverUser?.full_name || 'Your Driver';
+        const vehicleInfo = driverProfile
+          ? `${driverProfile.vehicle_color || ''} ${driverProfile.vehicle_make} ${driverProfile.vehicle_model} (${driverProfile.license_plate})`.trim()
+          : 'Verified Vehicle';
+
         // 📲 Lifecycle Push & In-App Alerts to Passenger
         if (data.status === 'ARRIVED') {
-          oneSignalService.sendPush({
-            userIds: [ride.rider_id],
-            heading: 'Driver Arrived at Pickup!',
-            content: 'Your driver has arrived at your pickup spot. Please step outside.',
-            data: { rideId: ride.id, status: 'ARRIVED' },
-          }).catch(() => {});
+          oneSignalService.sendDriverArrivedAlert(
+            ride.rider_id,
+            driverName,
+            vehicleInfo,
+            ride.id
+          ).catch(() => {});
 
           db.createNotification({
             user_id: ride.rider_id,
-            title: 'Driver Arrived',
-            message: 'Your driver has arrived and is waiting at your pickup point.',
+            title: 'Driver Has Arrived',
+            message: `${driverName} has arrived outside in ${vehicleInfo}. Free wait time is 3 minutes.`,
+            type: 'RIDE',
+            meta_data: { rideId: ride.id, driverId: user.userId },
+          }).catch(() => {});
+        } else if (data.status === 'IN_TRANSIT') {
+          oneSignalService.sendTripStartedAlert(
+            ride.rider_id,
+            ride.dropoff_address,
+            ride.id
+          ).catch(() => {});
+
+          db.createNotification({
+            user_id: ride.rider_id,
+            title: 'Trip Commenced',
+            message: `You are on the way to ${ride.dropoff_address}.`,
             type: 'RIDE',
             meta_data: { rideId: ride.id },
           }).catch(() => {});
-        } else if (data.status === 'IN_TRANSIT') {
-          oneSignalService.sendPush({
-            userIds: [ride.rider_id],
-            heading: 'Trip Started 🚗',
-            content: `You are en route to ${ride.dropoff_address}.`,
-            data: { rideId: ride.id, status: 'IN_TRANSIT' },
-          }).catch(() => {});
         } else if (data.status === 'COMPLETED') {
           const fare = ride.agreed_fare_ngn || ride.rider_offer_ngn;
-          oneSignalService.sendPush({
-            userIds: [ride.rider_id],
-            heading: 'Trip Completed! Receipt Ready',
-            content: `You arrived at ${ride.dropoff_address}. Total: ₦${fare.toLocaleString()}`,
-            data: { rideId: ride.id, status: 'COMPLETED' },
-          }).catch(() => {});
+          oneSignalService.sendTripCompletedAlert(
+            ride.rider_id,
+            fare,
+            ride.dropoff_address,
+            ride.id
+          ).catch(() => {});
 
           db.createNotification({
             user_id: ride.rider_id,
             title: 'Trip Completed',
-            message: `You arrived safely at ${ride.dropoff_address}. ₦${fare.toLocaleString()} settled.`,
+            message: `You arrived safely at ${ride.dropoff_address}. ₦${fare.toLocaleString()} settled with 0% commission.`,
             type: 'RIDE',
             meta_data: { rideId: ride.id, fareNgn: fare },
           }).catch(() => {});
+
+          // Trigger instant settlement modal on passenger's device
+          io.to(`user:${ride.rider_id}`).emit('ride:finished', {
+            rideId: ride.id,
+            finalFareNgn: fare,
+          });
         }
 
         // When ride is COMPLETED, deduct driver subscription credit atomically!
@@ -532,8 +651,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
       });
     });
 
-    // --- In-App Gate & Ride Chat (Zero Number Exchange) ---
-    socket.on('ride:chat_send', async (data: { rideId: string; receiverId: string; text: string }) => {
+    // --- In-App Gate & Ride Chat (Zero Number Exchange + Audio Walkie-Talkie Support) ---
+    socket.on('ride:chat_send', async (data: { rideId: string; receiverId: string; text: string; isVoiceMemo?: boolean; durationSecs?: number }) => {
       try {
         const sender = await db.findUserById(user.userId);
         const senderName = user.role === 'DRIVER' ? (sender?.full_name || 'Driver') : (sender?.full_name || 'Passenger');
@@ -544,11 +663,168 @@ export function setupBiddingGateway(io: SocketIOServer) {
           senderName,
           senderRole: user.role,
           text: data.text,
+          isVoiceMemo: data.isVoiceMemo ?? false,
+          durationSecs: data.durationSecs ?? null,
           timestamp: new Date().toISOString(),
         };
 
         io.to(`user:${data.receiverId}`).emit('ride:chat_message', messagePayload);
         socket.emit('ride:chat_sent', messagePayload);
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // --- 🚫 Zero-Exploitation Ride Cancellation & Auto-Cascade ---
+    socket.on('ride:cancel', async (data: { rideId: string; reason?: string }) => {
+      try {
+        const ride = await db.getRideById(data.rideId);
+        if (!ride) return;
+
+        await db.updateRideStatus(data.rideId, 'CANCELLED');
+        const reason = data.reason || 'Ride cancelled by user';
+
+        // Notify both passenger and driver
+        io.to(`user:${ride.rider_id}`).emit('ride:cancelled', {
+          rideId: ride.id,
+          cancelledBy: user.role,
+          reason,
+        });
+
+        if (ride.driver_id) {
+          io.to(`user:${ride.driver_id}`).emit('ride:cancelled', {
+            rideId: ride.id,
+            cancelledBy: user.role,
+            reason,
+          });
+
+          // Push alert to the opposite party
+          if (user.role === 'PASSENGER') {
+            oneSignalService.sendPush({
+              userIds: [ride.driver_id],
+              heading: 'Ride Cancelled by Passenger',
+              content: `Reason: ${reason}`,
+              data: { rideId: ride.id, type: 'RIDE_CANCELLED' },
+            }).catch(() => {});
+          } else {
+            oneSignalService.sendPush({
+              userIds: [ride.rider_id],
+              heading: 'Driver Cancelled Ride',
+              content: 'Your driver cancelled the trip. Tap to auto-assign the next nearest driver.',
+              data: { rideId: ride.id, type: 'RIDE_CANCELLED' },
+            }).catch(() => {});
+          }
+        }
+
+        db.createNotification({
+          user_id: user.role === 'PASSENGER' ? (ride.driver_id || '') : ride.rider_id,
+          title: 'Ride Cancelled',
+          message: `Trip to ${ride.dropoff_address} was cancelled. Reason: ${reason}`,
+          type: 'RIDE',
+          meta_data: { rideId: ride.id, reason },
+        }).catch(() => {});
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // --- ⚠️ Real-Time In-Trip Complaint & Safety Mediation ---
+    socket.on('ride:report_issue', async (data: { rideId: string; issueType: string; description: string }) => {
+      try {
+        const complaint = await db.recordRideComplaint(
+          data.rideId,
+          user.userId,
+          user.role as 'PASSENGER' | 'DRIVER',
+          data.issueType,
+          data.description
+        );
+
+        socket.emit('ride:issue_logged', {
+          success: true,
+          complaintId: complaint.id,
+          message: 'Issue reported to Giga Operations & Safety Desk. Resolution team alerted.',
+        });
+
+        // Broadcast to admin room for real-time security monitor
+        io.to('admin_room').emit('safety:incident', {
+          rideId: data.rideId,
+          reporterId: user.userId,
+          reporterRole: user.role,
+          issueType: data.issueType,
+          description: data.description,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // --- 💵 Rollover Cash Change Directly to Passenger's Living Wallet ---
+    socket.on('ride:settle_change_to_wallet', async (data: { rideId: string; tenderedNgn: number; agreedFareNgn: number }) => {
+      try {
+        const changeNgn = data.tenderedNgn - data.agreedFareNgn;
+        if (changeNgn <= 0) {
+          socket.emit('error', { message: 'Tendered amount must exceed fare to generate wallet change.' });
+          return;
+        }
+
+        const ride = await db.getRideById(data.rideId);
+        if (!ride || !ride.driver_id) {
+          socket.emit('error', { message: 'Active ride or assigned driver not found.' });
+          return;
+        }
+
+        const driver = await db.getDriverProfile(ride.driver_id);
+        const driverUserId = driver ? driver.driver_id : ride.driver_id;
+
+        // Double-entry settlement: Driver Debited, Passenger Credited, Zero Platform Loss
+        const result = await db.settleCashChangeRollover(
+          driverUserId,
+          ride.rider_id,
+          changeNgn,
+          ride.id
+        );
+
+        // 1. Notify Passenger (Credited)
+        io.to(`user:${ride.rider_id}`).emit('wallet:change_credited', {
+          rideId: ride.id,
+          changeNgn,
+          newBalanceNgn: result.passengerBalance,
+        });
+
+        // 2. Notify Driver (Debited)
+        io.to(`driver:${ride.driver_id}`).emit('wallet:change_debited', {
+          rideId: ride.id,
+          changeNgn,
+          newBalanceNgn: result.driverBalance,
+        });
+        io.to(`user:${driverUserId}`).emit('wallet:change_debited', {
+          rideId: ride.id,
+          changeNgn,
+          newBalanceNgn: result.driverBalance,
+        });
+
+        // 3. Push notifications to both parties
+        oneSignalService.sendPush({
+          userIds: [ride.rider_id],
+          heading: '₦' + changeNgn.toLocaleString('en-NG') + ' Change Deposited!',
+          content: 'Your driver rollover change was credited to your Living Wallet. New balance: ₦' + result.passengerBalance.toLocaleString('en-NG'),
+          data: { type: 'WALLET_TOPUP', rideId: ride.id },
+        }).catch(() => {});
+
+        oneSignalService.sendPush({
+          userIds: [driverUserId],
+          heading: '₦' + changeNgn.toLocaleString('en-NG') + ' Change Deducted',
+          content: '₦' + changeNgn.toLocaleString('en-NG') + ' debited for passenger change rollover. New driver balance: ₦' + result.driverBalance.toLocaleString('en-NG'),
+          data: { type: 'WALLET_DEBIT', rideId: ride.id },
+        }).catch(() => {});
+
+        socket.emit('wallet:change_settled', {
+          success: true,
+          changeNgn,
+          passengerBalance: result.passengerBalance,
+          driverBalance: result.driverBalance,
+        });
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }

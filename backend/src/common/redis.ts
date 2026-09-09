@@ -60,6 +60,16 @@ class MemoryGeoStore {
     return results.sort((a, b) => a.distanceKm - b.distanceKm);
   }
 
+  getAllOnlineDrivers(): DriverGeoLocation[] {
+    const online: DriverGeoLocation[] = [];
+    for (const loc of this.drivers.values()) {
+      if (loc.isOnline) {
+        online.push(loc);
+      }
+    }
+    return online;
+  }
+
   set(key: string, value: string, ttlSeconds?: number): void {
     const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
     this.cache.set(key, { value, expiresAt });
@@ -136,6 +146,10 @@ export class GeoSessionManager {
     radiusKm: number = 5.0
   ): { driverId: string; distanceKm: number; location: DriverGeoLocation }[] {
     return this.memoryStore.findNearbyEligibleDrivers(lat, lng, radiusKm);
+  }
+
+  public getAllOnlineDrivers(): DriverGeoLocation[] {
+    return this.memoryStore.getAllOnlineDrivers();
   }
 
   public setCache(key: string, value: string, ttlSeconds?: number): void {

@@ -5,11 +5,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationService {
-  /// Nigeria geographic center — used only as absolute last resort
-  static const LatLng defaultNigeriaCenter = LatLng(9.0820, 8.6753);
-
-  /// Keep for backward compatibility — maps to Nigeria center now
-  static const LatLng defaultLagosLocation = LatLng(9.0820, 8.6753);
+  /// Default Lagos Central location (fallback before GPS lock)
+  static const LatLng defaultLagosLocation = LatLng(6.5244, 3.3792);
+  static const LatLng defaultNigeriaCenter = LatLng(6.5244, 3.3792);
 
   /// In-memory cache of the user's latest resolved coordinates
   static LatLng? lastKnownUserLocation;

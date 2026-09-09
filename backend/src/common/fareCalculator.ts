@@ -6,9 +6,16 @@ export interface FareEstimate {
   distanceKm: number;
   estimatedMinutes: number;
   suggestedFareNgn: number;
+  recommendedFareNgn: number; // alias for frontend compatibility
+  estimatedFareNgn: number;   // alias for frontend compatibility
   minimumBidFloorNgn: number;
   fuelCostEstimateNgn: number;
   petrolPricePerLitreNgn: number;
+  tiers: {
+    economyFareNgn: number;
+    comfortFareNgn: number;
+    xlSuvFareNgn: number;
+  };
   breakdown: {
     baseFlagFallNgn: number;
     distanceChargeNgn: number;
@@ -27,10 +34,19 @@ export function calculateSuggestedFare(
   pickupLng: number,
   dropoffLat: number,
   dropoffLng: number,
-  customSettings?: PlatformSettingsRow
+  customSettings?: PlatformSettingsRow,
+  roadDistanceKm?: number | null,
+  roadDurationMinutes?: number | null
 ): FareEstimate {
-  const distanceKm = calculateHaversineDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-  const estimatedMinutes = estimateTravelTimeMinutes(distanceKm);
+  const straightLineDistanceKm = calculateHaversineDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  // Real road network is typically 1.3x straight line if road distance is not supplied
+  const distanceKm = (roadDistanceKm && roadDistanceKm > 0)
+    ? Number(roadDistanceKm.toFixed(2))
+    : Number((straightLineDistanceKm * 1.3).toFixed(2));
+
+  const estimatedMinutes = (roadDurationMinutes && roadDurationMinutes > 0)
+    ? Math.round(roadDurationMinutes)
+    : estimateTravelTimeMinutes(distanceKm);
 
   const petrolPrice = customSettings ? customSettings.petrol_price_ngn : ENV.PETROL_PRICE_PER_LITRE_NGN;
   const baseFlagFall = customSettings ? customSettings.base_flag_fall_ngn : ENV.BASE_FLAG_FALL_NGN;
@@ -38,14 +54,22 @@ export function calculateSuggestedFare(
   const perMinuteRate = customSettings ? customSettings.per_minute_rate_ngn : ENV.PER_MINUTE_RATE_NGN;
   const regulatoryLevy = customSettings ? customSettings.lagos_mot_levy_ngn : ENV.LAGOS_MOT_LEVY_NGN;
 
-  // Typical fuel consumption for 1.8L–2.4L engine (Corolla, Camry in Lagos)
+  // Progressive distance rate: Short trips have higher per-km rate to ensure driver viability
+  let effectivePerKm = perKmRate;
+  if (distanceKm < 4.0) {
+    effectivePerKm = Math.round(perKmRate * 1.25);
+  } else if (distanceKm > 15.0) {
+    effectivePerKm = Math.round(perKmRate * 0.90);
+  }
+
+  // Typical fuel consumption for 1.8L–2.4L engine (Corolla, Camry in Nigerian cities ~10 km/L)
   const estimatedLitresUsed = distanceKm / 10.0;
   const fuelCostEstimateNgn = Math.round(estimatedLitresUsed * petrolPrice);
 
-  const distanceCharge = Math.round(distanceKm * perKmRate);
+  const distanceCharge = Math.round(distanceKm * effectivePerKm);
   const timeCharge = Math.round(estimatedMinutes * perMinuteRate);
 
-  // Raw computed fare
+  // Raw computed fare rounded to nearest ₦100
   const rawFare = baseFlagFall + distanceCharge + timeCharge + regulatoryLevy;
   const suggestedFareNgn = Math.ceil(rawFare / 100) * 100;
 
@@ -59,9 +83,16 @@ export function calculateSuggestedFare(
     distanceKm,
     estimatedMinutes,
     suggestedFareNgn,
+    recommendedFareNgn: suggestedFareNgn,
+    estimatedFareNgn: suggestedFareNgn,
     minimumBidFloorNgn: Math.min(minimumFloor, suggestedFareNgn),
     fuelCostEstimateNgn,
     petrolPricePerLitreNgn: petrolPrice,
+    tiers: {
+      economyFareNgn: suggestedFareNgn,
+      comfortFareNgn: Math.ceil((suggestedFareNgn * 1.25) / 100) * 100,
+      xlSuvFareNgn: Math.ceil((suggestedFareNgn * 1.70) / 100) * 100,
+    },
     breakdown: {
       baseFlagFallNgn: baseFlagFall,
       distanceChargeNgn: distanceCharge,
@@ -75,8 +106,18 @@ export async function calculateSuggestedFareWithDb(
   pickupLat: number,
   pickupLng: number,
   dropoffLat: number,
-  dropoffLng: number
+  dropoffLng: number,
+  roadDistanceKm?: number | null,
+  roadDurationMinutes?: number | null
 ): Promise<FareEstimate> {
   const settings = await db.getPlatformSettings();
-  return calculateSuggestedFare(pickupLat, pickupLng, dropoffLat, dropoffLng, settings);
+  return calculateSuggestedFare(
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
+    settings,
+    roadDistanceKm,
+    roadDurationMinutes
+  );
 }

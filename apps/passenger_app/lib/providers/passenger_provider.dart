@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/places_service.dart';
 import '../services/socket_service.dart';
 
 class PassengerProvider with ChangeNotifier {
@@ -19,6 +23,15 @@ class PassengerProvider with ChangeNotifier {
   Map<String, dynamic>? selectedDriverBid;
   String? tripStatus; // 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT', 'COMPLETED'
   int? finalFarePaid;
+
+  // 🚗 Live Real-Time Telemetry & Environs Awareness
+  LatLng? liveDriverLocation;
+  double liveDriverHeading = 0.0;
+  double liveDriverSpeed = 0.0;
+  String? activeMilestoneMessage;
+  String? nearestLandmarkName;
+  int freeWaitSecondsRemaining = 180;
+  Timer? _waitCountdownTimer;
 
   // Real Ride History & Scheduled Trips from backend
   List<dynamic> pastRides = [];
@@ -211,18 +224,141 @@ class PassengerProvider with ChangeNotifier {
         // Prevent duplicate bids from same driver
         incomingBids.removeWhere((b) => b['driverId'] == bid['driverId']);
         incomingBids.insert(0, bid);
+        HapticFeedback.lightImpact();
         notifyListeners();
       },
       onRideStatusChanged: (statusData) {
-        tripStatus = statusData['status'];
+        final newStatus = statusData['status'];
+        tripStatus = newStatus;
+
+        if (newStatus == 'ARRIVED') {
+          HapticFeedback.heavyImpact();
+          SystemSound.play(SystemSoundType.alert);
+          activeMilestoneMessage = 'Driver has arrived outside! Free wait: 03:00';
+          _startFreeWaitTimer();
+        } else if (newStatus == 'IN_TRANSIT') {
+          _waitCountdownTimer?.cancel();
+          HapticFeedback.mediumImpact();
+          activeMilestoneMessage = 'Trip in progress • Heading to destination';
+        } else if (newStatus == 'COMPLETED') {
+          _waitCountdownTimer?.cancel();
+          HapticFeedback.heavyImpact();
+          activeMilestoneMessage = 'Trip completed! Please rate your ride';
+        }
+
         notifyListeners();
       },
       onRideFinished: (finished) {
         tripStatus = 'COMPLETED';
         finalFarePaid = finished['finalFareNgn'];
+        _waitCountdownTimer?.cancel();
+        HapticFeedback.heavyImpact();
         notifyListeners();
       },
     );
+
+    // 🚗 Live Driver GPS Telemetry & Landmark Snapping
+    socket.onDriverLocationUpdate = (locData) {
+      final lat = (locData['latitude'] as num?)?.toDouble();
+      final lng = (locData['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        liveDriverLocation = LatLng(lat, lng);
+        liveDriverHeading = (locData['heading'] as num?)?.toDouble() ?? liveDriverHeading;
+        liveDriverSpeed = (locData['speedKmh'] as num?)?.toDouble() ?? 0.0;
+
+        // Check if passing near any iconic Nigerian landmark
+        final nearest = PlacesService.findNearestLandmark(liveDriverLocation!, maxDistanceKm: 0.45);
+        if (nearest != null) {
+          nearestLandmarkName = nearest['name'];
+        }
+
+        if (tripStatus == 'ACCEPTED') {
+          if (nearestLandmarkName != null) {
+            activeMilestoneMessage = 'Driver on the way • Passing $nearestLandmarkName';
+          } else {
+            activeMilestoneMessage = 'Driver is on the way to pickup';
+          }
+        } else if (tripStatus == 'IN_TRANSIT') {
+          if (nearestLandmarkName != null) {
+            activeMilestoneMessage = 'En route to destination • Passing $nearestLandmarkName';
+          } else {
+            activeMilestoneMessage = 'Trip in progress • Heading to destination';
+          }
+        }
+        notifyListeners();
+      }
+    };
+
+    // ⚡ Driver Approaching Notification (< 500m)
+    socket.onDriverApproaching = (data) {
+      HapticFeedback.mediumImpact();
+      SystemSound.play(SystemSoundType.alert);
+      activeMilestoneMessage = 'Driver is ~2 mins away! Please head outside to pickup.';
+      notifyListeners();
+    };
+
+    // 🚫 Ride Cancelled Listener
+    socket.onRideCancelled = (data) {
+      tripStatus = 'CANCELLED';
+      _waitCountdownTimer?.cancel();
+      activeMilestoneMessage = 'Ride was cancelled: ${data['reason'] ?? 'Driver/Passenger cancelled'}';
+      HapticFeedback.heavyImpact();
+      notifyListeners();
+    };
+
+    // 💵 Wallet Change Credited
+    socket.onWalletChangeCredited = (data) {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+      notifyListeners();
+    };
+  }
+
+  void cancelActiveRide({String? reason}) {
+    if (currentRide != null) {
+      socket.cancelRide(rideId: currentRide!['id'], reason: reason);
+      tripStatus = 'CANCELLED';
+      _waitCountdownTimer?.cancel();
+      notifyListeners();
+    }
+  }
+
+  void reportInTripIssue({required String issueType, required String description}) {
+    if (currentRide != null) {
+      socket.reportRideIssue(
+        rideId: currentRide!['id'],
+        issueType: issueType,
+        description: description,
+      );
+    }
+  }
+
+  void settleCashChange({required int tenderedNgn, required int agreedFareNgn}) {
+    if (currentRide != null) {
+      socket.settleChangeToWallet(
+        rideId: currentRide!['id'],
+        tenderedNgn: tenderedNgn,
+        agreedFareNgn: agreedFareNgn,
+      );
+    }
+  }
+
+  void _startFreeWaitTimer() {
+    _waitCountdownTimer?.cancel();
+    freeWaitSecondsRemaining = 180;
+    _waitCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (freeWaitSecondsRemaining > 0) {
+        freeWaitSecondsRemaining--;
+        final mins = (freeWaitSecondsRemaining ~/ 60).toString().padLeft(2, '0');
+        final secs = (freeWaitSecondsRemaining % 60).toString().padLeft(2, '0');
+        activeMilestoneMessage = 'Driver waiting outside • Free wait: $mins:$secs';
+        notifyListeners();
+      } else {
+        activeMilestoneMessage = 'Driver waiting outside • Standard wait rate applies';
+        timer.cancel();
+        notifyListeners();
+      }
+    });
   }
 
   Future<void> calculateEstimate({
@@ -230,6 +366,8 @@ class PassengerProvider with ChangeNotifier {
     required double pickupLng,
     required double dropoffLat,
     required double dropoffLng,
+    double? distanceKm,
+    int? durationMinutes,
   }) async {
     isLoading = true;
     notifyListeners();
@@ -239,6 +377,8 @@ class PassengerProvider with ChangeNotifier {
         pickupLng: pickupLng,
         dropoffLat: dropoffLat,
         dropoffLng: dropoffLng,
+        distanceKm: distanceKm,
+        durationMinutes: durationMinutes,
       );
     } finally {
       isLoading = false;
@@ -259,6 +399,8 @@ class PassengerProvider with ChangeNotifier {
     String? riderName,
     String? riderPhone,
     String? riderType,
+    double? distanceKm,
+    int? durationMinutes,
   }) async {
     isLoading = true;
     incomingBids.clear();
@@ -279,6 +421,8 @@ class PassengerProvider with ChangeNotifier {
         riderName: riderName,
         riderPhone: riderPhone,
         riderType: riderType,
+        distanceKm: distanceKm,
+        durationMinutes: durationMinutes,
       );
 
       // Broadcast ride request to nearby drivers via Socket.io

@@ -40,7 +40,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/check-availability'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({if (phoneNumber != null) 'phoneNumber': phoneNumber, if (email != null) 'email': email}),
+      body: jsonEncode({'phoneNumber': ?phoneNumber, 'email': ?email}),
     );
     final data = jsonDecode(response.body);
     // 200 = available, 409 = taken

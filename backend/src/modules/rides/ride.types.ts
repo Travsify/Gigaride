@@ -11,6 +11,8 @@ export interface CreateRideRequestDto {
   riderType?: 'SELF' | 'FRIEND' | null;
   notes?: string | null;
   isBusiness?: boolean | null;
+  distanceKm?: number | null;
+  durationMinutes?: number | null;
 }
 
 export interface FareEstimateDto {
@@ -18,4 +20,6 @@ export interface FareEstimateDto {
   pickupLng: number;
   dropoffLat: number;
   dropoffLng: number;
+  distanceKm?: number | null;
+  durationMinutes?: number | null;
 }

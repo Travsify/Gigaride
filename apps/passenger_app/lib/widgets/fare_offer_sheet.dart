@@ -53,9 +53,10 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
       NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
 
   String _selectedTier = 'ECONOMY';
-  int _offerAmount = 2500;
-  int _recommendedBase = 2500;
-  int _minimumFloor = 1200;
+  late int _offerAmount;
+  late int _recommendedBase;
+  late int _minimumFloor;
+  final Map<String, int> _tierFares = {};
   bool _isLoading = false;
   bool _isBroadcasting = false;
 
@@ -69,9 +70,24 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
   // Long-press repeat stepper
   Timer? _stepTimer;
 
+  int _computeInstantBase(double km, int mins) {
+    final dist = km > 0 ? km : 5.0;
+    final dur = mins > 0 ? mins : 15;
+    final raw = 1500 + (dist * 350) + (dur * 80);
+    return ((raw / 100).round() * 100).clamp(1500, 200000);
+  }
+
   @override
   void initState() {
     super.initState();
+    final instantBase = _computeInstantBase(widget.distanceKm, widget.durationMins);
+    _recommendedBase = instantBase;
+    _minimumFloor = (instantBase * 0.70).round();
+    _offerAmount = instantBase;
+    _tierFares['ECONOMY'] = instantBase;
+    _tierFares['COMFORT'] = (instantBase * 1.25).round();
+    _tierFares['XL_SUV'] = (instantBase * 1.70).round();
+
     _loadEstimate();
   }
 
@@ -90,17 +106,29 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
         pickupLng: widget.pickupLng,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
+        distanceKm: widget.distanceKm,
+        durationMinutes: widget.durationMins,
       );
       final est = provider.currentEstimate;
       if (est != null && mounted) {
-        final base =
-            (est['recommendedFareNgn'] ?? est['estimatedFareNgn'] ?? 2500)
-                as num;
-        final floor = (est['minimumBidFloorNgn'] ?? 1200) as num;
+        final base = (est['suggestedFareNgn'] ??
+                est['recommendedFareNgn'] ??
+                est['estimatedFareNgn'] ??
+                _computeInstantBase(widget.distanceKm, widget.durationMins))
+            as num;
+        final floor = (est['minimumBidFloorNgn'] ?? (base * 0.70).round()) as num;
+        final tiers = est['tiers'];
+        if (tiers != null && tiers is Map) {
+          _tierFares['ECONOMY'] = (tiers['economyFareNgn'] ?? base).toInt();
+          _tierFares['COMFORT'] =
+              (tiers['comfortFareNgn'] ?? (base * 1.25).round()).toInt();
+          _tierFares['XL_SUV'] =
+              (tiers['xlSuvFareNgn'] ?? (base * 1.70).round()).toInt();
+        }
         setState(() {
           _recommendedBase = base.round();
           _minimumFloor = floor.round();
-          _offerAmount = _tierAmount('ECONOMY');
+          _offerAmount = _tierAmount(_selectedTier);
         });
       }
     } catch (_) {}
@@ -108,6 +136,9 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
   }
 
   int _tierAmount(String tier) {
+    if (_tierFares.containsKey(tier)) {
+      return _tierFares[tier]!;
+    }
     final mult = _multipliers[tier] ?? 1.0;
     return (_recommendedBase * mult).round();
   }
@@ -172,6 +203,8 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
         riderName: widget.riderName,
         riderPhone: widget.riderPhone,
         riderType: widget.riderType,
+        distanceKm: widget.distanceKm,
+        durationMinutes: widget.durationMins,
       );
 
       if (mounted) {

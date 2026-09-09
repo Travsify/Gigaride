@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -14,6 +15,14 @@ class InteractiveRideMap extends StatefulWidget {
   final VoidCallback? onToggleExpand;
   final VoidCallback? onRecenter;
 
+  // 🚗 Live Driver Telemetry & Heading
+  final LatLng? assignedDriverLocation;
+  final double assignedDriverHeading;
+  final String? driverVehicleModel;
+
+  // 🏛️ Corridor Environs & Landmarks
+  final List<Map<String, dynamic>>? corridorLandmarks;
+
   const InteractiveRideMap({
     super.key,
     required this.currentLocation,
@@ -25,17 +34,28 @@ class InteractiveRideMap extends StatefulWidget {
     this.isExpanded = false,
     this.onToggleExpand,
     this.onRecenter,
+    this.assignedDriverLocation,
+    this.assignedDriverHeading = 0.0,
+    this.driverVehicleModel,
+    this.corridorLandmarks,
   });
 
   @override
   State<InteractiveRideMap> createState() => _InteractiveRideMapState();
 }
 
-class _InteractiveRideMapState extends State<InteractiveRideMap> with SingleTickerProviderStateMixin {
+class _InteractiveRideMapState extends State<InteractiveRideMap> with TickerProviderStateMixin {
   late final MapController _mapController;
   bool _isSatelliteMode = false;
   late AnimationController _pulseAnimCtrl;
   late Animation<double> _pulseAnimation;
+
+  // Smooth Vehicle Interpolation & Rotation Controller
+  late AnimationController _driverAnimCtrl;
+  LatLng? _prevDriverPos;
+  LatLng? _currDriverPos;
+  double _prevHeading = 0.0;
+  double _currHeading = 0.0;
 
   @override
   void initState() {
@@ -48,17 +68,63 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with SingleTick
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.3).animate(
       CurvedAnimation(parent: _pulseAnimCtrl, curve: Curves.easeInOut),
     );
+
+    _driverAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..addListener(() {
+      if (mounted) setState(() {});
+    });
+    _prevDriverPos = widget.assignedDriverLocation;
+    _currDriverPos = widget.assignedDriverLocation;
+    _prevHeading = widget.assignedDriverHeading;
+    _currHeading = widget.assignedDriverHeading;
+  }
+
+  LatLng get _interpolatedDriverPos {
+    final p0 = _prevDriverPos ?? widget.assignedDriverLocation ?? widget.currentLocation;
+    final p1 = _currDriverPos ?? widget.assignedDriverLocation ?? widget.currentLocation;
+    final t = CurvedAnimation(
+      parent: _driverAnimCtrl,
+      curve: Curves.easeOutCubic,
+    ).value;
+    return LatLng(
+      p0.latitude + (p1.latitude - p0.latitude) * t,
+      p0.longitude + (p1.longitude - p0.longitude) * t,
+    );
+  }
+
+  double get _interpolatedDriverHeading {
+    final t = CurvedAnimation(
+      parent: _driverAnimCtrl,
+      curve: Curves.easeOutCubic,
+    ).value;
+    return _prevHeading + (_currHeading - _prevHeading) * t;
   }
 
   @override
   void dispose() {
     _pulseAnimCtrl.dispose();
+    _driverAnimCtrl.dispose();
     super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant InteractiveRideMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Smoothly animate driver car to new coordinates with easing curve
+    if (widget.assignedDriverLocation != null &&
+        (oldWidget.assignedDriverLocation == null ||
+         widget.assignedDriverLocation!.latitude != oldWidget.assignedDriverLocation!.latitude ||
+         widget.assignedDriverLocation!.longitude != oldWidget.assignedDriverLocation!.longitude ||
+         widget.assignedDriverHeading != oldWidget.assignedDriverHeading)) {
+      _prevDriverPos = _currDriverPos ?? widget.assignedDriverLocation;
+      _currDriverPos = widget.assignedDriverLocation;
+      _prevHeading = _currHeading;
+      _currHeading = widget.assignedDriverHeading;
+      _driverAnimCtrl.forward(from: 0.0);
+    }
     if (widget.routePoints.isNotEmpty && widget.routePoints != oldWidget.routePoints) {
       _fitRouteBounds();
     } else if (widget.routePoints.isEmpty &&
@@ -127,6 +193,7 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with SingleTick
               TileLayer(
                 key: ValueKey(_isSatelliteMode),
                 urlTemplate: tileUrl,
+                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'ng.giga.passengerApp',
                 maxZoom: 19,
               ),
@@ -244,7 +311,101 @@ class _InteractiveRideMapState extends State<InteractiveRideMap> with SingleTick
                       ),
                     ),
 
-                  // Nearby Drivers Car Markers
+                  // 🏛️ Real-Time Environs & Nigerian Landmarks Corridor
+                  if (widget.corridorLandmarks != null)
+                    ...widget.corridorLandmarks!.take(6).map((lm) {
+                      final name = (lm['name'] ?? '').toString().split('(').first.trim();
+                      final lat = (lm['lat'] as num).toDouble();
+                      final lng = (lm['lng'] as num).toDouble();
+                      return Marker(
+                        point: LatLng(lat, lng),
+                        width: 110,
+                        height: 32,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xDD0F172A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 1),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black45, blurRadius: 4),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.account_balance_rounded, size: 12, color: Color(0xFF38BDF8)),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+
+                  // 🚗 Smooth Animated Assigned Driver Vehicle Marker (with Heading Rotation)
+                  if (widget.assignedDriverLocation != null)
+                    Marker(
+                      point: _interpolatedDriverPos,
+                      width: 64,
+                      height: 64,
+                      child: Center(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Glowing radar aura around driver vehicle
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppConstants.accentColor.withOpacity(0.22),
+                              ),
+                            ),
+                            // Heading-rotated Navigation Pointer & Vehicle Disc
+                            Transform.rotate(
+                              angle: (_interpolatedDriverHeading * math.pi) / 180.0,
+                              child: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppConstants.accentColor, width: 2.5),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black54,
+                                      blurRadius: 8,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.navigation_rounded,
+                                    size: 22,
+                                    color: AppConstants.accentColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Nearby Drivers Car Markers (when searching / idle)
                   ...widget.nearbyDrivers.map((driverPos) {
                     return Marker(
                       point: driverPos,
