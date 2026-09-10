@@ -42,13 +42,28 @@ class CustomAudioCallService {
 
   final Map<String, dynamic> _audioConstraints = {
     'audio': {
-      'echoCancellation': true,
-      'noiseSuppression': true,
-      'autoGainControl': true,
-      'highpassFilter': true,
+      'mandatory': {
+        'googEchoCancellation': true,
+        'googEchoCancellation2': true,
+        'googDAEchoCancellation': true,
+        'googAutoGainControl': true,
+        'googHighpassFilter': true,
+        'googNoiseSuppression': true,
+        'googTypingNoiseDetection': true,
+        'googAudioMirroring': false,
+      },
+      'optional': <Map<String, dynamic>>[],
     },
     'video': false,
   };
+
+  String _optimizeSdpForVoice(String sdp) {
+    // Force Opus to use mono (stereo=0), voice coding, and enable in-band FEC
+    return sdp.replaceAll(
+      'useinbandfec=1',
+      'useinbandfec=1;stereo=0;sprop-stereo=0;cbr=1;maxaveragebitrate=24000',
+    );
+  }
 
   Future<bool> initialize({
     required String rideId,
@@ -110,7 +125,7 @@ class CustomAudioCallService {
         }
       };
 
-      // 5. Default to loudspeaker for in-cabin driving safety
+      // 5. Initialize speakerphone mode
       await toggleSpeaker(_isSpeakerOn);
 
       _isInitialized = true;
@@ -123,7 +138,7 @@ class CustomAudioCallService {
     }
   }
 
-  /// Caller side: Initiates SDP Offer
+  /// Caller side: Initiates SDP Offer with mono & AEC optimization
   Future<void> sendOffer() async {
     if (_peerConnection == null || _currentRideId == null || _remoteUserId == null) {
       debugPrint('[WebRTC Audio] Cannot send offer: not initialized');
@@ -135,21 +150,24 @@ class CustomAudioCallService {
         'offerToReceiveAudio': 1,
         'offerToReceiveVideo': 0,
       });
-      await _peerConnection!.setLocalDescription(offer);
+
+      final optimizedSdp = _optimizeSdpForVoice(offer.sdp ?? '');
+      final optimizedOffer = RTCSessionDescription(optimizedSdp, offer.type);
+      await _peerConnection!.setLocalDescription(optimizedOffer);
 
       _socketService?.sendCallSignalOffer(
         rideId: _currentRideId!,
         targetId: _remoteUserId!,
-        sdp: offer.toMap(),
+        sdp: optimizedOffer.toMap(),
       );
-      debugPrint('[WebRTC Audio] Sent SDP offer to $_remoteUserId');
+      debugPrint('[WebRTC Audio] Sent optimized SDP offer to $_remoteUserId');
     } catch (e) {
       debugPrint('[WebRTC Audio] Error creating offer: $e');
       onError?.call('Error starting call: $e');
     }
   }
 
-  /// Callee side: Handles remote SDP Offer and responds with SDP Answer
+  /// Callee side: Handles remote SDP Offer and responds with optimized SDP Answer
   Future<void> handleRemoteOffer(Map<String, dynamic> sdp) async {
     if (_peerConnection == null) {
       debugPrint('[WebRTC Audio] PeerConnection null on handleRemoteOffer');
@@ -157,19 +175,22 @@ class CustomAudioCallService {
     }
 
     try {
-      final description = RTCSessionDescription(sdp['sdp'], sdp['type'] ?? 'offer');
+      final rawSdp = sdp['sdp']?.toString() ?? '';
+      final description = RTCSessionDescription(_optimizeSdpForVoice(rawSdp), sdp['type'] ?? 'offer');
       await _peerConnection!.setRemoteDescription(description);
 
       final RTCSessionDescription answer = await _peerConnection!.createAnswer();
-      await _peerConnection!.setLocalDescription(answer);
+      final optimizedAnswerSdp = _optimizeSdpForVoice(answer.sdp ?? '');
+      final optimizedAnswer = RTCSessionDescription(optimizedAnswerSdp, answer.type);
+      await _peerConnection!.setLocalDescription(optimizedAnswer);
 
       if (_currentRideId != null && _remoteUserId != null) {
         _socketService?.sendCallSignalAnswer(
           rideId: _currentRideId!,
           targetId: _remoteUserId!,
-          sdp: answer.toMap(),
+          sdp: optimizedAnswer.toMap(),
         );
-        debugPrint('[WebRTC Audio] Sent SDP answer to $_remoteUserId');
+        debugPrint('[WebRTC Audio] Sent optimized SDP answer to $_remoteUserId');
       }
     } catch (e) {
       debugPrint('[WebRTC Audio] Error handling offer: $e');

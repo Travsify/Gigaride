@@ -475,6 +475,68 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
                       vba?['account_name'] ?? (provider.user?['fullName'] ?? provider.user?['full_name'] ?? 'Driver Account'),
                       style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
+                    const Divider(color: Colors.white24, height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Available Withdrawable Balance', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            Text('Instant NIP / Crypto Payout', style: TextStyle(color: Colors.white38, fontSize: 9)),
+                          ],
+                        ),
+                        Text(
+                          '₦${NumberFormat('#,##0', 'en_US').format((vba?['balance_ngn'] as num?)?.toInt() ?? 0)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                        ),
+                      ],
+                    ),
+                    if (vba?['usdt_address'] != null && (vba!['usdt_address'] as String).isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.currency_bitcoin_rounded, color: Colors.tealAccent, size: 13),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Maplerad USDT Wallet (${vba['usdt_network'] ?? 'TRC20'})',
+                                        style: const TextStyle(color: Colors.tealAccent, fontSize: 10.5, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    vba['usdt_address'],
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'monospace'),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded, color: Colors.tealAccent, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _copyToClipboard(vba['usdt_address'], 'USDT Wallet Address'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

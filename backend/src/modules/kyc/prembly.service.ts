@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { db } from '../../database';
 import { ENV } from '../../config/env';
-import { korapayService } from '../payments/korapay.service';
+import { fincraService } from '../payments/fincra.service';
+import { mapleradService } from '../payments/maplerad.service';
 import { resendService } from '../notifications/resend.service';
+import { oneSignalService } from '../notifications/onesignal.service';
 
 export class PremblyService {
   private baseUrl = 'https://api.prembly.com/identitypass/verification';
@@ -159,17 +161,60 @@ export class PremblyService {
       // Approve driver KYC
       await db.updateDriverKyc(driverId, 'APPROVED');
 
-      // Auto-generate dedicated Korapay Virtual Bank Account
+      // Auto-generate dedicated Fincra Virtual Bank Account
       const user = await db.findUserById(driverId);
+      const driverProfile = await db.getDriverProfile(driverId);
       if (user) {
-        const vba = await korapayService.generateDedicatedVirtualAccount(driverId, user.full_name, user.email, user.phone_number);
-        // Send congratulatory approval email with account details
+        const vba = await fincraService.generateDedicatedVirtualAccount(
+          driverId,
+          user.full_name,
+          user.email,
+          user.phone_number,
+          driverProfile?.bvn || undefined
+        );
+
+        // Immediate Maplerad USDT Crypto Wallet Provisioning
+        let usdtWalletAddress = '';
+        const usdtNetwork = 'TRC20';
+        try {
+          const usdtRes = await mapleradService.generateUsdtDepositAddress(driverId, usdtNetwork, 20);
+          if (usdtRes && usdtRes.depositAddress) {
+            usdtWalletAddress = usdtRes.depositAddress;
+            (vba as any).usdt_address = usdtWalletAddress;
+            (vba as any).usdt_network = usdtNetwork;
+            await db.saveStore();
+          }
+        } catch (mErr: any) {
+          console.warn('[Prembly Auto-Approval] Maplerad USDT wallet notice:', mErr.message);
+        }
+
+        // Send congratulatory approval email with Fincra Bank + Maplerad USDT wallet details
         await resendService.sendKycApproval(user.email, user.full_name, {
           accountNumber: vba.account_number,
           bankName: vba.bank_name,
           accountName: vba.account_name,
+          usdtAddress: usdtWalletAddress || undefined,
+          usdtNetwork: usdtNetwork,
         });
-        console.log(`[Prembly Auto-Approval] Driver ${driverId} (${user.full_name}) automatically approved with Korapay DVA ${vba.account_number}`);
+
+        // Send push notification to driver device
+        oneSignalService.sendPush({
+          userIds: [driverId],
+          heading: 'Verification Approved! 🎉',
+          content: `Your profile is verified. Fincra Account: ${vba.account_number} (${vba.bank_name}) & USDT wallet are ready!`,
+          data: { type: 'KYC_APPROVED', accountNumber: vba.account_number, bankName: vba.bank_name, usdtAddress: usdtWalletAddress },
+        }).catch(() => {});
+
+        // Save in-app notification in ledger
+        await db.createNotification({
+          user_id: driverId,
+          title: 'KYC Verification Approved! 🎉',
+          message: `Your identity has been verified. Dedicated Fincra Account ${vba.account_number} (${vba.bank_name}) & Maplerad USDT wallet have been generated.`,
+          type: 'KYC',
+          meta_data: { accountNumber: vba.account_number, bankName: vba.bank_name, usdtAddress: usdtWalletAddress },
+        }).catch(() => {});
+
+        console.log(`[Prembly Auto-Approval] Driver ${driverId} (${user.full_name}) approved: Fincra DVA ${vba.account_number}, Maplerad USDT: ${usdtWalletAddress || 'Generated'}`);
       }
     }
   }

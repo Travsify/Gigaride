@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 
 class SupportHelpScreen extends StatefulWidget {
@@ -245,6 +246,111 @@ class _SupportHelpScreenState extends State<SupportHelpScreen> {
                   const Text(
                     'Direct in-app dispatch dispute resolution, safety mediation, and instant refund support.',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+
+            // Emergency Hotlines & Instant Dispatch
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppConstants.dangerColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppConstants.dangerColor.withOpacity(0.35)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.emergency_rounded, color: AppConstants.dangerColor, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Emergency & Rapid Dispatch Hotlines',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            HapticFeedback.heavyImpact();
+                            final uri = Uri.parse('tel:112');
+                            if (await canLaunchUrl(uri)) launchUrl(uri);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppConstants.dangerColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.call, color: Colors.white, size: 14),
+                                SizedBox(width: 6),
+                                Text('112 Police', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            HapticFeedback.heavyImpact();
+                            final uri = Uri.parse('tel:767');
+                            if (await canLaunchUrl(uri)) launchUrl(uri);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.shade700,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.call, color: Colors.white, size: 14),
+                                SizedBox(width: 6),
+                                Text('767 LASEMA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            HapticFeedback.heavyImpact();
+                            final uri = Uri.parse('tel:122');
+                            if (await canLaunchUrl(uri)) launchUrl(uri);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade800,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.call, color: Colors.white, size: 14),
+                                SizedBox(width: 6),
+                                Text('122 FRSC', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

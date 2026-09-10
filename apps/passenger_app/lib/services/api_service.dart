@@ -99,6 +99,44 @@ class ApiService {
     throw Exception('Network connection timed out. Please try again.');
   }
 
+  Future<http.Response> _safePatch(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await http.patch(uri, headers: headers, body: body).timeout(timeout);
+      } on SocketException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Network connection timed out. Please check your internet connection and try again.');
+      } on http.ClientException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Unable to reach Giga Ride servers. Please check your internet connection.');
+      } on TimeoutException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Connection timed out. The server took too long to respond. Please try again.');
+      } catch (e) {
+        final str = e.toString();
+        if (str.contains('SocketException') || str.contains('timed out') || str.contains('ClientException')) {
+          throw Exception('Network connection timed out. Please check your internet connection and try again.');
+        }
+        rethrow;
+      }
+    }
+    throw Exception('Network connection timed out. Please try again.');
+  }
+
   Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber, {bool isSignUp = false, bool isLogin = false}) async {
     final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/send-otp'),
@@ -844,6 +882,37 @@ class ApiService {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
+    );
+  }
+
+  // --- In-App Notifications Suite ---
+  Future<Map<String, dynamic>> getNotifications() async {
+    final token = await getToken();
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/notifications'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to fetch notifications');
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    final token = await getToken();
+    await _safePatch(
+      Uri.parse('$baseUrl/api/notifications/$id/read'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final token = await getToken();
+    await _safePatch(
+      Uri.parse('$baseUrl/api/notifications/read-all'),
+      headers: {'Authorization': 'Bearer $token'},
     );
   }
 }

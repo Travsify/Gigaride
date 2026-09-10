@@ -47,6 +47,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _bootstrapApp() async {
     try {
       await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
       final provider = context.read<DriverProvider>();
       final prefs = await SharedPreferences.getInstance().timeout(
         const Duration(seconds: 3),

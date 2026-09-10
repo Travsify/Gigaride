@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import 'phone_auth_screen.dart';
@@ -18,6 +20,26 @@ class DriverProfileScreen extends StatefulWidget {
 class _DriverProfileScreenState extends State<DriverProfileScreen> {
   bool _acAvailable = true;
   bool _biometricLock = false;
+
+  Future<void> _callEmergencyHotline(String number) async {
+    final uri = Uri.parse('tel:$number');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open phone dialer for $number: $e'),
+            backgroundColor: AppConstants.dangerColor,
+          ),
+        );
+      }
+    }
+  }
 
   void _showPrivacyPolicy(BuildContext context) {
     showModalBottomSheet(
@@ -501,6 +523,145 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     value: _biometricLock,
                     activeColor: AppConstants.primaryLight,
                     onChanged: (val) => setState(() => _biometricLock = val),
+                  ),
+                ],
+              ),
+            ),
+
+            // Safety Center & Rapid Emergency Services
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppConstants.cardBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppConstants.dangerColor.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.shield_outlined, color: AppConstants.dangerColor, size: 20),
+                      SizedBox(width: 8),
+                      Text('Emergency Safety Toolkit', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('24/7 Rapid response hotlines & live GPS broadcast protection', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              HapticFeedback.heavyImpact();
+                              _callEmergencyHotline('112');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppConstants.dangerColor.withOpacity(0.4)),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.phone_in_talk_rounded, color: AppConstants.dangerColor, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('112', style: TextStyle(color: AppConstants.dangerColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text('Police / EMS', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                                  SizedBox(height: 2),
+                                  Text('Tap to Call', style: TextStyle(color: AppConstants.dangerColor, fontSize: 8, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              HapticFeedback.heavyImpact();
+                              _callEmergencyHotline('767');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.phone_in_talk_rounded, color: Colors.amber, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('767', style: TextStyle(color: Colors.amber, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text('LASEMA Rapid', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                                  SizedBox(height: 2),
+                                  Text('Tap to Call', style: TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              HapticFeedback.heavyImpact();
+                              _callEmergencyHotline('122');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: AppConstants.surfaceBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.blueAccent.withOpacity(0.4)),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.phone_in_talk_rounded, color: Colors.blueAccent, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('122', style: TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text('FRSC Highway', style: TextStyle(color: AppConstants.textMuted, fontSize: 9)),
+                                  SizedBox(height: 2),
+                                  Text('Tap to Call', style: TextStyle(color: Colors.blueAccent, fontSize: 8, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

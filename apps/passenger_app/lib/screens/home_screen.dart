@@ -11,6 +11,7 @@ import 'wallet_screen.dart';
 import 'activity_screen.dart';
 import 'profile_screen.dart';
 import 'support_help_screen.dart';
+import 'notifications_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
@@ -1345,32 +1346,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
 
-                // Clearly clickable Offline Booking button
-                GestureDetector(
-                  onTap: () => _showOfflineBookingModal(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 15),
-                        SizedBox(width: 4),
-                        Text(
-                          'Offline Mode',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    // Notification Bell Button with Real-Time Badge
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                        );
+                      },
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.06),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 19),
                           ),
-                        ),
-                      ],
+                          if (provider.unreadNotificationsCount > 0)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: AppConstants.dangerColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                child: Center(
+                                  child: Text(
+                                    '${provider.unreadNotificationsCount}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+
+                    // Clearly clickable Offline Booking button
+                    GestureDetector(
+                      onTap: () => _showOfflineBookingModal(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 15),
+                            SizedBox(width: 4),
+                            Text(
+                              'Offline Mode',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

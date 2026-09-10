@@ -24,12 +24,28 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
-  final List<String> _quickChips = [
-    "I'm at the pickup point / gate",
-    "I'm in traffic, arriving in 3 mins",
-    "Please what is the estate gate code?",
-    "I'm outside in the car with hazard lights on",
+  final List<Map<String, String>> _smartQuickReplies = [
+    {'icon': '📍', 'text': "I'm at the pickup point / gate"},
+    {'icon': '🚗', 'text': "I'm outside in the car"},
+    {'icon': '🚦', 'text': "In traffic, arriving in 3 mins"},
+    {'icon': '🔑', 'text': "What is the estate gate code?"},
+    {'icon': '🧳', 'text': "I've popped the trunk / boot"},
+    {'icon': '⏱️', 'text': "Free wait time is 3 minutes"},
+    {'icon': '👍', 'text': "Understood, waiting for you!"},
   ];
+
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final dt = DateTime.parse(timestamp.toString()).toLocal();
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:$minute $period';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   void initState() {
@@ -49,6 +65,7 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
     // Register single socket listener — ALWAYS reassign so only one is active
     provider.socket.onChatMessage = (data) {
       provider.addChatMessage(widget.rideId, data);
+      HapticFeedback.lightImpact();
       if (mounted) _scrollToBottom();
     };
 
@@ -165,22 +182,26 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
             ),
             const Divider(color: Colors.white10, height: 1),
 
-            // Quick reply chips
+            // Smart Quick Reply Action Chips
             SizedBox(
-              height: 44,
+              height: 46,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                itemCount: _quickChips.length,
+                itemCount: _smartQuickReplies.length,
                 separatorBuilder: (_, index) => const SizedBox(width: 8),
-                itemBuilder: (ctx, i) => ActionChip(
-                  label: Text(_quickChips[i], style: const TextStyle(color: AppConstants.textLight, fontSize: 11)),
-                  backgroundColor: AppConstants.surfaceBg,
-                  side: const BorderSide(color: Colors.white12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  onPressed: () => _sendMessage(_quickChips[i]),
-                ),
+                itemBuilder: (ctx, i) {
+                  final chip = _smartQuickReplies[i];
+                  return ActionChip(
+                    avatar: Text(chip['icon'] ?? '💬', style: const TextStyle(fontSize: 13)),
+                    label: Text(chip['text'] ?? '', style: const TextStyle(color: AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.w500)),
+                    backgroundColor: AppConstants.surfaceBg,
+                    side: BorderSide(color: AppConstants.primaryLight.withOpacity(0.2)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    onPressed: () => _sendMessage(chip['text'] ?? ''),
+                  );
+                },
               ),
             ),
             const Divider(color: Colors.white10, height: 1),
@@ -194,7 +215,7 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
                         children: [
                           Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.white.withOpacity(0.15)),
                           const SizedBox(height: 8),
-                          const Text('Send a message or use quick chips above', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                          const Text('Send a message or tap a quick chip above', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
                         ],
                       ),
                     )
@@ -209,8 +230,8 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
                             decoration: BoxDecoration(
                               color: isMe ? AppConstants.primaryColor : AppConstants.surfaceBg,
                               borderRadius: BorderRadius.circular(16).copyWith(
@@ -218,9 +239,29 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
                                 bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
                               ),
                             ),
-                            child: Text(
-                              msg['text'] ?? '',
-                              style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                            child: Column(
+                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  msg['text'] ?? '',
+                                  style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _formatTime(msg['timestamp']),
+                                      style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
+                                    ),
+                                    if (isMe) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.done_all_rounded, size: 13, color: AppConstants.accentColor),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         );

@@ -623,7 +623,7 @@ export class DatabaseService {
   private savePending = false;
 
   // Atomic file write using temporary swap buffer to prevent any corruptions or race conditions
-  private saveStore() {
+  public saveStore() {
     if (this.isSaving) {
       this.savePending = true;
       return;

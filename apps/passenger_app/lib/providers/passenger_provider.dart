@@ -73,6 +73,44 @@ class PassengerProvider with ChangeNotifier {
     return 0;
   }
 
+  // In-App Notifications & Activity Feed
+  List<dynamic> notifications = [];
+  int unreadNotificationsCount = 0;
+
+  Future<void> loadNotifications() async {
+    try {
+      final data = await api.getNotifications();
+      notifications = data['notifications'] ?? [];
+      unreadNotificationsCount = data['unreadCount'] ?? 0;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to load notifications: $e');
+    }
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    try {
+      await api.markNotificationRead(id);
+      final idx = notifications.indexWhere((n) => n['id'] == id);
+      if (idx != -1) {
+        notifications[idx]['is_read'] = true;
+        if (unreadNotificationsCount > 0) unreadNotificationsCount--;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await api.markAllNotificationsRead();
+      for (var n in notifications) {
+        n['is_read'] = true;
+      }
+      unreadNotificationsCount = 0;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   // 💬 In-memory persistent chat history per ride
   final Map<String, List<Map<String, dynamic>>> _rideChatHistory = {};
 
@@ -122,10 +160,14 @@ class PassengerProvider with ChangeNotifier {
     try {
       final profile = await api.getMe();
       user = profile;
+      if (profile['id'] != null) {
+        OneSignal.login(profile['id']);
+      }
       if (profile['activeRide'] != null) {
         currentRide = Map<String, dynamic>.from(profile['activeRide']);
       }
       connectSocket(t);
+      loadNotifications();
       return true;
     } catch (_) {
       return false;
@@ -155,6 +197,7 @@ class PassengerProvider with ChangeNotifier {
           OneSignal.login(user!['id']);
         }
         connectSocket(res['token']);
+        await loadNotifications();
       }
       return res;
     } finally {
@@ -211,6 +254,7 @@ class PassengerProvider with ChangeNotifier {
         OneSignal.login(user!['id']);
       }
       connectSocket(res['token']);
+      await loadNotifications();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -238,6 +282,7 @@ class PassengerProvider with ChangeNotifier {
         OneSignal.login(user!['id']);
       }
       connectSocket(res['token']);
+      await loadNotifications();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -257,6 +302,7 @@ class PassengerProvider with ChangeNotifier {
         OneSignal.login(user!['id']);
       }
       connectSocket(res['token']);
+      await loadNotifications();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -279,6 +325,7 @@ class PassengerProvider with ChangeNotifier {
         OneSignal.login(user!['id']);
       }
       connectSocket(res['token']);
+      await loadNotifications();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -294,6 +341,7 @@ class PassengerProvider with ChangeNotifier {
         incomingBids.insert(0, bid);
         HapticFeedback.lightImpact();
         notifyListeners();
+        loadNotifications();
       },
       onRideStatusChanged: (statusData) {
         final newStatus = statusData['status'];
@@ -319,6 +367,7 @@ class PassengerProvider with ChangeNotifier {
         }
 
         notifyListeners();
+        loadNotifications();
       },
       onRideFinished: (finished) {
         tripStatus = 'COMPLETED';
@@ -332,6 +381,7 @@ class PassengerProvider with ChangeNotifier {
         _waitCountdownTimer?.cancel();
         HapticFeedback.heavyImpact();
         notifyListeners();
+        loadNotifications();
       },
     );
 

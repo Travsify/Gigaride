@@ -205,18 +205,27 @@ export class ResendService {
     });
   }
 
-  public async sendKycApproval(driverEmail: string, driverName: string, virtualAccount: { accountNumber: string; bankName: string; accountName: string }) {
+  public async sendKycApproval(driverEmail: string, driverName: string, virtualAccount: { accountNumber: string; bankName: string; accountName: string; usdtAddress?: string; usdtNetwork?: string }) {
     const content = `
       <h2 style="color: #10B981; margin-top: 0;">🎉 Congratulations ${driverName}, Your Account is Approved!</h2>
-      <p style="color: #D1D5DB; font-size: 14px; line-height: 1.6;">Your documents and KYC have been verified by our compliance team. You are now live on the dispatch radar with zero commission on all rides.</p>
+      <p style="color: #D1D5DB; font-size: 14px; line-height: 1.6;">Your documents and KYC/KYB have been successfully verified. You are now live on the dispatch radar with zero commission on all rides.</p>
       
       <div style="background: #1F2937; border: 1px solid #374151; padding: 18px; border-radius: 12px; margin: 20px 0;">
-        <h3 style="color: #F59E0B; margin-top: 0; font-size: 15px;">💳 Your Dedicated Virtual Bank Account</h3>
+        <h3 style="color: #F59E0B; margin-top: 0; font-size: 15px;">💳 Your Dedicated Fincra NUBAN Bank Account</h3>
         <p style="margin: 4px 0; color: #D1D5DB; font-size: 13px;"><strong>Bank Name:</strong> ${virtualAccount.bankName}</p>
         <p style="margin: 4px 0; color: #D1D5DB; font-size: 13px;"><strong>Account Number:</strong> <span style="font-size: 18px; font-weight: bold; color: #38BDF8;">${virtualAccount.accountNumber}</span></p>
         <p style="margin: 4px 0; color: #D1D5DB; font-size: 13px;"><strong>Account Name:</strong> ${virtualAccount.accountName}</p>
-        <p style="font-size: 12px; color: #9CA3AF; margin-top: 10px;">Transfer money directly from OPay, PalmPay, Moniepoint, or any banking app. Your ride credits auto-top up instantly!</p>
+        <p style="font-size: 12px; color: #9CA3AF; margin-top: 10px;">Direct transfers from OPay, PalmPay, Moniepoint, or any banking app are credited instantly.</p>
       </div>
+
+      ${virtualAccount.usdtAddress ? `
+      <div style="background: #0F172A; border: 1px solid #0D9488; padding: 18px; border-radius: 12px; margin: 20px 0;">
+        <h3 style="color: #2DD4BF; margin-top: 0; font-size: 15px;">💎 Your Dedicated Maplerad USDT Crypto Wallet</h3>
+        <p style="margin: 4px 0; color: #D1D5DB; font-size: 13px;"><strong>Network:</strong> ${virtualAccount.usdtNetwork || 'TRC20'}</p>
+        <p style="margin: 4px 0; color: #D1D5DB; font-size: 13px;"><strong>Deposit Address:</strong> <span style="font-family: monospace; font-size: 14px; font-weight: bold; color: #2DD4BF;">${virtualAccount.usdtAddress}</span></p>
+        <p style="font-size: 12px; color: #9CA3AF; margin-top: 10px;">USDT deposits are automatically converted to Naira (₦) at live institutional rates with zero commission.</p>
+      </div>
+      ` : ''}
     `;
     return this.sendEmail({
       to: driverEmail,

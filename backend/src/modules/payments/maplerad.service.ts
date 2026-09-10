@@ -466,6 +466,14 @@ export class MapleradService {
         })
         .catch(() => {});
 
+      await db.createNotification({
+        user_id: tx.user_id,
+        title: 'USDT Converted to Naira ✓',
+        message: `${usdtAmount} USDT successfully converted and credited as ₦${creditedNgn.toLocaleString()} to your wallet.`,
+        type: 'WALLET',
+        meta_data: { reference, usdtAmount, creditedNgn, provider: 'maplerad' },
+      }).catch(() => {});
+
       return { success: true, creditedNgn, reference };
     }
 

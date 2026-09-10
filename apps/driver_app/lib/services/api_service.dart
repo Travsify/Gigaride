@@ -108,7 +108,7 @@ class ApiService {
   }) async {
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
-        return await _safePatch(uri, headers: headers, body: body).timeout(timeout);
+        return await http.patch(uri, headers: headers, body: body).timeout(timeout);
       } on SocketException catch (_) {
         if (attempt == 0) {
           await Future.delayed(const Duration(milliseconds: 600));

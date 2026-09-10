@@ -24,12 +24,28 @@ class _RideChatSheetState extends State<RideChatSheet> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
-  final List<String> _quickChips = [
-    "I'm waiting at the estate security gate",
-    "I'm outside in a blue shirt",
-    "Please turn on the AC",
-    "Stuck at the door, coming down in 2 mins",
+  final List<Map<String, String>> _smartQuickReplies = [
+    {'icon': '🚶', 'text': "I'm coming down / coming out now"},
+    {'icon': '📍', 'text': "Waiting at the estate security gate"},
+    {'icon': '⏱️', 'text': "Please wait 2 minutes, on my way!"},
+    {'icon': '❄️', 'text': "Please turn on the AC"},
+    {'icon': '🧳', 'text': "I have luggage / bags with me"},
+    {'icon': '🚪', 'text': "Security will let you into compound"},
+    {'icon': '👍', 'text': "Alright, see you in a bit!"},
   ];
+
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final dt = DateTime.parse(timestamp.toString()).toLocal();
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:$minute $period';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   void initState() {
@@ -49,6 +65,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
     // Register single socket listener — reassign so only one is ever active
     provider.socket.onChatMessage = (data) {
       provider.addChatMessage(widget.rideId, data);
+      HapticFeedback.lightImpact();
       if (mounted) _scrollToBottom();
     };
 
@@ -150,7 +167,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
                           children: [
                             Icon(Icons.lock_rounded, size: 11, color: AppConstants.successColor),
                             SizedBox(width: 4),
-                            Text('Private In-App Chat • No Number Leak', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            Text('Private In-App Chat • Zero Phone Leak', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                           ],
                         ),
                       ],
@@ -161,6 +178,31 @@ class _RideChatSheetState extends State<RideChatSheet> {
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
+              ),
+            ),
+
+            const Divider(color: Colors.white10, height: 1),
+
+            // Smart Quick Action Chips
+            SizedBox(
+              height: 46,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                itemCount: _smartQuickReplies.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                itemBuilder: (ctx, i) {
+                  final chip = _smartQuickReplies[i];
+                  return ActionChip(
+                    avatar: Text(chip['icon'] ?? '💬', style: const TextStyle(fontSize: 13)),
+                    label: Text(chip['text'] ?? '', style: const TextStyle(color: AppConstants.textLight, fontSize: 11, fontWeight: FontWeight.w500)),
+                    backgroundColor: AppConstants.surfaceBg,
+                    side: BorderSide(color: AppConstants.primaryLight.withOpacity(0.2)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    onPressed: () => _sendMessage(chip['text'] ?? ''),
+                  );
+                },
               ),
             ),
 
@@ -177,7 +219,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
                           SizedBox(height: 10),
                           Text('Direct In-App Coordination', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
                           SizedBox(height: 4),
-                          Text('Tap a quick preset below or send a custom message.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                          Text('Tap a smart preset above or send a message.', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                         ],
                       ),
                     )
@@ -193,7 +235,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
                             decoration: BoxDecoration(
                               color: isMe ? AppConstants.primaryColor : AppConstants.surfaceBg,
@@ -204,33 +246,34 @@ class _RideChatSheetState extends State<RideChatSheet> {
                                 bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(16),
                               ),
                             ),
-                            child: Text(
-                              msg['text'] ?? '',
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                            child: Column(
+                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  msg['text'] ?? '',
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _formatTime(msg['timestamp']),
+                                      style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
+                                    ),
+                                    if (isMe) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.done_all_rounded, size: 13, color: AppConstants.accentColor),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         );
                       },
                     ),
-            ),
-
-            // Quick Nigerian African Gate Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: _quickChips.map((chip) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ActionChip(
-                      backgroundColor: AppConstants.surfaceBg,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      label: Text(chip, style: const TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
-                      onPressed: () => _sendMessage(chip),
-                    ),
-                  );
-                }).toList(),
-              ),
             ),
 
             // Input Bar

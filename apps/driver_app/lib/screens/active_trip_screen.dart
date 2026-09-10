@@ -12,6 +12,7 @@ import '../widgets/driver_interactive_map.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'driver_chat_sheet.dart';
 import 'in_app_call_screen.dart';
+import '../services/in_app_alert_service.dart';
 
 int _extractFare(dynamic req) {
   if (req is! Map) return 3000;
@@ -61,6 +62,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   int _unreadChatMessages = 0;
   bool _isChatSheetOpen = false;
   bool _isCompletionDialogShowing = false;
+  bool _isProcessingAction = false;
 
   String _formatDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
@@ -223,43 +225,18 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
       context.read<DriverProvider>().addChatMessage(rideId, msgData);
     }
     if (!_isChatSheetOpen) {
-      HapticFeedback.mediumImpact();
       setState(() {
         _unreadChatMessages++;
       });
       final text = msgData['text']?.toString() ?? 'New message';
       final riderName = widget.trip['passengerName'] ?? widget.trip['riderName'] ?? widget.trip['rider_name'] ?? 'Passenger';
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF13202E),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-          content: Row(
-            children: [
-              const Icon(Icons.chat_bubble_rounded, color: AppConstants.accentColor, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$riderName:', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                    Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'REPLY',
-            textColor: AppConstants.primaryLight,
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              _openDriverChatSheet();
-            },
-          ),
-        ),
+      
+      // Audible Chime Sound + Modern Top Heads-Up Notification Banner
+      InAppAlertService.showChatNotification(
+        context,
+        senderName: riderName,
+        message: text,
+        onReply: _openDriverChatSheet,
       );
     }
   }
@@ -514,23 +491,48 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     }).catchError((_) {});
   }
 
-  void _progressStep() {
+  Future<void> _progressStep() async {
+    if (_isProcessingAction) return;
+
+    HapticFeedback.heavyImpact();
+    SystemSound.play(SystemSoundType.click);
+
+    setState(() {
+      _isProcessingAction = true;
+    });
+
     final provider = context.read<DriverProvider>();
     final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
-    if (_currentStep == 'ACCEPTED') {
-      provider.updateTripStatus('ARRIVED', overrideRideId: rideId);
-      setState(() => _currentStep = 'ARRIVED');
-      AppSnackBar.success(context, '📍 Arrived at pickup point — waiting for passenger.');
-    } else if (_currentStep == 'ARRIVED') {
-      provider.updateTripStatus('IN_TRANSIT', overrideRideId: rideId);
-      setState(() => _currentStep = 'IN_TRANSIT');
-      AppSnackBar.success(context, '🚗 Trip started! Safe driving.');
-    } else if (_currentStep == 'IN_TRANSIT') {
-      final waitEarnings = provider.accruedDriverWaitEarnings;
-      final waitElapsedSecs = provider.waitElapsedSeconds;
-      final billableMins = (waitElapsedSecs / 60).ceil() - provider.waitGraceMins > 0 ? (waitElapsedSecs / 60).ceil() - provider.waitGraceMins : 0;
-      provider.updateTripStatus('COMPLETED', overrideRideId: rideId);
-      _showCompletionDialog(accruedWaitEarnings: waitEarnings, billableWaitMinutes: billableMins);
+
+    try {
+      if (_currentStep == 'ACCEPTED') {
+        setState(() => _currentStep = 'ARRIVED');
+        provider.updateTripStatus('ARRIVED', overrideRideId: rideId);
+        AppSnackBar.success(context, '📍 Arrived at pickup point — waiting for passenger.');
+      } else if (_currentStep == 'ARRIVED') {
+        setState(() => _currentStep = 'IN_TRANSIT');
+        provider.updateTripStatus('IN_TRANSIT', overrideRideId: rideId);
+        AppSnackBar.success(context, '🚗 Trip started! Safe driving.');
+        // Recalculate route to dropoff destination
+        _fetchDriverLocationAndRoute();
+      } else if (_currentStep == 'IN_TRANSIT') {
+        final waitEarnings = provider.accruedDriverWaitEarnings;
+        final waitElapsedSecs = provider.waitElapsedSeconds;
+        final billableMins = (waitElapsedSecs / 60).ceil() - provider.waitGraceMins > 0
+            ? (waitElapsedSecs / 60).ceil() - provider.waitGraceMins
+            : 0;
+        provider.updateTripStatus('COMPLETED', overrideRideId: rideId);
+        _showCompletionDialog(accruedWaitEarnings: waitEarnings, billableWaitMinutes: billableMins);
+      }
+    } catch (e) {
+      debugPrint('Error in _progressStep: $e');
+    } finally {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+        });
+      }
     }
   }
 
@@ -856,12 +858,15 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final notes = rawNotes;
 
     String actionTitle = 'I Have Arrived at Pickup';
+    IconData actionIcon = Icons.place_rounded;
     Color actionColor = AppConstants.primaryColor;
     if (_currentStep == 'ARRIVED') {
       actionTitle = 'Start Trip (Passenger Onboard)';
+      actionIcon = Icons.directions_car_rounded;
       actionColor = Colors.cyan.shade700;
     } else if (_currentStep == 'IN_TRANSIT') {
       actionTitle = 'Complete Trip';
+      actionIcon = Icons.check_circle_rounded;
       actionColor = AppConstants.successColor;
     }
 
@@ -1515,9 +1520,29 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: actionColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: _progressStep,
-                  child: Text(actionTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: actionColor,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _isProcessingAction ? null : _progressStep,
+                  child: _isProcessingAction
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(actionIcon, color: Colors.white, size: 22),
+                            const SizedBox(width: 10),
+                            Text(
+                              actionTitle,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),

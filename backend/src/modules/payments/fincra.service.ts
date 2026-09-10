@@ -615,6 +615,37 @@ export class FincraService {
           content: `₦${amountNgn.toLocaleString()} has been securely settled into your Giga account.`,
           data: { type: 'PAYMENT_SUCCESS', reference, amountNgn },
         }).catch(() => {});
+
+        await db.createNotification({
+          user_id: userId,
+          title: 'Payment Credited ✓',
+          message: `₦${amountNgn.toLocaleString()} settled into your Giga wallet via Fincra.`,
+          type: 'WALLET',
+          meta_data: { reference, amountNgn, provider: 'fincra' },
+        }).catch(() => {});
+      }
+    }
+
+    // Handle Successful Payout/Disbursement
+    if (eventType === 'payout.successful' || eventType === 'disbursement.success') {
+      const amountNgn = Number(event.data?.amount || 0);
+      const userId = metadata?.userId || event.data?.customer?.id;
+
+      if (userId && amountNgn > 0) {
+        oneSignalService.sendPush({
+          userIds: [userId],
+          heading: 'Withdrawal Settled ✓',
+          content: `₦${amountNgn.toLocaleString()} has been sent to your bank account.`,
+          data: { type: 'PAYOUT_SUCCESS', reference, amountNgn },
+        }).catch(() => {});
+
+        await db.createNotification({
+          user_id: userId,
+          title: 'Withdrawal Completed ✓',
+          message: `₦${amountNgn.toLocaleString()} successfully disbursed to your bank account.`,
+          type: 'WALLET',
+          meta_data: { reference, amountNgn, provider: 'fincra' },
+        }).catch(() => {});
       }
     }
 

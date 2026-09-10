@@ -9,6 +9,7 @@ import 'home_screen.dart';
 import 'in_app_call_screen.dart';
 import 'ride_chat_sheet.dart';
 import 'offer_room_screen.dart';
+import '../services/in_app_alert_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
@@ -89,7 +90,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
   void _handleIncomingChatMessage(Map<String, dynamic> msgData) {
     if (!_isChatSheetOpen) {
-      HapticFeedback.mediumImpact();
       setState(() {
         _unreadChatMessages++;
       });
@@ -99,37 +99,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       final text = msgData['text']?.toString() ?? 'New message';
       final rideId = provider.currentRide?['id'] ?? driver?['rideId'] ?? 'active-ride';
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF13202E),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-          content: Row(
-            children: [
-              const Icon(Icons.chat_bubble_rounded, color: AppConstants.accentColor, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$driverName:', style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                    Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'REPLY',
-            textColor: AppConstants.primaryLight,
-            onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              _openChatSheet(context, driver, rideId);
-            },
-          ),
-        ),
+      // Audible Chime Sound + Modern Top Heads-Up Notification Banner
+      InAppAlertService.showChatNotification(
+        context,
+        senderName: driverName,
+        message: text,
+        onReply: () => _openChatSheet(context, driver, rideId),
       );
     }
   }
@@ -351,9 +326,99 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
             Text('Activate SOS Dispatch?', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
-        content: const Text(
-          'This will immediately transmit your real-time GPS coordinates, vehicle license plate, and driver identity to Giga Security Operations and Lagos Emergency Response.\n\nOnly use this in real emergency situations.',
-          style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will immediately transmit your real-time GPS coordinates, vehicle license plate, and driver identity to Giga Security Operations and Lagos Emergency Response.\n\nOnly use this in real emergency situations.',
+              style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Direct Emergency Dialers (1-Tap):',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.heavyImpact();
+                      final uri = Uri.parse('tel:112');
+                      if (await canLaunchUrl(uri)) launchUrl(uri);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppConstants.dangerColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.call, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text('112 Police', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.heavyImpact();
+                      final uri = Uri.parse('tel:767');
+                      if (await canLaunchUrl(uri)) launchUrl(uri);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.shade700,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.call, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text('767 LASEMA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.heavyImpact();
+                      final uri = Uri.parse('tel:122');
+                      if (await canLaunchUrl(uri)) launchUrl(uri);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade800,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.call, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text('122 FRSC', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         actions: [
           TextButton(
