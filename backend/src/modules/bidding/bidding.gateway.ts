@@ -777,14 +777,17 @@ export function setupBiddingGateway(io: SocketIOServer) {
       }
     });
 
-    // --- In-App Secure Calling (VoIP / Encrypted Signaling) ---
-    // Passenger's personal phone number is NEVER exposed. Calls route via in-app WebSockets.
+    // --- In-App Secure Calling (VoIP / WebRTC Encrypted Audio) ---
+    // Passenger's personal phone number is NEVER exposed. Audio routes peer-to-peer via WebRTC.
     socket.on('call:initiate', async (data: { rideId: string; receiverId: string }) => {
       try {
         const caller = await db.findUserById(user.userId);
         const callerName = user.role === 'DRIVER' ? (caller?.full_name || 'Driver') : (caller?.full_name || 'Passenger');
         const channelName = `ride_${data.rideId}`;
-        const agoraData = await agoraService.generateRtcToken(channelName, 0);
+        let agoraData = { appId: '', token: '' };
+        try {
+          agoraData = await agoraService.generateRtcToken(channelName, 0);
+        } catch (_) {}
 
         console.log(`📞 [In-App Call] Initiated by ${user.role} (${user.userId}) to ${data.receiverId} for ride ${data.rideId}`);
 
@@ -799,7 +802,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
           timestamp: new Date().toISOString(),
         });
 
-        // Also return token immediately to caller so both ends are armed
+        // Also notify caller
         socket.emit('call:token_ready', {
           rideId: data.rideId,
           agoraAppId: agoraData.appId,
@@ -814,7 +817,10 @@ export function setupBiddingGateway(io: SocketIOServer) {
     socket.on('call:answer', async (data: { rideId: string; callerId: string }) => {
       try {
         const channelName = `ride_${data.rideId}`;
-        const agoraData = await agoraService.generateRtcToken(channelName, 0);
+        let agoraData = { appId: '', token: '' };
+        try {
+          agoraData = await agoraService.generateRtcToken(channelName, 0);
+        } catch (_) {}
         console.log(`📞 [In-App Call Answered] User ${user.userId} answered call from ${data.callerId}`);
 
         const connectPayload = {
@@ -830,6 +836,37 @@ export function setupBiddingGateway(io: SocketIOServer) {
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }
+    });
+
+    // WebRTC Signaling: Offer SDP relay
+    socket.on('call:signal_offer', (data: { rideId: string; targetId: string; sdp: any; type?: string }) => {
+      console.log(`📡 [WebRTC Offer] From ${user.userId} to ${data.targetId} for ride ${data.rideId}`);
+      io.to(`user:${data.targetId}`).emit('call:signal_offer', {
+        rideId: data.rideId,
+        senderId: user.userId,
+        sdp: data.sdp,
+        type: data.type || 'offer',
+      });
+    });
+
+    // WebRTC Signaling: Answer SDP relay
+    socket.on('call:signal_answer', (data: { rideId: string; targetId: string; sdp: any; type?: string }) => {
+      console.log(`📡 [WebRTC Answer] From ${user.userId} to ${data.targetId} for ride ${data.rideId}`);
+      io.to(`user:${data.targetId}`).emit('call:signal_answer', {
+        rideId: data.rideId,
+        senderId: user.userId,
+        sdp: data.sdp,
+        type: data.type || 'answer',
+      });
+    });
+
+    // WebRTC Signaling: ICE Candidate relay
+    socket.on('call:ice_candidate', (data: { rideId: string; targetId: string; candidate: any }) => {
+      io.to(`user:${data.targetId}`).emit('call:ice_candidate', {
+        rideId: data.rideId,
+        senderId: user.userId,
+        candidate: data.candidate,
+      });
     });
 
     socket.on('call:end', (data: { rideId: string; targetId: string; reason?: string }) => {

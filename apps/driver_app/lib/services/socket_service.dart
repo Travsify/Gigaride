@@ -103,6 +103,25 @@ class SocketService {
       }
     });
 
+    // WebRTC Signaling Listeners
+    socket!.on('call:signal_offer', (data) {
+      if (data != null && onCallSignalOffer != null) {
+        onCallSignalOffer!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:signal_answer', (data) {
+      if (data != null && onCallSignalAnswer != null) {
+        onCallSignalAnswer!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('call:ice_candidate', (data) {
+      if (data != null && onCallIceCandidate != null) {
+        onCallIceCandidate!(Map<String, dynamic>.from(data));
+      }
+    });
+
     // Stopover & Round-Trip Wait Time Listeners
     socket!.on('ride:wait_started', (data) {
       if (data != null && onWaitStarted != null) {
@@ -155,6 +174,9 @@ class SocketService {
   Function(Map<String, dynamic>)? onCallConnected;
   Function(Map<String, dynamic>)? onCallTokenReady;
   Function(Map<String, dynamic>)? onCallEnded;
+  Function(Map<String, dynamic>)? onCallSignalOffer;
+  Function(Map<String, dynamic>)? onCallSignalAnswer;
+  Function(Map<String, dynamic>)? onCallIceCandidate;
   Function()? onReconnected;
 
   // In-App Calling Actions
@@ -177,6 +199,32 @@ class SocketService {
       'rideId': rideId,
       'targetId': targetId,
       'reason': reason ?? 'Call ended',
+    });
+  }
+
+  void sendCallSignalOffer({required String rideId, required String targetId, required Map<String, dynamic> sdp, String type = 'offer'}) {
+    socket?.emit('call:signal_offer', {
+      'rideId': rideId,
+      'targetId': targetId,
+      'sdp': sdp,
+      'type': type,
+    });
+  }
+
+  void sendCallSignalAnswer({required String rideId, required String targetId, required Map<String, dynamic> sdp, String type = 'answer'}) {
+    socket?.emit('call:signal_answer', {
+      'rideId': rideId,
+      'targetId': targetId,
+      'sdp': sdp,
+      'type': type,
+    });
+  }
+
+  void sendCallIceCandidate({required String rideId, required String targetId, required Map<String, dynamic> candidate}) {
+    socket?.emit('call:ice_candidate', {
+      'rideId': rideId,
+      'targetId': targetId,
+      'candidate': candidate,
     });
   }
 

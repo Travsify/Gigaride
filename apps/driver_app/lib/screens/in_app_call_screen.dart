@@ -5,8 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
-import '../services/agora_voice_service.dart';
-
+import '../services/custom_audio_call_service.dart';
 
 class InAppCallScreen extends StatefulWidget {
   final String rideId;
@@ -35,11 +34,28 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   int _callSeconds = 0;
   Timer? _timer;
   Timer? _ringTimeoutTimer;
+  Map<String, dynamic>? _pendingOffer;
 
   @override
   void initState() {
     super.initState();
     final provider = context.read<DriverProvider>();
+
+    // Initialize custom WebRTC audio pipeline
+    CustomAudioCallService.instance.initialize(
+      rideId: widget.rideId,
+      remoteUserId: widget.riderId,
+      socketService: provider.socket,
+    );
+
+    CustomAudioCallService.instance.onConnectionStateChanged = (connected) {
+      if (mounted && connected && !_isConnected) {
+        setState(() {
+          _isConnected = true;
+        });
+        _startTimer();
+      }
+    };
 
     if (!widget.isIncoming) {
       // Outgoing Call: emit call initiate over WebSockets
@@ -61,23 +77,9 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
           );
         }
       });
-
-      // Listen for backend Agora RTC Token
-      provider.socket.onCallTokenReady = (data) {
-        if (mounted) {
-          final channel = data['channelName'] ?? 'ride_${widget.rideId}';
-          final token = data['agoraToken'] as String?;
-          final appId = data['agoraAppId'] as String?;
-          AgoraVoiceService.instance.joinChannel(
-            channelId: channel,
-            token: token,
-            appId: appId,
-          );
-        }
-      };
     }
 
-    // Listen for connection (when rider answers)
+    // Callee answered: Caller initiates WebRTC SDP Offer
     provider.socket.onCallConnected = (data) {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
@@ -86,16 +88,43 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
         });
         _startTimer();
 
-        // Only join if we haven't already joined from token_ready
-        if (!AgoraVoiceService.instance.isJoined) {
-          final channel = data['channelName'] ?? 'ride_${widget.rideId}';
-          final token = data['agoraToken'] as String?;
-          final appId = data['agoraAppId'] as String?;
-          AgoraVoiceService.instance.joinChannel(
-            channelId: channel,
-            token: token,
-            appId: appId,
-          );
+        // If we are caller, send WebRTC Offer to callee
+        if (!widget.isIncoming) {
+          CustomAudioCallService.instance.sendOffer();
+        }
+      }
+    };
+
+    // Receive remote WebRTC SDP Offer
+    provider.socket.onCallSignalOffer = (data) {
+      if (mounted) {
+        final sdp = data['sdp'] as Map<String, dynamic>?;
+        if (sdp != null) {
+          if (_isConnected || !widget.isIncoming) {
+            CustomAudioCallService.instance.handleRemoteOffer(sdp);
+          } else {
+            _pendingOffer = sdp;
+          }
+        }
+      }
+    };
+
+    // Receive remote WebRTC SDP Answer
+    provider.socket.onCallSignalAnswer = (data) {
+      if (mounted) {
+        final sdp = data['sdp'] as Map<String, dynamic>?;
+        if (sdp != null) {
+          CustomAudioCallService.instance.handleRemoteAnswer(sdp);
+        }
+      }
+    };
+
+    // Receive remote WebRTC ICE Candidate
+    provider.socket.onCallIceCandidate = (data) {
+      if (mounted) {
+        final candidate = data['candidate'] as Map<String, dynamic>?;
+        if (candidate != null) {
+          CustomAudioCallService.instance.handleRemoteCandidate(candidate);
         }
       }
     };
@@ -105,7 +134,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
         _timer?.cancel();
-        AgoraVoiceService.instance.leaveChannel();
+        CustomAudioCallService.instance.endCall();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -147,13 +176,19 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       _isConnected = true;
     });
     _startTimer();
+
+    // If offer arrived while ringing, handle it immediately
+    if (_pendingOffer != null) {
+      CustomAudioCallService.instance.handleRemoteOffer(_pendingOffer!);
+      _pendingOffer = null;
+    }
   }
 
   void _endCall({String? reason}) {
     HapticFeedback.mediumImpact();
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
-    AgoraVoiceService.instance.leaveChannel();
+    CustomAudioCallService.instance.endCall();
     final provider = context.read<DriverProvider>();
     provider.socket.endCall(
       rideId: widget.rideId,
@@ -169,7 +204,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   void dispose() {
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
-    AgoraVoiceService.instance.leaveChannel();
+    CustomAudioCallService.instance.endCall();
     super.dispose();
   }
 
@@ -392,7 +427,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                                   HapticFeedback.lightImpact();
                                   final newMuted = !_isMuted;
                                   setState(() => _isMuted = newMuted);
-                                  AgoraVoiceService.instance.mute(newMuted);
+                                  CustomAudioCallService.instance.mute(newMuted);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(
@@ -448,7 +483,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                                   HapticFeedback.lightImpact();
                                   final newSpeaker = !_isSpeakerOn;
                                   setState(() => _isSpeakerOn = newSpeaker);
-                                  AgoraVoiceService.instance.toggleSpeaker(newSpeaker);
+                                  CustomAudioCallService.instance.toggleSpeaker(newSpeaker);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(
