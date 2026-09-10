@@ -49,38 +49,44 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _bootstrapApp() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // 1. Check VPS Health in background
     try {
-      if (mounted) setState(() => _statusText = 'Verifying VPS platform health...');
-      final healthUri = Uri.parse('${AppConstants.defaultApiUrl}/health');
-      await http.get(healthUri).timeout(const Duration(seconds: 4));
+      await Future.delayed(const Duration(milliseconds: 700));
+
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => throw Exception('Prefs timeout'),
+      );
+      final hasSeenOnboarding = prefs.getBool(AppConstants.keyHasSeenOnboarding) ?? false;
+
+      if (!mounted) return;
+
+      if (!hasSeenOnboarding) {
+        _navigateTo(const OnboardingScreen());
+        return;
+      }
+
+      // Check Authentication with 2.5 second maximum timeout
+      if (mounted) setState(() => _statusText = 'Restoring session...');
+      final provider = context.read<PassengerProvider>();
+      bool isAuthenticated = false;
+      try {
+        isAuthenticated = await provider.checkAuth().timeout(
+          const Duration(milliseconds: 2500),
+          onTimeout: () => false,
+        );
+      } catch (_) {
+        isAuthenticated = false;
+      }
+
+      if (!mounted) return;
+
+      if (isAuthenticated) {
+        _navigateTo(const LocationPermissionGate(nextScreen: HomeScreen()));
+      } else {
+        _navigateTo(const PhoneAuthScreen());
+      }
     } catch (_) {
-      // Offline or network lag — continue to allow offline state inspection
-    }
-
-    // 2. Check Onboarding Flag
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeenOnboarding = prefs.getBool(AppConstants.keyHasSeenOnboarding) ?? false;
-
-    if (!mounted) return;
-
-    if (!hasSeenOnboarding) {
-      _navigateTo(const OnboardingScreen());
-      return;
-    }
-
-    // 3. Check Authentication
-    if (mounted) setState(() => _statusText = 'Restoring session...');
-    final provider = context.read<PassengerProvider>();
-    final isAuthenticated = await provider.checkAuth();
-
-    if (!mounted) return;
-
-    if (isAuthenticated) {
-      _navigateTo(const LocationPermissionGate(nextScreen: HomeScreen()));
-    } else {
+      if (!mounted) return;
       _navigateTo(const PhoneAuthScreen());
     }
   }

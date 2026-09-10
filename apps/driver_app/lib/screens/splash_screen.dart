@@ -42,37 +42,53 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _bootstrapApp() async {
-    final provider = context.read<DriverProvider>();
-    final prefs = await SharedPreferences.getInstance();
-
-    final hasSeenOnboarding = prefs.getBool('driver_seen_onboarding') ?? false;
-
-    // Timeout protection: Maximum 4 seconds wait
-    final authCheck = provider.checkAuth();
-    final authed = await Future.any([
-      authCheck,
-      Future.delayed(const Duration(seconds: 4), () => false),
-    ]);
-
-    if (!mounted) return;
-
-    if (!hasSeenOnboarding) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+    try {
+      await Future.delayed(const Duration(milliseconds: 700));
+      final provider = context.read<DriverProvider>();
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => throw Exception('Prefs timeout'),
       );
-    } else if (!authed) {
+
+      final hasSeenOnboarding = prefs.getBool('driver_seen_onboarding') ?? false;
+
+      // Timeout protection: Maximum 2.5 seconds wait
+      bool authed = false;
+      try {
+        authed = await provider.checkAuth().timeout(
+          const Duration(milliseconds: 2500),
+          onTimeout: () => false,
+        );
+      } catch (_) {
+        authed = false;
+      }
+
+      if (!mounted) return;
+
+      if (!hasSeenOnboarding) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      } else if (!authed) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
+        );
+      } else {
+        // Authenticated: check KYC status
+        final kycStatus = provider.driverProfile?['kyc_status'];
+        final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
-      );
-    } else {
-      // Authenticated: check KYC status
-      final kycStatus = provider.driverProfile?['kyc_status'];
-      final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
       );
     }
   }

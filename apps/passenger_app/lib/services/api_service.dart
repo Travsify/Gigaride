@@ -32,7 +32,7 @@ class ApiService {
   }) async {
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
-        return await _safePost(uri, headers: headers, body: body).timeout(timeout);
+        return await http.post(uri, headers: headers, body: body).timeout(timeout);
       } on SocketException catch (_) {
         if (attempt == 0) {
           await Future.delayed(const Duration(milliseconds: 600));
@@ -69,7 +69,7 @@ class ApiService {
   }) async {
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
-        return await _safeGet(uri, headers: headers).timeout(timeout);
+        return await http.get(uri, headers: headers).timeout(timeout);
       } on SocketException catch (_) {
         if (attempt == 0) {
           await Future.delayed(const Duration(milliseconds: 600));
