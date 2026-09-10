@@ -34,6 +34,7 @@ export class TwilioService {
               Authorization: `Basic ${authHeader}`,
               'Content-Type': 'application/x-www-form-urlencoded',
             },
+            timeout: 6000,
           }
         );
 
@@ -111,6 +112,7 @@ export class TwilioService {
               Authorization: `Basic ${authHeader}`,
               'Content-Type': 'application/x-www-form-urlencoded',
             },
+            timeout: 6000,
           }
         );
         return { success: true, simulated: false };

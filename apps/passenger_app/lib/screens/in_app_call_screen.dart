@@ -2,16 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
+import '../services/agora_voice_service.dart';
 
 class InAppCallScreen extends StatefulWidget {
   final String rideId;
   final String driverId;
   final String driverName;
   final String? vehicleInfo;
-  final String? driverPhone;
   final bool isIncoming;
 
   const InAppCallScreen({
@@ -20,7 +19,6 @@ class InAppCallScreen extends StatefulWidget {
     required this.driverId,
     required this.driverName,
     this.vehicleInfo,
-    this.driverPhone,
     this.isIncoming = false,
   });
 
@@ -61,16 +59,39 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
           );
         }
       });
+
+      // Listen for backend Agora RTC Token
+      provider.socket.socket?.on('call:token_ready', (data) {
+        if (data != null && mounted) {
+          final channel = data['channelName'] ?? 'ride_${widget.rideId}';
+          final token = data['agoraToken'] as String?;
+          final appId = data['agoraAppId'] as String?;
+          AgoraVoiceService.instance.joinChannel(
+            channelId: channel,
+            token: token,
+            appId: appId,
+          );
+        }
+      });
     }
 
     // Listen for connection (when driver answers)
-    provider.socket.onCallConnected = (_) {
+    provider.socket.onCallConnected = (data) {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
         setState(() {
           _isConnected = true;
         });
         _startTimer();
+
+        final channel = data?['channelName'] ?? 'ride_${widget.rideId}';
+        final token = data?['agoraToken'] as String?;
+        final appId = data?['agoraAppId'] as String?;
+        AgoraVoiceService.instance.joinChannel(
+          channelId: channel,
+          token: token,
+          appId: appId,
+        );
       }
     };
 
@@ -79,6 +100,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
         _timer?.cancel();
+        AgoraVoiceService.instance.leaveChannel();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -120,12 +142,16 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       _isConnected = true;
     });
     _startTimer();
+    AgoraVoiceService.instance.joinChannel(
+      channelId: 'ride_${widget.rideId}',
+    );
   }
 
   void _endCall({String? reason}) {
     HapticFeedback.mediumImpact();
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
+    AgoraVoiceService.instance.leaveChannel();
     final provider = context.read<PassengerProvider>();
     provider.socket.endCall(
       rideId: widget.rideId,
@@ -141,6 +167,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   void dispose() {
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
+    AgoraVoiceService.instance.leaveChannel();
     super.dispose();
   }
 
@@ -256,39 +283,15 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('NDPR Shield Active', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('NDPR Privacy Shield Active', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
                           SizedBox(height: 2),
-                          Text('Your personal phone number is 100% hidden from the driver.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                          Text('All communications are 100% encrypted in-app audio. Driver personal phone number is securely masked.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-
-              if (widget.driverPhone != null && widget.driverPhone!.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 18),
-                      label: Text(
-                        'Direct Cellular Call (${widget.driverPhone})',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        launchUrl(Uri.parse('tel:${widget.driverPhone}'), mode: LaunchMode.externalApplication);
-                      },
-                    ),
-                  ),
-                ),
-              ],
 
               // Call Controls Area
               Padding(
@@ -355,7 +358,9 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                               InkWell(
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  setState(() => _isMuted = !_isMuted);
+                                  final newMuted = !_isMuted;
+                                  setState(() => _isMuted = newMuted);
+                                  AgoraVoiceService.instance.mute(newMuted);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(
@@ -409,7 +414,9 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                               InkWell(
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  setState(() => _isSpeakerOn = !_isSpeakerOn);
+                                  final newSpeaker = !_isSpeakerOn;
+                                  setState(() => _isSpeakerOn = newSpeaker);
+                                  AgoraVoiceService.instance.toggleSpeaker(newSpeaker);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(

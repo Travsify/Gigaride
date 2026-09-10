@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
+import '../services/agora_voice_service.dart';
 
 class InAppCallScreen extends StatefulWidget {
   final String rideId;
@@ -58,16 +59,39 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
           );
         }
       });
+
+      // Listen for backend Agora RTC Token
+      provider.socket.onCallTokenReady = (data) {
+        if (mounted) {
+          final channel = data['channelName'] ?? 'ride_${widget.rideId}';
+          final token = data['agoraToken'] as String?;
+          final appId = data['agoraAppId'] as String?;
+          AgoraVoiceService.instance.joinChannel(
+            channelId: channel,
+            token: token,
+            appId: appId,
+          );
+        }
+      };
     }
 
     // Listen for connection (when rider answers)
-    provider.socket.onCallConnected = (_) {
+    provider.socket.onCallConnected = (data) {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
         setState(() {
           _isConnected = true;
         });
         _startTimer();
+
+        final channel = data['channelName'] ?? 'ride_${widget.rideId}';
+        final token = data['agoraToken'] as String?;
+        final appId = data['agoraAppId'] as String?;
+        AgoraVoiceService.instance.joinChannel(
+          channelId: channel,
+          token: token,
+          appId: appId,
+        );
       }
     };
 
@@ -76,6 +100,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       if (mounted) {
         _ringTimeoutTimer?.cancel();
         _timer?.cancel();
+        AgoraVoiceService.instance.leaveChannel();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -117,12 +142,16 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       _isConnected = true;
     });
     _startTimer();
+    AgoraVoiceService.instance.joinChannel(
+      channelId: 'ride_${widget.rideId}',
+    );
   }
 
   void _endCall({String? reason}) {
     HapticFeedback.mediumImpact();
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
+    AgoraVoiceService.instance.leaveChannel();
     final provider = context.read<DriverProvider>();
     provider.socket.endCall(
       rideId: widget.rideId,
@@ -138,6 +167,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
   void dispose() {
     _ringTimeoutTimer?.cancel();
     _timer?.cancel();
+    AgoraVoiceService.instance.leaveChannel();
     super.dispose();
   }
 
@@ -328,7 +358,9 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                               InkWell(
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  setState(() => _isMuted = !_isMuted);
+                                  final newMuted = !_isMuted;
+                                  setState(() => _isMuted = newMuted);
+                                  AgoraVoiceService.instance.mute(newMuted);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(
@@ -382,7 +414,9 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                               InkWell(
                                 onTap: () {
                                   HapticFeedback.lightImpact();
-                                  setState(() => _isSpeakerOn = !_isSpeakerOn);
+                                  final newSpeaker = !_isSpeakerOn;
+                                  setState(() => _isSpeakerOn = newSpeaker);
+                                  AgoraVoiceService.instance.toggleSpeaker(newSpeaker);
                                 },
                                 customBorder: const CircleBorder(),
                                 child: Container(

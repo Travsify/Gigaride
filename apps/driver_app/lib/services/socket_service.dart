@@ -84,17 +84,39 @@ class SocketService {
       }
     });
 
+    socket!.on('call:token_ready', (data) {
+      if (data != null && onCallTokenReady != null) {
+        onCallTokenReady!(Map<String, dynamic>.from(data));
+      }
+    });
+
     socket!.on('call:ended', (data) {
       if (data != null && onCallEnded != null) {
         onCallEnded!(Map<String, dynamic>.from(data));
       }
     });
+
+    // Stopover & Round-Trip Wait Time Listeners
+    socket!.on('ride:wait_started', (data) {
+      if (data != null && onWaitStarted != null) {
+        onWaitStarted!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ride:wait_ended', (data) {
+      if (data != null && onWaitEnded != null) {
+        onWaitEnded!(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
+  Function(Map<String, dynamic>)? onWaitStarted;
+  Function(Map<String, dynamic>)? onWaitEnded;
   Function(Map<String, dynamic>)? onRideCancelled;
   Function(Map<String, dynamic>)? onChatMessage;
   Function(Map<String, dynamic>)? onIncomingCall;
   Function(Map<String, dynamic>)? onCallConnected;
+  Function(Map<String, dynamic>)? onCallTokenReady;
   Function(Map<String, dynamic>)? onCallEnded;
 
   // In-App Calling Actions
@@ -158,6 +180,20 @@ class SocketService {
       'rideId': rideId,
       'receiverId': receiverId,
       'text': text,
+    });
+  }
+
+  // ⏱️ Stopover & Round-Trip Wait Time Emitters
+  void startWait({required String rideId, String? stopAddress}) {
+    socket?.emit('ride:start_wait', {
+      'rideId': rideId,
+      'stopAddress': ?stopAddress,
+    });
+  }
+
+  void resumeTrip({required String rideId}) {
+    socket?.emit('ride:resume_trip', {
+      'rideId': rideId,
     });
   }
 

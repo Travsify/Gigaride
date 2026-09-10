@@ -36,6 +36,15 @@ class DriverProvider with ChangeNotifier {
   Map<String, dynamic>? activeTrip;
   String? tripStep; // 'ARRIVED', 'IN_TRANSIT', 'COMPLETED'
 
+  // ⏱️ Stopover Wait Time State
+  bool isWaitingAtStop = false;
+  int waitElapsedSeconds = 0;
+  int accruedDriverWaitEarnings = 0;
+  int waitGraceMins = 5;
+  int waitRatePerMin = 40;
+  int waitCommissionPercent = 15;
+  Timer? _waitTimer;
+
   // Daily Gross Earnings Summary
   double todayGrossEarningsNgn = 0;
   int todayCompletedTripsCount = 0;
@@ -110,6 +119,28 @@ class DriverProvider with ChangeNotifier {
         await loadNotifications();
         connectSocket(res['token']);
       }
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber, {bool isSignUp = false, bool isLogin = false}) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.sendPhoneOtp(phoneNumber, isSignUp: isSignUp, isLogin: isLogin);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyPhoneOtp(String phoneNumber, String otpCode) async {
+    isLoading = true;
+    notifyListeners();
+    try {
+      return await api.verifyPhoneOtp(phoneNumber, otpCode);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -341,6 +372,34 @@ class DriverProvider with ChangeNotifier {
       },
     );
 
+    // Stopover & Round-Trip Wait Time Handlers
+    socket.onWaitStarted = (data) {
+      isWaitingAtStop = true;
+      if (data['graceMinutes'] != null) {
+        waitGraceMins = (data['graceMinutes'] as num).toInt();
+      }
+      if (data['ratePerMinute'] != null) {
+        waitRatePerMin = (data['ratePerMinute'] as num).toInt();
+      }
+      _waitTimer?.cancel();
+      _waitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        waitElapsedSeconds++;
+        final totalWaitMins = (waitElapsedSeconds / 60).ceil();
+        final billableMins = (totalWaitMins - waitGraceMins) > 0 ? (totalWaitMins - waitGraceMins) : 0;
+        final totalWaitFare = billableMins * waitRatePerMin;
+        final commission = (totalWaitFare * (waitCommissionPercent / 100)).round();
+        accruedDriverWaitEarnings = totalWaitFare - commission;
+        notifyListeners();
+      });
+      notifyListeners();
+    };
+
+    socket.onWaitEnded = (data) {
+      isWaitingAtStop = false;
+      _waitTimer?.cancel();
+      notifyListeners();
+    };
+
     // Broadcast initial live coordinates and start continuous GPS tracking
     LocationService.getCurrentLocation().then((pos) {
       socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: isOnline);
@@ -423,6 +482,7 @@ class DriverProvider with ChangeNotifier {
         socket.updateLocation(latitude: 6.5244, longitude: 3.3792, isOnline: true);
       });
       _startGpsStreaming();
+      fetchBroadcastedFares();
     } else {
       _stopGpsStreaming();
       LocationService.getCurrentLocation().then((pos) {
@@ -438,6 +498,25 @@ class DriverProvider with ChangeNotifier {
     return true;
   }
 
+  Future<void> fetchBroadcastedFares() async {
+    try {
+      final fares = await api.fetchAvailableBroadcastedRides();
+      bool addedAny = false;
+      for (final fare in fares) {
+        final rId = (fare['rideId'] ?? fare['id'] ?? fare['ride_id'] ?? '').toString();
+        if (rId.isNotEmpty && !incomingRequests.any((r) => (r['rideId'] ?? r['id'] ?? r['ride_id']).toString() == rId)) {
+          incomingRequests.add(Map<String, dynamic>.from(fare));
+          addedAny = true;
+        }
+      }
+      if (addedAny) {
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchBroadcastedFares error: $e');
+    }
+  }
+
   void submitCounterOffer(String rideId, int counterFareNgn, int etaMinutes) {
     socket.submitBid(
       rideId: rideId,
@@ -448,22 +527,65 @@ class DriverProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void updateTripStatus(String status) {
-    if (activeTrip == null) return;
-    final rId = (activeTrip!['rideId'] ?? activeTrip!['id'] ?? activeTrip!['ride_id'] ?? '').toString();
-    socket.updateTripStatus(
-      rideId: rId,
-      status: status,
-    );
+  void startWaitTime(String rideId, {String? stopAddress}) {
+    socket.startWait(rideId: rideId, stopAddress: stopAddress);
+    isWaitingAtStop = true;
+    waitElapsedSeconds = 0;
+    accruedDriverWaitEarnings = 0;
+    _waitTimer?.cancel();
+    _waitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      waitElapsedSeconds++;
+      final totalWaitMins = (waitElapsedSeconds / 60).ceil();
+      final billableMins = (totalWaitMins - waitGraceMins) > 0 ? (totalWaitMins - waitGraceMins) : 0;
+      final totalWaitFare = billableMins * waitRatePerMin;
+      final commission = (totalWaitFare * (waitCommissionPercent / 100)).round();
+      accruedDriverWaitEarnings = totalWaitFare - commission;
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  void resumeTripFromWait(String rideId) {
+    socket.resumeTrip(rideId: rideId);
+    isWaitingAtStop = false;
+    _waitTimer?.cancel();
+    notifyListeners();
+  }
+
+  void updateTripStatus(String status, {String? overrideRideId}) {
+    final rId = (overrideRideId != null && overrideRideId.isNotEmpty)
+        ? overrideRideId
+        : (activeTrip != null ? (activeTrip!['rideId'] ?? activeTrip!['id'] ?? activeTrip!['ride_id'] ?? '').toString() : '');
+    
+    if (rId.isNotEmpty) {
+      socket.updateTripStatus(
+        rideId: rId,
+        status: status,
+      );
+      // Resilient HTTP PATCH fallback in case socket dropped
+      api.updateRideStatus(rId, status).catchError((e) {
+        debugPrint('HTTP status update error: $e');
+        return <String, dynamic>{};
+      });
+    }
+
     tripStep = status;
     if (status == 'COMPLETED') {
-      socket.socket?.emit('ride:completed', {'rideId': rId});
-      socket.socket?.emit('ride:finish', {'rideId': rId});
-      final fare = activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? activeTrip!['riderOfferNgn'] ?? 0;
-      todayGrossEarningsNgn += fare;
+      if (rId.isNotEmpty) {
+        socket.socket?.emit('ride:completed', {'rideId': rId});
+        socket.socket?.emit('ride:finish', {'rideId': rId});
+      }
+      final fare = activeTrip != null
+          ? (activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? activeTrip!['riderOfferNgn'] ?? 0)
+          : 0;
+      todayGrossEarningsNgn += (fare + accruedDriverWaitEarnings);
       todayCompletedTripsCount++;
       activeTrip = null;
       tripStep = null;
+      isWaitingAtStop = false;
+      _waitTimer?.cancel();
+      waitElapsedSeconds = 0;
+      accruedDriverWaitEarnings = 0;
       refreshSubscription();
     }
     notifyListeners();
@@ -472,6 +594,10 @@ class DriverProvider with ChangeNotifier {
   void clearActiveTrip() {
     activeTrip = null;
     tripStep = null;
+    isWaitingAtStop = false;
+    _waitTimer?.cancel();
+    waitElapsedSeconds = 0;
+    accruedDriverWaitEarnings = 0;
     notifyListeners();
   }
 
@@ -480,6 +606,10 @@ class DriverProvider with ChangeNotifier {
     OneSignal.logout();
     await api.clearAuth();
     socket.disconnect();
+    _waitTimer?.cancel();
+    isWaitingAtStop = false;
+    waitElapsedSeconds = 0;
+    accruedDriverWaitEarnings = 0;
     user = null;
     driverProfile = null;
     virtualAccount = null;

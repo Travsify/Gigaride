@@ -4,6 +4,7 @@ import { rideService } from './ride.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
 import { fincraService } from '../payments/fincra.service';
+import { agoraService } from '../calls/agora.service';
 
 export const rideRouter = Router();
 
@@ -29,6 +30,8 @@ const createRideSchema = z.object({
   riderType: z.enum(['SELF', 'FRIEND']).optional().nullable(),
   notes: z.string().optional().nullable(),
   isBusiness: z.boolean().optional().nullable(),
+  hasWaitTime: z.boolean().optional().nullable(),
+  requestedWaitMinutes: z.number().optional().nullable(),
   distanceKm: z.number().optional().nullable(),
   durationMinutes: z.number().optional().nullable(),
 });
@@ -242,6 +245,81 @@ rideRouter.get(
           driverName: driver?.full_name || 'Giga Driver Partner',
         },
       });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 📞 Get Agora RTC Voice Call Token for Active Ride
+rideRouter.get(
+  '/:id/call-token',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const rideId = String(req.params.id);
+      const ride = await db.getRideById(rideId);
+      if (!ride) {
+        res.status(404).json({ success: false, message: 'Ride not found' });
+        return;
+      }
+
+      // Ensure caller is participant
+      if (ride.rider_id !== req.user!.userId && ride.driver_id !== req.user!.userId) {
+        res.status(403).json({ success: false, message: 'Unauthorized for this ride channel.' });
+        return;
+      }
+
+      const channelName = `ride_${rideId}`;
+      const tokenData = await agoraService.generateRtcToken(channelName, 0);
+
+      res.status(200).json({
+        success: true,
+        data: tokenData,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 🚗 Get Available Broadcasted Fares for Drivers
+rideRouter.get(
+  '/feed/available',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const available = await db.getAvailableBroadcastedRides();
+      res.status(200).json({ success: true, data: available });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// 🔄 Driver updates ride lifecycle status (ARRIVED -> IN_TRANSIT -> COMPLETED)
+rideRouter.patch(
+  '/:id/status',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const rideId = String(req.params.id);
+      const { status } = req.body;
+      if (!status || !['ARRIVED', 'IN_TRANSIT', 'COMPLETED'].includes(status)) {
+        res.status(400).json({ success: false, message: 'Invalid ride status.' });
+        return;
+      }
+
+      const ride = await db.getRideById(rideId);
+      if (!ride) {
+        res.status(404).json({ success: false, message: 'Ride not found' });
+        return;
+      }
+
+      await db.updateRideStatus(rideId, status);
+      res.status(200).json({ success: true, data: { rideId, status } });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
     }

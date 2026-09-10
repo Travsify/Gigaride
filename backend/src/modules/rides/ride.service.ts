@@ -66,6 +66,8 @@ export class RideService {
       rider_name: dto.riderName || null,
       rider_phone: dto.riderPhone || null,
       is_business: dto.isBusiness || false,
+      has_wait_time: dto.hasWaitTime || false,
+      requested_wait_minutes: dto.requestedWaitMinutes || 0,
       created_at: new Date().toISOString(),
     };
 

@@ -60,6 +60,16 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   int _unreadChatMessages = 0;
   bool _isChatSheetOpen = false;
 
+  String _formatDuration(int totalSeconds) {
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -464,26 +474,31 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
   void _progressStep() {
     final provider = context.read<DriverProvider>();
+    final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
     if (_currentStep == 'ACCEPTED') {
-      provider.updateTripStatus('ARRIVED');
+      provider.updateTripStatus('ARRIVED', overrideRideId: rideId);
       setState(() => _currentStep = 'ARRIVED');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Status updated: You arrived at pickup point.'), backgroundColor: AppConstants.primaryColor),
       );
     } else if (_currentStep == 'ARRIVED') {
-      provider.updateTripStatus('IN_TRANSIT');
+      provider.updateTripStatus('IN_TRANSIT', overrideRideId: rideId);
       setState(() => _currentStep = 'IN_TRANSIT');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Trip started! Safe driving.'), backgroundColor: AppConstants.primaryColor),
       );
     } else if (_currentStep == 'IN_TRANSIT') {
-      provider.updateTripStatus('COMPLETED');
-      _showCompletionDialog();
+      final waitEarnings = provider.accruedDriverWaitEarnings;
+      final waitElapsedSecs = provider.waitElapsedSeconds;
+      final billableMins = (waitElapsedSecs / 60).ceil() - provider.waitGraceMins > 0 ? (waitElapsedSecs / 60).ceil() - provider.waitGraceMins : 0;
+      provider.updateTripStatus('COMPLETED', overrideRideId: rideId);
+      _showCompletionDialog(accruedWaitEarnings: waitEarnings, billableWaitMinutes: billableMins);
     }
   }
 
-  void _showCompletionDialog() {
-    final fare = _extractFare(widget.trip);
+  void _showCompletionDialog({int accruedWaitEarnings = 0, int billableWaitMinutes = 0}) {
+    final baseFare = _extractFare(widget.trip);
+    final fare = baseFare + accruedWaitEarnings;
     final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
     int tenderedCash = fare;
     bool changeRolledOver = false;
@@ -522,10 +537,20 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Trip Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
-                            Text('₦${_formatFare(fare)}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
+                            const Text('Base Ride Fare', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                            Text('₦${_formatFare(baseFare)}', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 15)),
                           ],
                         ),
+                        if (accruedWaitEarnings > 0) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Stopover Wait ($billableWaitMinutes mins net)', style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 13, fontWeight: FontWeight.bold)),
+                              Text('+₦${_formatFare(accruedWaitEarnings)}', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.bold, fontSize: 14)),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -753,6 +778,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<DriverProvider>();
     final fare = _extractFare(widget.trip);
     final pickup = widget.trip['pickupAddress'] ?? 'Pickup Location';
     final dropoff = widget.trip['dropoffAddress'] ?? 'Destination Location';
@@ -1135,6 +1161,26 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: [
+                              if (widget.trip['hasWaitTime'] == true || widget.trip['has_wait_time'] == true || (((widget.trip['requestedWaitMinutes'] ?? widget.trip['requested_wait_minutes'] ?? 0) as num) > 0))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.timer_outlined, color: Color(0xFFFBBF24), size: 13),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '⏱️ Includes ${widget.trip['requestedWaitMinutes'] ?? widget.trip['requested_wait_minutes'] ?? 30}m Stopover Wait',
+                                        style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               if (notes.toString().contains('AC: Must Be ON') || notes.toString().contains('Comfort AC'))
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1259,6 +1305,156 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                       ],
                     ),
                   ),
+
+                  // ⏱️ Stopover Wait Time Controls (When IN_TRANSIT)
+                  if (_currentStep == 'IN_TRANSIT') ...[
+                    if (provider.isWaitingAtStop) ...[
+                      // Wait Timer Active Card
+                      Container(
+                        margin: const EdgeInsets.only(top: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFF59E0B).withOpacity(0.2),
+                              const Color(0xFFD97706).withOpacity(0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withOpacity(0.25),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.timer_outlined, color: Color(0xFFF59E0B), size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Stopover Wait Timer Running',
+                                        style: TextStyle(color: Color(0xFFFBBF24), fontSize: 15, fontWeight: FontWeight.bold),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'Passenger notified. Wait earnings are tracking in real-time.',
+                                        style: TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.black38,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('WAIT DURATION', style: TextStyle(color: AppConstants.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _formatDuration(provider.waitElapsedSeconds),
+                                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text('YOUR 85% EARNINGS', style: TextStyle(color: AppConstants.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      if (provider.waitElapsedSeconds <= (provider.waitGraceMins * 60)) ...[
+                                        Text(
+                                          'Grace (${_formatDuration((provider.waitGraceMins * 60) - provider.waitElapsedSeconds)})',
+                                          style: const TextStyle(color: AppConstants.successColor, fontSize: 13, fontWeight: FontWeight.bold),
+                                        ),
+                                      ] else ...[
+                                        Text(
+                                          '+₦${_formatFare(provider.accruedDriverWaitEarnings)}',
+                                          style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 20, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 46,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConstants.successColor,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                                label: const Text(
+                                  'Passenger Re-boarded • Resume Driving',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () {
+                                  HapticFeedback.heavyImpact();
+                                  final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
+                                  provider.resumeTripFromWait(rideId);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Wait timer stopped. Trip resumed!'), backgroundColor: AppConstants.primaryColor),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // Start Wait Timer Button
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                            backgroundColor: const Color(0xFFF59E0B).withOpacity(0.08),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.pause_circle_outline_rounded, color: Color(0xFFFBBF24), size: 20),
+                          label: const Text(
+                            'Arrived at Stopover? Start Wait Timer',
+                            style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
+                            provider.startWaitTime(rideId);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Wait timer started! Passenger notified.'), backgroundColor: Color(0xFFD97706)),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),

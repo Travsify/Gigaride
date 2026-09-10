@@ -457,6 +457,11 @@ export class AdminService {
       default_auto_topup_plan_id: s.default_auto_topup_plan_id || 'plan_standard_50',
       grace_rides_limit: s.grace_rides_limit || 2,
       subscription_rollover_enabled: s.subscription_rollover_enabled !== false,
+      agora_app_id: s.agora_app_id || '57d797d4eb6143769bd02999aed126ad',
+      agora_app_certificate: maskKey(s.agora_app_certificate || '1235f6d658a44ac3875adc71d0109dce'),
+      wait_time_rate_per_min_ngn: s.wait_time_rate_per_min_ngn !== undefined ? Number(s.wait_time_rate_per_min_ngn) : 40,
+      wait_time_commission_percent: s.wait_time_commission_percent !== undefined ? Number(s.wait_time_commission_percent) : 15,
+      wait_time_free_grace_mins: s.wait_time_free_grace_mins !== undefined ? Number(s.wait_time_free_grace_mins) : 5,
     };
   }
 
@@ -510,6 +515,11 @@ export class AdminService {
       default_auto_topup_plan_id: cleanSetting(payload.default_auto_topup_plan_id, current.default_auto_topup_plan_id),
       grace_rides_limit: payload.grace_rides_limit ? parseInt(payload.grace_rides_limit, 10) : current.grace_rides_limit,
       subscription_rollover_enabled: payload.subscription_rollover_enabled !== undefined ? Boolean(payload.subscription_rollover_enabled) : current.subscription_rollover_enabled,
+      agora_app_id: cleanSetting(payload.agora_app_id, current.agora_app_id),
+      agora_app_certificate: cleanSetting(payload.agora_app_certificate, current.agora_app_certificate),
+      wait_time_rate_per_min_ngn: payload.wait_time_rate_per_min_ngn !== undefined ? Number(payload.wait_time_rate_per_min_ngn) : current.wait_time_rate_per_min_ngn,
+      wait_time_commission_percent: payload.wait_time_commission_percent !== undefined ? Number(payload.wait_time_commission_percent) : current.wait_time_commission_percent,
+      wait_time_free_grace_mins: payload.wait_time_free_grace_mins !== undefined ? Number(payload.wait_time_free_grace_mins) : current.wait_time_free_grace_mins,
     };
 
     await db.updatePlatformSettings(updateData);

@@ -36,6 +36,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   bool _loginOtpSent = false;
   bool _loginEmailOtpSent = false;
 
+  // Dedicated Loading & Debouncing States
+  bool _isSendingOtp = false;
+  bool _isVerifyingOtp = false;
+  bool _isSendingLoginOtp = false;
+  bool _isVerifyingLoginOtp = false;
+  bool _isSendingLoginEmailOtp = false;
+  bool _isVerifyingLoginEmailOtp = false;
+
 
   // Sign Up Controllers
   final _phoneCtrl = TextEditingController();
@@ -106,6 +114,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   // SIGN UP: STEP 1 - PHONE VERIFICATION
   // ==========================================
   void _sendPhoneOtp() async {
+    if (_isSendingOtp) return;
     final phone = _phoneCtrl.text.trim();
     if (phone.isEmpty) {
       _showError('Please enter your phone number');
@@ -113,6 +122,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     }
     final formatted = _formatPhone(phone);
     final provider = context.read<DriverProvider>();
+
+    setState(() => _isSendingOtp = true);
 
     try {
       // Check if phone is already registered before sending OTP
@@ -126,16 +137,21 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
         return;
       }
 
-      await provider.api.sendPhoneOtp(formatted, isSignUp: true);
+      await provider.sendPhoneOtp(formatted, isSignUp: true);
+      if (!mounted) return;
       setState(() => _phoneOtpSent = true);
       _showSuccess('Verification code sent to your phone via SMS.');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingOtp = false);
+      }
     }
   }
 
-
   void _verifyPhoneOtp() async {
+    if (_isVerifyingOtp) return;
     final phone = _formatPhone(_phoneCtrl.text.trim());
     final otp = _phoneOtpCtrl.text.trim();
     if (otp.length < 6) {
@@ -144,14 +160,20 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     }
 
     final provider = context.read<DriverProvider>();
+    setState(() => _isVerifyingOtp = true);
     try {
-      await provider.api.verifyPhoneOtp(phone, otp);
+      await provider.verifyPhoneOtp(phone, otp);
+      if (!mounted) return;
       setState(() {
         _signUpStep = 2;
       });
       _showSuccess('✓ Phone verified. Complete driver details & email verification.');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingOtp = false);
+      }
     }
   }
 
@@ -434,6 +456,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   }
 
   void _sendLoginPhoneOtp() async {
+    if (_isSendingLoginOtp) return;
     final phone = _loginPhoneCtrl.text.trim();
     if (phone.isEmpty) {
       _showError('Please enter your phone number');
@@ -442,16 +465,23 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     final formatted = _formatPhone(phone);
     final provider = context.read<DriverProvider>();
 
+    setState(() => _isSendingLoginOtp = true);
     try {
-      await provider.api.sendPhoneOtp(formatted, isLogin: true);
+      await provider.sendPhoneOtp(formatted, isLogin: true);
+      if (!mounted) return;
       setState(() => _loginOtpSent = true);
       _showSuccess('Verification code sent to your phone via SMS.');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingLoginOtp = false);
+      }
     }
   }
 
   void _verifyLoginPhoneOtp() async {
+    if (_isVerifyingLoginOtp) return;
     final phone = _formatPhone(_loginPhoneCtrl.text.trim());
     final otp = _loginOtpCtrl.text.trim();
     if (otp.length < 6) {
@@ -460,32 +490,45 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     }
 
     final provider = context.read<DriverProvider>();
+    setState(() => _isVerifyingLoginOtp = true);
     try {
       await provider.loginWithPhoneOtp(phone, otp);
       if (!mounted) return;
       _navigateAfterAuth(provider);
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingLoginOtp = false);
+      }
     }
   }
 
   void _sendLoginEmailOtp() async {
+    if (_isSendingLoginEmailOtp) return;
     final email = _loginEmailCtrl.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       _showError('Please enter a valid email address');
       return;
     }
     final provider = context.read<DriverProvider>();
+    setState(() => _isSendingLoginEmailOtp = true);
     try {
       await provider.sendEmailLoginOtp(email);
+      if (!mounted) return;
       setState(() => _loginEmailOtpSent = true);
       _showSuccess('Verification code sent to your email address.');
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingLoginEmailOtp = false);
+      }
     }
   }
 
   void _verifyLoginEmailOtp() async {
+    if (_isVerifyingLoginEmailOtp) return;
     final email = _loginEmailCtrl.text.trim();
     final otp = _loginOtpCtrl.text.trim();
     if (otp.length < 6) {
@@ -493,12 +536,17 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
     final provider = context.read<DriverProvider>();
+    setState(() => _isVerifyingLoginEmailOtp = true);
     try {
       await provider.loginWithEmailOtp(email, otp);
       if (!mounted) return;
       _navigateAfterAuth(provider);
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingLoginEmailOtp = false);
+      }
     }
   }
 
@@ -939,9 +987,22 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        onPressed: isLoading ? null : _sendLoginPhoneOtp,
-                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Send SMS Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          disabledBackgroundColor: AppConstants.primaryColor.withOpacity(0.5),
+                        ),
+                        onPressed: (_isSendingLoginOtp || isLoading) ? null : _sendLoginPhoneOtp,
+                        child: _isSendingLoginOtp
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                                  SizedBox(width: 12),
+                                  Text('Sending Verification Code...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                ],
+                              )
+                            : const Text('Send SMS Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     ),
                   ] else ...[
@@ -959,13 +1020,33 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.successColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        onPressed: isLoading ? null : _verifyLoginPhoneOtp,
-                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Verify & Enter Cockpit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.successColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          disabledBackgroundColor: AppConstants.successColor.withOpacity(0.5),
+                        ),
+                        onPressed: (_isVerifyingLoginOtp || isLoading) ? null : _verifyLoginPhoneOtp,
+                        child: _isVerifyingLoginOtp
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                                  SizedBox(width: 12),
+                                  Text('Verifying SMS Code...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                ],
+                              )
+                            : const Text('Verify & Enter Cockpit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Center(child: TextButton(onPressed: _sendLoginPhoneOtp, child: const Text('Resend SMS Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)))),
+                    Center(
+                      child: TextButton(
+                        onPressed: (_isSendingLoginOtp || isLoading) ? null : _sendLoginPhoneOtp,
+                        child: _isSendingLoginOtp
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: AppConstants.accentColor, strokeWidth: 2))
+                            : const Text('Resend SMS Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)),
+                      ),
+                    ),
                   ],
                 ],
 
@@ -1140,9 +1221,22 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        onPressed: isLoading ? null : _sendPhoneOtp,
-                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Send SMS Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          disabledBackgroundColor: AppConstants.primaryColor.withOpacity(0.5),
+                        ),
+                        onPressed: (_isSendingOtp || isLoading) ? null : _sendPhoneOtp,
+                        child: _isSendingOtp
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                                  SizedBox(width: 12),
+                                  Text('Sending Verification Code...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                ],
+                              )
+                            : const Text('Send SMS Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     ),
                   ] else ...[
@@ -1160,13 +1254,33 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.successColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        onPressed: isLoading ? null : _verifyPhoneOtp,
-                        child: isLoading ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Verify Phone & Continue to Step 2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.successColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          disabledBackgroundColor: AppConstants.successColor.withOpacity(0.5),
+                        ),
+                        onPressed: (_isVerifyingOtp || isLoading) ? null : _verifyPhoneOtp,
+                        child: _isVerifyingOtp
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                                  SizedBox(width: 12),
+                                  Text('Verifying Phone Number...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                ],
+                              )
+                            : const Text('Verify Phone & Continue to Step 2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Center(child: TextButton(onPressed: _sendPhoneOtp, child: const Text('Resend Verification Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)))),
+                    Center(
+                      child: TextButton(
+                        onPressed: (_isSendingOtp || isLoading) ? null : _sendPhoneOtp,
+                        child: _isSendingOtp
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: AppConstants.accentColor, strokeWidth: 2))
+                            : const Text('Resend Verification Code', style: TextStyle(color: AppConstants.accentColor, fontSize: 12)),
+                      ),
+                    ),
                   ],
                 ],
 

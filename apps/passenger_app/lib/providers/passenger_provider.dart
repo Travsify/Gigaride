@@ -23,6 +23,19 @@ class PassengerProvider with ChangeNotifier {
   Map<String, dynamic>? selectedDriverBid;
   String? tripStatus; // 'ACCEPTED', 'ARRIVED', 'IN_TRANSIT', 'COMPLETED'
   int? finalFarePaid;
+  int? finalBaseFareNgn;
+  int? finalWaitFareNgn;
+  int? finalBillableWaitMinutes;
+  int? finalActualWaitSeconds;
+
+  // ⏱️ Stopover Wait Time State
+  bool isStopoverWaiting = false;
+  DateTime? stopoverWaitStartTime;
+  int stopoverWaitElapsedSeconds = 0;
+  int stopoverFreeGraceMins = 5;
+  int stopoverRatePerMin = 40;
+  int stopoverAccruedWaitFareNgn = 0;
+  Timer? _stopoverWaitTimer;
 
   // 🚗 Live Real-Time Telemetry & Environs Awareness
   LatLng? liveDriverLocation;
@@ -248,10 +261,14 @@ class PassengerProvider with ChangeNotifier {
           _startFreeWaitTimer();
         } else if (newStatus == 'IN_TRANSIT') {
           _waitCountdownTimer?.cancel();
+          _waitCountdownTimer = null;
+          freeWaitSecondsRemaining = 0;
           HapticFeedback.mediumImpact();
           activeMilestoneMessage = 'Trip in progress • Heading to destination';
         } else if (newStatus == 'COMPLETED') {
           _waitCountdownTimer?.cancel();
+          _waitCountdownTimer = null;
+          freeWaitSecondsRemaining = 0;
           HapticFeedback.heavyImpact();
           activeMilestoneMessage = 'Trip completed! Please rate your ride';
         }
@@ -260,12 +277,54 @@ class PassengerProvider with ChangeNotifier {
       },
       onRideFinished: (finished) {
         tripStatus = 'COMPLETED';
-        finalFarePaid = finished['finalFareNgn'];
+        finalFarePaid = (finished['finalFareNgn'] as num?)?.toInt();
+        finalBaseFareNgn = (finished['baseFareNgn'] as num?)?.toInt();
+        finalWaitFareNgn = (finished['waitFareNgn'] as num?)?.toInt();
+        finalBillableWaitMinutes = (finished['billableWaitMinutes'] as num?)?.toInt();
+        finalActualWaitSeconds = (finished['actualWaitSeconds'] as num?)?.toInt();
+        _stopoverWaitTimer?.cancel();
+        isStopoverWaiting = false;
         _waitCountdownTimer?.cancel();
         HapticFeedback.heavyImpact();
         notifyListeners();
       },
     );
+
+    // ⏱️ Stopover Wait Time Listeners
+    socket.onWaitStarted = (data) {
+      isStopoverWaiting = true;
+      stopoverFreeGraceMins = (data['freeGraceMins'] as num?)?.toInt() ?? 5;
+      stopoverRatePerMin = (data['ratePerMinuteNgn'] as num?)?.toInt() ?? 40;
+      final startStr = data['startTime'] as String?;
+      stopoverWaitStartTime = startStr != null ? DateTime.tryParse(startStr) ?? DateTime.now() : DateTime.now();
+      stopoverWaitElapsedSeconds = 0;
+      stopoverAccruedWaitFareNgn = 0;
+
+      _stopoverWaitTimer?.cancel();
+      _stopoverWaitTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        stopoverWaitElapsedSeconds++;
+        final totalMins = (stopoverWaitElapsedSeconds / 60).ceil();
+        final billableMins = (totalMins - stopoverFreeGraceMins) > 0 ? (totalMins - stopoverFreeGraceMins) : 0;
+        stopoverAccruedWaitFareNgn = billableMins * stopoverRatePerMin;
+        notifyListeners();
+      });
+
+      HapticFeedback.mediumImpact();
+      activeMilestoneMessage = 'Driver parked at stopover • Wait timer active';
+      notifyListeners();
+    };
+
+    socket.onWaitEnded = (data) {
+      isStopoverWaiting = false;
+      _stopoverWaitTimer?.cancel();
+      _stopoverWaitTimer = null;
+      final accruedFare = (data['waitFareNgn'] as num?)?.toInt() ?? stopoverAccruedWaitFareNgn;
+      stopoverAccruedWaitFareNgn = accruedFare;
+      final billableMins = (data['billableWaitMinutes'] as num?)?.toInt() ?? 0;
+      activeMilestoneMessage = 'Stopover wait ended ($billableMins billable mins: ₦$stopoverAccruedWaitFareNgn)';
+      HapticFeedback.lightImpact();
+      notifyListeners();
+    };
 
     // 🚗 Live Driver GPS Telemetry & Landmark Snapping
     socket.onDriverLocationUpdate = (locData) {
@@ -357,6 +416,11 @@ class PassengerProvider with ChangeNotifier {
     _waitCountdownTimer?.cancel();
     freeWaitSecondsRemaining = 180;
     _waitCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (tripStatus != 'ARRIVED') {
+        timer.cancel();
+        _waitCountdownTimer = null;
+        return;
+      }
       if (freeWaitSecondsRemaining > 0) {
         freeWaitSecondsRemaining--;
         final mins = (freeWaitSecondsRemaining ~/ 60).toString().padLeft(2, '0');
@@ -366,9 +430,36 @@ class PassengerProvider with ChangeNotifier {
       } else {
         activeMilestoneMessage = 'Driver waiting outside • Standard wait rate applies';
         timer.cancel();
+        _waitCountdownTimer = null;
         notifyListeners();
       }
     });
+  }
+
+  Future<void> syncActiveRideStatus(String rideId) async {
+    try {
+      final res = await api.getRideDetails(rideId);
+      if (res != null && res['status'] != null) {
+        final currentBackendStatus = res['status'] as String;
+        if (currentBackendStatus != tripStatus) {
+          tripStatus = currentBackendStatus;
+          if (tripStatus == 'IN_TRANSIT') {
+            _waitCountdownTimer?.cancel();
+            _waitCountdownTimer = null;
+            freeWaitSecondsRemaining = 0;
+            HapticFeedback.mediumImpact();
+            activeMilestoneMessage = 'Trip in progress • Heading to destination';
+          } else if (tripStatus == 'COMPLETED') {
+            _waitCountdownTimer?.cancel();
+            _waitCountdownTimer = null;
+            freeWaitSecondsRemaining = 0;
+            HapticFeedback.heavyImpact();
+            activeMilestoneMessage = 'Trip completed! Please rate your ride';
+          }
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> calculateEstimate({
@@ -411,6 +502,8 @@ class PassengerProvider with ChangeNotifier {
     String? riderType,
     double? distanceKm,
     int? durationMinutes,
+    bool hasWaitTime = false,
+    int requestedWaitMinutes = 0,
   }) async {
     isLoading = true;
     incomingBids.clear();
@@ -433,6 +526,8 @@ class PassengerProvider with ChangeNotifier {
         riderType: riderType,
         distanceKm: distanceKm,
         durationMinutes: durationMinutes,
+        hasWaitTime: hasWaitTime,
+        requestedWaitMinutes: requestedWaitMinutes,
       );
 
       // Broadcast ride request to nearby drivers via Socket.io
@@ -463,6 +558,15 @@ class PassengerProvider with ChangeNotifier {
     selectedDriverBid = null;
     tripStatus = null;
     finalFarePaid = null;
+    finalBaseFareNgn = null;
+    finalWaitFareNgn = null;
+    finalBillableWaitMinutes = null;
+    finalActualWaitSeconds = null;
+    isStopoverWaiting = false;
+    _stopoverWaitTimer?.cancel();
+    _stopoverWaitTimer = null;
+    stopoverWaitElapsedSeconds = 0;
+    stopoverAccruedWaitFareNgn = 0;
     notifyListeners();
   }
 

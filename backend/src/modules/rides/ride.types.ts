@@ -11,6 +11,8 @@ export interface CreateRideRequestDto {
   riderType?: 'SELF' | 'FRIEND' | null;
   notes?: string | null;
   isBusiness?: boolean | null;
+  hasWaitTime?: boolean | null;
+  requestedWaitMinutes?: number | null;
   distanceKm?: number | null;
   durationMinutes?: number | null;
 }

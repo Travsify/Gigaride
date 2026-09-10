@@ -59,6 +59,8 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
   final Map<String, int> _tierFares = {};
   bool _isLoading = false;
   bool _isBroadcasting = false;
+  bool _addWaitTime = false;
+  int _selectedWaitMinutes = 30;
 
   // Multipliers per tier
   static const Map<String, double> _multipliers = {
@@ -180,13 +182,17 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
     try {
       final provider = context.read<PassengerProvider>();
 
-      // Build notes with tier
+      // Build notes with tier & wait time
       final List<String> notesList = [];
       if (widget.notes != null && widget.notes!.isNotEmpty) {
         notesList.add(widget.notes!);
       }
       if (_selectedTier == 'COMFORT') notesList.add('[✨ Comfort AC Tier]');
       if (_selectedTier == 'XL_SUV') notesList.add('[🚙 XL SUV (6-seater) Tier]');
+      if (_addWaitTime) {
+        final waitLabel = _selectedWaitMinutes >= 60 ? '${_selectedWaitMinutes ~/ 60}hr' : '$_selectedWaitMinutes mins';
+        notesList.add('[⏱️ Includes $waitLabel Stopover Wait]');
+      }
       final combinedNotes =
           notesList.isNotEmpty ? notesList.join(' • ') : null;
 
@@ -205,6 +211,8 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
         riderType: widget.riderType,
         distanceKm: widget.distanceKm,
         durationMinutes: widget.durationMins,
+        hasWaitTime: _addWaitTime,
+        requestedWaitMinutes: _addWaitTime ? _selectedWaitMinutes : 0,
       );
 
       if (mounted) {
@@ -407,7 +415,120 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
                             ),
                           ),
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 20),
+
+                        // ── Stopover / Round-Trip Wait Time Option ──
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppConstants.cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _addWaitTime ? AppConstants.accentColor.withOpacity(0.6) : Colors.white12,
+                              width: _addWaitTime ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _addWaitTime ? AppConstants.accentColor.withOpacity(0.15) : AppConstants.surfaceBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.hourglass_bottom_rounded,
+                                      color: _addWaitTime ? AppConstants.accentColor : AppConstants.textMuted,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Need Driver to Wait at Stop?',
+                                          style: TextStyle(
+                                            color: AppConstants.textLight,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Round-trip, meeting or quick stopover',
+                                          style: TextStyle(
+                                            color: AppConstants.textMuted.withOpacity(0.8),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _addWaitTime,
+                                    activeColor: AppConstants.accentColor,
+                                    onChanged: (val) {
+                                      setState(() => _addWaitTime = val);
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (_addWaitTime) ...[
+                                const SizedBox(height: 12),
+                                const Divider(color: Colors.white10, height: 1),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'EXPECTED STOP DURATION',
+                                  style: TextStyle(
+                                    color: AppConstants.textMuted,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    _buildWaitChip(15, '15 mins'),
+                                    _buildWaitChip(30, '30 mins'),
+                                    _buildWaitChip(45, '45 mins'),
+                                    _buildWaitChip(60, '1 Hour'),
+                                    _buildWaitChip(90, '1.5 Hours'),
+                                    _buildWaitChip(120, '2 Hours'),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.surfaceBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.info_outline_rounded, color: AppConstants.accentColor, size: 14),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'First 5 mins free at stop. Metered at ₦40/min thereafter on actual duration.',
+                                          style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
 
                         // ── Broadcast CTA ───────────────────────────
                         SizedBox(
@@ -456,6 +577,35 @@ class _FareOfferSheetState extends State<FareOfferSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWaitChip(int mins, String label) {
+    final isSel = _selectedWaitMinutes == mins;
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        setState(() => _selectedWaitMinutes = mins);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSel ? AppConstants.accentColor : AppConstants.surfaceBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSel ? AppConstants.accentColor : Colors.white12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSel ? Colors.black : Colors.white70,
+            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

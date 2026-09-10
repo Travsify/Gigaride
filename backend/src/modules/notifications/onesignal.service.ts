@@ -193,6 +193,23 @@ export class OneSignalService {
       data: { type: 'SOS_INCIDENT', trackingUrl },
     });
   }
+
+  /**
+   * Helper: Dispatches wait time started alert to passenger.
+   */
+  public async sendWaitTimeStartedAlert(
+    passengerId: string,
+    graceMins: number,
+    ratePerMin: number,
+    rideId: string
+  ) {
+    return this.sendPush({
+      userIds: [passengerId],
+      heading: '⏱️ Driver Started Wait Time',
+      content: `Driver has parked at stopover. First ${graceMins} minutes are free, then ₦${ratePerMin}/min.`,
+      data: { type: 'WAIT_TIME_STARTED', rideId },
+    });
+  }
 }
 
 export const oneSignalService = new OneSignalService();

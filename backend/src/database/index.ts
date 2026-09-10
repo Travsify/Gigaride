@@ -180,6 +180,15 @@ export interface RideRow {
   rider_name?: string | null;
   rider_phone?: string | null;
   is_business?: boolean | null;
+  has_wait_time?: boolean;
+  requested_wait_minutes?: number;
+  wait_start_time?: string | null;
+  wait_end_time?: string | null;
+  actual_wait_seconds?: number;
+  billable_wait_minutes?: number;
+  wait_fare_ngn?: number;
+  wait_commission_ngn?: number;
+  driver_wait_payout_ngn?: number;
   created_at: string;
   completed_at?: string | null;
 }
@@ -420,6 +429,13 @@ export interface PlatformSettingsRow {
   default_auto_topup_plan_id?: string;
   grace_rides_limit?: number;
   subscription_rollover_enabled?: boolean;
+  // Agora Voice In-App VoIP Calling
+  agora_app_id?: string;
+  agora_app_certificate?: string;
+  // Stopover Wait Time Monetization
+  wait_time_rate_per_min_ngn?: number;
+  wait_time_commission_percent?: number;
+  wait_time_free_grace_mins?: number;
   updated_at: string;
 }
 
@@ -504,6 +520,11 @@ export class DatabaseService {
       default_auto_topup_plan_id: 'plan_standard_50',
       grace_rides_limit: 2,
       subscription_rollover_enabled: true,
+      agora_app_id: process.env.AGORA_APP_ID || '57d797d4eb6143769bd02999aed126ad',
+      agora_app_certificate: process.env.AGORA_APP_CERTIFICATE || '1235f6d658a44ac3875adc71d0109dce',
+      wait_time_rate_per_min_ngn: 40,
+      wait_time_commission_percent: 15,
+      wait_time_free_grace_mins: 5,
       updated_at: new Date().toISOString(),
     } as PlatformSettingsRow,
   };
@@ -535,8 +556,21 @@ export class DatabaseService {
             lagos_mot_levy_ngn: 50,
             welcome_bonus_rides: 5,
             search_radius_km: 7.0,
+            wait_time_rate_per_min_ngn: 40,
+            wait_time_commission_percent: 15,
+            wait_time_free_grace_mins: 5,
             updated_at: new Date().toISOString(),
           };
+        } else {
+          if (this.store.platform_settings.wait_time_rate_per_min_ngn === undefined) {
+            this.store.platform_settings.wait_time_rate_per_min_ngn = 40;
+          }
+          if (this.store.platform_settings.wait_time_commission_percent === undefined) {
+            this.store.platform_settings.wait_time_commission_percent = 15;
+          }
+          if (this.store.platform_settings.wait_time_free_grace_mins === undefined) {
+            this.store.platform_settings.wait_time_free_grace_mins = 5;
+          }
         }
         if (!this.store.sos_incidents) this.store.sos_incidents = [];
         if (!this.store.subscription_credit_audits) this.store.subscription_credit_audits = [];
@@ -1400,6 +1434,17 @@ export class DatabaseService {
     }));
   }
 
+  public async getAvailableBroadcastedRides(): Promise<any[]> {
+    const available = this.store.rides.filter((r) =>
+      ['REQUESTED', 'NEGOTIATING'].includes(r.status)
+    );
+
+    return available.map((r) => ({
+      ...r,
+      rider: this.store.users.find((u) => u.id === r.rider_id),
+    }));
+  }
+
   public async updateRideStatus(
     rideId: string,
     status: RideRow['status'],
@@ -1414,6 +1459,27 @@ export class DatabaseService {
       if (status === 'COMPLETED') {
         ride.completed_at = new Date().toISOString();
       }
+      this.saveStore();
+    }
+    return ride;
+  }
+
+  public async updateRideWaitTime(
+    rideId: string,
+    updates: {
+      has_wait_time?: boolean;
+      wait_start_time?: string | null;
+      wait_end_time?: string | null;
+      actual_wait_seconds?: number;
+      billable_wait_minutes?: number;
+      wait_fare_ngn?: number;
+      wait_commission_ngn?: number;
+      driver_wait_payout_ngn?: number;
+    }
+  ): Promise<RideRow | undefined> {
+    const ride = this.store.rides.find((r) => r.id === rideId);
+    if (ride) {
+      Object.assign(ride, updates);
       this.saveStore();
     }
     return ride;

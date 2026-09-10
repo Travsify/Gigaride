@@ -1380,6 +1380,83 @@
             </div>
           </div>
 
+          <!-- CARD: AGORA REAL-TIME VOICE CALLING (VOIP TELECOM) -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
+                  <i class="fa-solid fa-headset"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Agora Voice Engine (VoIP In-App Calls)</h3>
+                  <p class="text-[11px] text-slate-400">Zero-GSM Driver-Passenger Encrypted Voice Channels</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">10,000 Mins Free / Mo</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Agora App ID</label>
+                <input type="text" id="int_agora_app_id" placeholder="57d797d4eb6143769bd02999aed126ad" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-indigo-500 outline-none" />
+              </div>
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Agora Primary Certificate</label>
+                <input type="text" id="int_agora_app_certificate" placeholder="1235f6d658a44ac3875adc71d0109dce" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-indigo-500 outline-none" />
+              </div>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+              <div class="text-[11px] text-slate-400 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                <span>NDPR Strict Shield Active: Driver cellular lines never exposed to riders.</span>
+              </div>
+              <span class="text-[10px] font-mono text-indigo-400 bg-indigo-950/60 px-2 py-1 rounded">Channel: ride_{rideId}</span>
+            </div>
+          </div>
+
+          <!-- CARD: STOPOVER & ROUND-TRIP WAIT TIME MONETIZATION -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <i class="fa-solid fa-hourglass-half text-sm"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-bold text-white">Stopover & Round-Trip Wait Time Monetization</h4>
+                  <p class="text-[11px] text-slate-400">Metered billing when driver waits for passengers at stopovers or round-trip legs.</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Active Revenue Share</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Wait Time Rate (₦ / Min)</label>
+                <input type="number" id="int_wait_time_rate_per_min_ngn" placeholder="40" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-500 outline-none" />
+                <span class="text-[10px] text-slate-500 mt-1 block">e.g. ₦40/min = ₦2,400/hr</span>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Platform Commission (%)</label>
+                <input type="number" id="int_wait_time_commission_percent" placeholder="15" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-500 outline-none" />
+                <span class="text-[10px] text-slate-500 mt-1 block">Platform share on wait fees</span>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Free Grace Period (Mins)</label>
+                <input type="number" id="int_wait_time_free_grace_mins" placeholder="5" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-500 outline-none" />
+                <span class="text-[10px] text-slate-500 mt-1 block">Initial free minutes at stop</span>
+              </div>
+            </div>
+
+            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+              <div class="text-[11px] text-slate-400 flex items-center gap-2">
+                <i class="fa-solid fa-coins text-amber-400"></i>
+                <span>Driver keeps <strong class="text-white">85%</strong> of wait fees. Platform deducts <strong class="text-white">15%</strong> service fee.</span>
+              </div>
+              <span class="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-2 py-1 rounded">Itemized on Receipt</span>
+            </div>
+          </div>
+
           <!-- CARD 6: DRIVER AUTO TOP-UP & SPILLOVER RULES -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -3703,6 +3780,13 @@
           document.getElementById('int_twilio_phone_number').value = s.twilio_phone_number || '';
           document.getElementById('int_twilio_verify_sid').value = s.twilio_verify_sid || '';
 
+          if (document.getElementById('int_agora_app_id')) document.getElementById('int_agora_app_id').value = s.agora_app_id || '';
+          if (document.getElementById('int_agora_app_certificate')) document.getElementById('int_agora_app_certificate').value = s.agora_app_certificate || '';
+
+          if (document.getElementById('int_wait_time_rate_per_min_ngn')) document.getElementById('int_wait_time_rate_per_min_ngn').value = s.wait_time_rate_per_min_ngn !== undefined ? s.wait_time_rate_per_min_ngn : 40;
+          if (document.getElementById('int_wait_time_commission_percent')) document.getElementById('int_wait_time_commission_percent').value = s.wait_time_commission_percent !== undefined ? s.wait_time_commission_percent : 15;
+          if (document.getElementById('int_wait_time_free_grace_mins')) document.getElementById('int_wait_time_free_grace_mins').value = s.wait_time_free_grace_mins !== undefined ? s.wait_time_free_grace_mins : 5;
+
           document.getElementById('int_auto_topup_enabled').checked = s.auto_topup_enabled !== false;
           document.getElementById('int_auto_topup_threshold_rides').value = s.auto_topup_threshold_rides || 2;
           document.getElementById('int_grace_rides_limit').value = s.grace_rides_limit || 2;
@@ -3739,6 +3823,13 @@
         twilio_auth_token: document.getElementById('int_twilio_auth_token').value.trim(),
         twilio_phone_number: document.getElementById('int_twilio_phone_number').value.trim(),
         twilio_verify_sid: document.getElementById('int_twilio_verify_sid').value.trim(),
+
+        agora_app_id: document.getElementById('int_agora_app_id') ? document.getElementById('int_agora_app_id').value.trim() : '',
+        agora_app_certificate: document.getElementById('int_agora_app_certificate') ? document.getElementById('int_agora_app_certificate').value.trim() : '',
+
+        wait_time_rate_per_min_ngn: document.getElementById('int_wait_time_rate_per_min_ngn') ? parseInt(document.getElementById('int_wait_time_rate_per_min_ngn').value, 10) : 40,
+        wait_time_commission_percent: document.getElementById('int_wait_time_commission_percent') ? parseInt(document.getElementById('int_wait_time_commission_percent').value, 10) : 15,
+        wait_time_free_grace_mins: document.getElementById('int_wait_time_free_grace_mins') ? parseInt(document.getElementById('int_wait_time_free_grace_mins').value, 10) : 5,
 
         auto_topup_enabled: document.getElementById('int_auto_topup_enabled').checked,
         auto_topup_threshold_rides: parseInt(document.getElementById('int_auto_topup_threshold_rides').value, 10),

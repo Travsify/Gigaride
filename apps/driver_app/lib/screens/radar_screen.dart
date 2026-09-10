@@ -55,6 +55,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
   LatLng _driverLocation = LocationService.defaultLagosLocation;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  Timer? _faresPollTimer;
 
   @override
   void initState() {
@@ -70,6 +71,16 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     _initDriverLocation();
     // Keep screen awake while driver is on radar
     WakelockPlus.enable();
+
+    // Poll available broadcasted fares every 8 seconds when online
+    _faresPollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        final prov = context.read<DriverProvider>();
+        if (prov.isOnline) {
+          prov.fetchBroadcastedFares();
+        }
+      }
+    });
   }
 
 
@@ -87,6 +98,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
     if (mounted) {
       setState(() => _driverLocation = pos);
       context.read<DriverProvider>().updateLocation(pos.latitude, pos.longitude);
+      context.read<DriverProvider>().fetchBroadcastedFares();
     }
 
     // 3. Keep driver location live as vehicle moves
@@ -100,6 +112,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    _faresPollTimer?.cancel();
     _driverLocationSub?.cancel();
     _pulseController.dispose();
     WakelockPlus.disable();
@@ -130,6 +143,30 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
             const Text('Place Custom Counter-Offer', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Text('Passenger offered ₦${_formatFare(originalFare)}. You keep 100% of your counter-offer.', style: const TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+            if (req['hasWaitTime'] == true || req['has_wait_time'] == true || (((req['requestedWaitMinutes'] ?? req['requested_wait_minutes'] ?? 0) as num) > 0)) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.timer_outlined, color: Color(0xFFFBBF24), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Passenger requested ${req['requestedWaitMinutes'] ?? req['requested_wait_minutes'] ?? 30} mins Stopover Wait. You will earn additional wait fees (+₦40/min, keeping 85% net) during stopover.',
+                        style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             TextField(
               controller: fareCtrl,
@@ -718,6 +755,28 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                           Text(
                                             'For: $riderName',
                                             style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  if (req['hasWaitTime'] == true || req['has_wait_time'] == true || (((req['requestedWaitMinutes'] ?? req['requested_wait_minutes'] ?? 0) as num) > 0)) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF59E0B).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.timer_outlined, color: Color(0xFFFBBF24), size: 12),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '⏱️ ${((req['requestedWaitMinutes'] ?? req['requested_wait_minutes'] ?? 0) as num) > 0 ? '${req['requestedWaitMinutes'] ?? req['requested_wait_minutes']}m ' : ''}Wait',
+                                            style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 10, fontWeight: FontWeight.bold),
                                           ),
                                         ],
                                       ),

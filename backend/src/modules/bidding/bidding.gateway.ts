@@ -7,6 +7,7 @@ import { autoTopupService } from '../subscriptions/autoTopup.service';
 import { calculateHaversineDistanceKm } from '../../common/geo';
 import { oneSignalService } from '../notifications/onesignal.service';
 import { twilioService } from '../notifications/twilio.service';
+import { agoraService } from '../calls/agora.service';
 import { ENV } from '../../config/env';
 
 interface AuthenticatedSocket extends Socket {
@@ -315,7 +316,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
           rideId: ride.id,
           driverId: user.userId,
           driverName: driverUser?.full_name || 'Driver',
-          driverPhone: driverUser?.phone_number,
+          driverPhone: null, // NDPR Privacy Shield: Never expose driver cellular line to passenger
           vehicleMake: driverProfile?.vehicle_make,
           vehicleModel: driverProfile?.vehicle_model,
           licensePlate: driverProfile?.license_plate,
@@ -429,7 +430,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
           driverName: driverName,
           vehicleModel: driverProfile ? `${driverProfile.vehicle_make} ${driverProfile.vehicle_model}` : 'Toyota Corolla',
           licensePlate: driverProfile?.license_plate || '',
-          driverPhone: driverUser?.phone_number || '',
+          driverPhone: null, // NDPR Privacy Shield: Never expose driver cellular line to passenger
         });
 
         // Broadcast to general pool that this ride is closed
@@ -454,6 +455,15 @@ export function setupBiddingGateway(io: SocketIOServer) {
           rideId: ride.id,
           status: data.status,
         });
+
+        if (data.status === 'IN_TRANSIT') {
+          io.to(`user:${ride.rider_id}`).emit('ride:commenced', {
+            rideId: ride.id,
+          });
+          io.to(`user:${ride.rider_id}`).emit('ride:started', {
+            rideId: ride.id,
+          });
+        }
 
         const driverUser = await db.findUserById(user.userId);
         const driverProfile = await db.getDriverProfile(user.userId);
@@ -493,10 +503,46 @@ export function setupBiddingGateway(io: SocketIOServer) {
             meta_data: { rideId: ride.id },
           }).catch(() => {});
         } else if (data.status === 'COMPLETED') {
-          const fare = ride.agreed_fare_ngn || ride.rider_offer_ngn;
+          // If wait time was started but driver completed trip without explicit resume, close wait timer now
+          if (ride.wait_start_time && !ride.wait_end_time) {
+            const waitEndTime = new Date().toISOString();
+            const elapsedSecs = Math.max(0, Math.floor((new Date(waitEndTime).getTime() - new Date(ride.wait_start_time).getTime()) / 1000));
+            const settings = await db.getPlatformSettings();
+            const graceMins = settings.wait_time_free_grace_mins !== undefined ? Number(settings.wait_time_free_grace_mins) : 5;
+            const ratePerMin = settings.wait_time_rate_per_min_ngn !== undefined ? Number(settings.wait_time_rate_per_min_ngn) : 40;
+            const commissionPct = settings.wait_time_commission_percent !== undefined ? Number(settings.wait_time_commission_percent) : 15;
+
+            const totalWaitMins = Math.ceil(elapsedSecs / 60);
+            const billableWaitMins = Math.max(0, totalWaitMins - graceMins);
+            const waitFareNgn = billableWaitMins * ratePerMin;
+            const waitCommNgn = Math.round(waitFareNgn * (commissionPct / 100));
+            const driverPayoutNgn = waitFareNgn - waitCommNgn;
+
+            await db.updateRideWaitTime(ride.id, {
+              wait_end_time: waitEndTime,
+              actual_wait_seconds: elapsedSecs,
+              billable_wait_minutes: billableWaitMins,
+              wait_fare_ngn: waitFareNgn,
+              wait_commission_ngn: waitCommNgn,
+              driver_wait_payout_ngn: driverPayoutNgn,
+            });
+            ride.wait_end_time = waitEndTime;
+            ride.actual_wait_seconds = elapsedSecs;
+            ride.billable_wait_minutes = billableWaitMins;
+            ride.wait_fare_ngn = waitFareNgn;
+            ride.wait_commission_ngn = waitCommNgn;
+            ride.driver_wait_payout_ngn = driverPayoutNgn;
+          }
+
+          const baseFare = ride.agreed_fare_ngn || ride.rider_offer_ngn;
+          const waitFare = ride.wait_fare_ngn || 0;
+          const totalFare = baseFare + waitFare;
+          const waitCommission = ride.wait_commission_ngn || 0;
+          const driverWaitPayout = ride.driver_wait_payout_ngn || 0;
+
           oneSignalService.sendTripCompletedAlert(
             ride.rider_id,
-            fare,
+            totalFare,
             ride.dropoff_address,
             ride.id
           ).catch(() => {});
@@ -504,15 +550,30 @@ export function setupBiddingGateway(io: SocketIOServer) {
           db.createNotification({
             user_id: ride.rider_id,
             title: 'Trip Completed',
-            message: `You arrived safely at ${ride.dropoff_address}. ₦${fare.toLocaleString()} settled with 0% commission.`,
+            message: `You arrived safely at ${ride.dropoff_address}. ₦${totalFare.toLocaleString()} total${waitFare > 0 ? ` (includes ₦${waitFare.toLocaleString()} for ${ride.billable_wait_minutes} mins wait time)` : ''}.`,
             type: 'RIDE',
-            meta_data: { rideId: ride.id, fareNgn: fare },
+            meta_data: { rideId: ride.id, fareNgn: totalFare, waitFareNgn: waitFare },
           }).catch(() => {});
 
-          // Trigger instant settlement modal on passenger's device
+          // Trigger instant settlement modal on passenger's device with wait itemization
           io.to(`user:${ride.rider_id}`).emit('ride:finished', {
             rideId: ride.id,
-            finalFareNgn: fare,
+            baseFareNgn: baseFare,
+            waitFareNgn: waitFare,
+            billableWaitMinutes: ride.billable_wait_minutes || 0,
+            actualWaitSeconds: ride.actual_wait_seconds || 0,
+            finalFareNgn: totalFare,
+            waitCommissionNgn: waitCommission,
+          });
+
+          // Also notify driver with payout details
+          socket.emit('ride:completed_breakdown', {
+            rideId: ride.id,
+            baseFareNgn: baseFare,
+            driverWaitPayoutNgn: driverWaitPayout,
+            totalDriverEarningsNgn: baseFare + driverWaitPayout,
+            waitCommissionNgn: waitCommission,
+            finalFareNgn: totalFare,
           });
         }
 
@@ -544,13 +605,92 @@ export function setupBiddingGateway(io: SocketIOServer) {
           } else if (topupResult.inGracePeriod) {
             socket.emit('subscription:grace_entered', { message: topupResult.message });
           }
-
-          // Complete notification to passenger
-          io.to(`user:${ride.rider_id}`).emit('ride:finished', {
-            rideId: ride.id,
-            finalFareNgn: ride.agreed_fare_ngn,
-          });
         }
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // ⏱️ Stopover Wait Time Handlers
+    socket.on('ride:start_wait', async (data: { rideId: string; stopAddress?: string }) => {
+      try {
+        const ride = await db.getRideById(data.rideId);
+        if (!ride) return;
+
+        const startTime = new Date().toISOString();
+        const settings = await db.getPlatformSettings();
+        const graceMins = settings.wait_time_free_grace_mins !== undefined ? Number(settings.wait_time_free_grace_mins) : 5;
+        const ratePerMin = settings.wait_time_rate_per_min_ngn !== undefined ? Number(settings.wait_time_rate_per_min_ngn) : 40;
+
+        await db.updateRideWaitTime(data.rideId, {
+          wait_start_time: startTime,
+          has_wait_time: true,
+        });
+
+        const payload = {
+          rideId: ride.id,
+          startTime,
+          freeGraceMins: graceMins,
+          ratePerMinuteNgn: ratePerMin,
+          stopAddress: data.stopAddress || 'Stopover location',
+        };
+
+        // Notify both rider and driver
+        io.to(`user:${ride.rider_id}`).emit('ride:wait_started', payload);
+        socket.emit('ride:wait_started', payload);
+
+        oneSignalService.sendWaitTimeStartedAlert(
+          ride.rider_id,
+          graceMins,
+          ratePerMin,
+          ride.id
+        ).catch(() => {});
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    socket.on('ride:resume_trip', async (data: { rideId: string }) => {
+      try {
+        const ride = await db.getRideById(data.rideId);
+        if (!ride || !ride.wait_start_time) return;
+
+        const endTime = new Date().toISOString();
+        const elapsedSecs = Math.max(0, Math.floor((new Date(endTime).getTime() - new Date(ride.wait_start_time).getTime()) / 1000));
+        const settings = await db.getPlatformSettings();
+        const graceMins = settings.wait_time_free_grace_mins !== undefined ? Number(settings.wait_time_free_grace_mins) : 5;
+        const ratePerMin = settings.wait_time_rate_per_min_ngn !== undefined ? Number(settings.wait_time_rate_per_min_ngn) : 40;
+        const commissionPct = settings.wait_time_commission_percent !== undefined ? Number(settings.wait_time_commission_percent) : 15;
+
+        const totalWaitMins = Math.ceil(elapsedSecs / 60);
+        const billableWaitMins = Math.max(0, totalWaitMins - graceMins);
+        const waitFareNgn = billableWaitMins * ratePerMin;
+        const waitCommNgn = Math.round(waitFareNgn * (commissionPct / 100));
+        const driverPayoutNgn = waitFareNgn - waitCommNgn;
+
+        await db.updateRideWaitTime(data.rideId, {
+          wait_end_time: endTime,
+          actual_wait_seconds: elapsedSecs,
+          billable_wait_minutes: billableWaitMins,
+          wait_fare_ngn: waitFareNgn,
+          wait_commission_ngn: waitCommNgn,
+          driver_wait_payout_ngn: driverPayoutNgn,
+        });
+
+        const payload = {
+          rideId: ride.id,
+          endTime,
+          actualWaitSeconds: elapsedSecs,
+          totalWaitMinutes: totalWaitMins,
+          freeGraceMins: graceMins,
+          billableWaitMinutes: billableWaitMins,
+          waitFareNgn: waitFareNgn,
+          waitCommissionNgn: waitCommNgn,
+          driverWaitPayoutNgn: driverPayoutNgn,
+        };
+
+        io.to(`user:${ride.rider_id}`).emit('ride:wait_ended', payload);
+        socket.emit('ride:wait_ended', payload);
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }
@@ -610,6 +750,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
       try {
         const caller = await db.findUserById(user.userId);
         const callerName = user.role === 'DRIVER' ? (caller?.full_name || 'Driver') : (caller?.full_name || 'Passenger');
+        const channelName = `ride_${data.rideId}`;
+        const agoraData = await agoraService.generateRtcToken(channelName, 0);
 
         console.log(`📞 [In-App Call] Initiated by ${user.role} (${user.userId}) to ${data.receiverId} for ride ${data.rideId}`);
 
@@ -618,23 +760,43 @@ export function setupBiddingGateway(io: SocketIOServer) {
           callerId: user.userId,
           callerName,
           callerRole: user.role,
+          agoraAppId: agoraData.appId,
+          agoraToken: agoraData.token,
+          channelName,
           timestamp: new Date().toISOString(),
+        });
+
+        // Also return token immediately to caller so both ends are armed
+        socket.emit('call:token_ready', {
+          rideId: data.rideId,
+          agoraAppId: agoraData.appId,
+          agoraToken: agoraData.token,
+          channelName,
         });
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }
     });
 
-    socket.on('call:answer', (data: { rideId: string; callerId: string }) => {
-      console.log(`📞 [In-App Call Answered] User ${user.userId} answered call from ${data.callerId}`);
-      io.to(`user:${data.callerId}`).emit('call:connected', {
-        rideId: data.rideId,
-        answeredBy: user.userId,
-      });
-      socket.emit('call:connected', {
-        rideId: data.rideId,
-        answeredBy: user.userId,
-      });
+    socket.on('call:answer', async (data: { rideId: string; callerId: string }) => {
+      try {
+        const channelName = `ride_${data.rideId}`;
+        const agoraData = await agoraService.generateRtcToken(channelName, 0);
+        console.log(`📞 [In-App Call Answered] User ${user.userId} answered call from ${data.callerId}`);
+
+        const connectPayload = {
+          rideId: data.rideId,
+          answeredBy: user.userId,
+          agoraAppId: agoraData.appId,
+          agoraToken: agoraData.token,
+          channelName,
+        };
+
+        io.to(`user:${data.callerId}`).emit('call:connected', connectPayload);
+        socket.emit('call:connected', connectPayload);
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
     });
 
     socket.on('call:end', (data: { rideId: string; targetId: string; reason?: string }) => {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -39,6 +40,17 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   String? _lastRoutedStatus;
   int _unreadChatMessages = 0;
   bool _isChatSheetOpen = false;
+  Timer? _statusSyncTimer;
+
+  String _formatDuration(int totalSeconds) {
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   void initState() {
@@ -56,6 +68,22 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
           _handleIncomingChatMessage(msgData);
         }
       };
+    });
+
+    // Resilient 4-second status synchronization poll to prevent desync
+    _statusSyncTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final provider = context.read<PassengerProvider>();
+      final rideId = provider.currentRide?['id'] ?? provider.selectedDriverBid?['rideId'];
+      if (rideId != null && rideId.toString().isNotEmpty) {
+        provider.syncActiveRideStatus(rideId.toString());
+      }
+      if (provider.tripStatus == 'COMPLETED' || provider.tripStatus == 'CANCELLED') {
+        timer.cancel();
+      }
     });
   }
 
@@ -227,154 +255,18 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   }
 
   void _callDriverSheet(BuildContext context, Map<String, dynamic>? driver, String rideId) {
-    final phone = driver?['driverPhone'] ?? driver?['phone'] ?? '+234 800 000 0000';
     final name = driver?['driverName'] ?? 'Driver';
     final driverId = driver?['driverId'] ?? 'driver';
-    final vehicle = '${driver?['vehicleModel'] ?? 'Toyota Corolla'} • ${driver?['licensePlate'] ?? ''}';
+    final vehicle = '${driver?['vehicleModel'] ?? 'Vehicle'} • ${driver?['licensePlate'] ?? ''}';
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppConstants.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppConstants.primaryColor.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.phone_in_talk_rounded, color: AppConstants.accentColor, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(vehicle, style: const TextStyle(color: AppConstants.textMuted, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // NDPR Privacy Banner
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.shield_outlined, color: Color(0xFF10B981), size: 18),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'NDPR Shield: Your personal phone number is never shared with the driver.',
-                        style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Option 1: In-App VoIP Call (Zero phone number leakage)
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.headset_mic_rounded, color: Colors.white),
-                  label: const Text(
-                    'Free In-App Audio Call (VoIP)',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => InAppCallScreen(
-                          rideId: rideId,
-                          driverId: driverId,
-                          driverName: name,
-                          vehicleInfo: vehicle,
-                          driverPhone: phone,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Option 2: Direct Cellular GSM Dial (Guaranteed Clear Voice)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppConstants.surfaceBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.phone_android_rounded, color: AppConstants.accentColor, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Driver Verified Cellular Line', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                          Text(
-                            phone,
-                            style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.call, color: Colors.greenAccent, size: 22),
-                      tooltip: 'Direct Phone Call',
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        launchUrl(Uri.parse('tel:$phone'), mode: LaunchMode.externalApplication);
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, color: AppConstants.accentColor, size: 18),
-                      tooltip: 'Copy Number',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: phone));
-                        HapticFeedback.lightImpact();
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Copied $phone to clipboard.'),
-                            backgroundColor: AppConstants.primaryColor,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InAppCallScreen(
+          rideId: rideId,
+          driverId: driverId,
+          driverName: name,
+          vehicleInfo: vehicle,
         ),
       ),
     );
@@ -523,6 +415,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
   @override
   void dispose() {
+    _statusSyncTimer?.cancel();
     _changeTenderedCtrl.dispose();
     super.dispose();
   }
@@ -891,6 +784,45 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           currencyFormat.format(provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0),
                           style: const TextStyle(color: AppConstants.accentColor, fontSize: 32, fontWeight: FontWeight.bold),
                         ),
+                        if ((provider.finalWaitFareNgn ?? 0) > 0) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppConstants.surfaceBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Base Trip Fare:', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                                    Text(
+                                      currencyFormat.format(provider.finalBaseFareNgn ?? ((provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0) - (provider.finalWaitFareNgn ?? 0))),
+                                      style: const TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Stopover Wait (${provider.finalBillableWaitMinutes ?? 0} mins):',
+                                      style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 12),
+                                    ),
+                                    Text(
+                                      '+${currencyFormat.format(provider.finalWaitFareNgn ?? 0)}',
+                                      style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const Divider(color: Colors.white12, height: 20),
                         if (isPaid) ...[
                           Row(
@@ -1333,6 +1265,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           'pickupAddress': provider.currentRide?['pickupAddress'] ?? provider.currentRide?['pickup_address'] ?? 'Pickup Point',
                           'dropoffAddress': provider.currentRide?['dropoffAddress'] ?? provider.currentRide?['dropoff_address'] ?? 'Destination',
                           'finalFarePaid': provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0,
+                          'baseFareNgn': provider.finalBaseFareNgn ?? ((provider.finalFarePaid ?? driver?['counterFareNgn'] ?? 0) - (provider.finalWaitFareNgn ?? 0)),
+                          'waitFareNgn': provider.finalWaitFareNgn ?? 0,
+                          'billableWaitMinutes': provider.finalBillableWaitMinutes ?? 0,
                           'driverName': driver?['driverName'] ?? 'Driver',
                           'vehicleModel': driver?['vehicleModel'] ?? 'Vehicle',
                           'licensePlate': driver?['licensePlate'] ?? 'LAG-000-XX',
@@ -1515,6 +1450,117 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // ⏱️ Live Stopover Wait Time Card
+              if (provider.isStopoverWaiting) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFF59E0B).withOpacity(0.18),
+                        const Color(0xFFD97706).withOpacity(0.08),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withOpacity(0.25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.timer_outlined, color: Color(0xFFF59E0B), size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Stopover Wait Timer Active',
+                                  style: TextStyle(color: Color(0xFFFBBF24), fontSize: 15, fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Driver is parked & waiting for you at your stopover.',
+                                  style: TextStyle(color: AppConstants.textLight, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('WAIT DURATION', style: TextStyle(color: AppConstants.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatDuration(provider.stopoverWaitElapsedSeconds),
+                                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text('ACCRUED WAIT FEE', style: TextStyle(color: AppConstants.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
+                                if (provider.stopoverWaitElapsedSeconds <= (provider.stopoverFreeGraceMins * 60)) ...[
+                                  Text(
+                                    'Free Grace (${_formatDuration((provider.stopoverFreeGraceMins * 60) - provider.stopoverWaitElapsedSeconds)})',
+                                    style: const TextStyle(color: AppConstants.successColor, fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    '+₦${NumberFormat('#,##0').format(provider.stopoverAccruedWaitFareNgn)}',
+                                    style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 20, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Rate: ₦${provider.stopoverRatePerMin}/min after ${provider.stopoverFreeGraceMins}m free grace',
+                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                          ),
+                          Text(
+                            'Base Fare: ₦${NumberFormat('#,##0').format(driver?['counterFareNgn'] ?? 0)}',
+                            style: const TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // 🗺️ Real-Time Hyper-Realistic Ride Tracking Map
               InteractiveRideMap(

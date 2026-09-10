@@ -122,6 +122,19 @@ class SocketService {
         onWalletChangeCredited!(Map<String, dynamic>.from(data));
       }
     });
+
+    // ⏱️ Stopover Wait Time Listeners
+    socket!.on('ride:wait_started', (data) {
+      if (data != null && onWaitStarted != null) {
+        onWaitStarted!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ride:wait_ended', (data) {
+      if (data != null && onWaitEnded != null) {
+        onWaitEnded!(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
   // Telemetry, Call & Chat event callbacks
@@ -134,6 +147,8 @@ class SocketService {
   Function(Map<String, dynamic>)? onRideCancelled;
   Function(Map<String, dynamic>)? onIssueLogged;
   Function(Map<String, dynamic>)? onWalletChangeCredited;
+  Function(Map<String, dynamic>)? onWaitStarted;
+  Function(Map<String, dynamic>)? onWaitEnded;
 
   void broadcastRide(String rideId) {
     socket?.emit('ride:request', {'rideId': rideId});

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,9 +24,124 @@ class ApiService {
     await prefs.remove('user_data');
   }
 
+  // --- Resilient HTTP Execution with Timeout & Clean Error Mapping ---
+  Future<http.Response> _safePost(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await _safePost(uri, headers: headers, body: body).timeout(timeout);
+      } on SocketException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Network connection timed out. Please check your internet connection and try again.');
+      } on http.ClientException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Unable to reach Giga Ride servers. Please check your internet connection.');
+      } on TimeoutException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Connection timed out. The server took too long to respond. Please try again.');
+      } catch (e) {
+        final str = e.toString();
+        if (str.contains('SocketException') || str.contains('timed out') || str.contains('ClientException')) {
+          throw Exception('Network connection timed out. Please check your internet connection and try again.');
+        }
+        rethrow;
+      }
+    }
+    throw Exception('Network connection timed out. Please try again.');
+  }
+
+  Future<http.Response> _safeGet(
+    Uri uri, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await _safeGet(uri, headers: headers).timeout(timeout);
+      } on SocketException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Network connection timed out. Please check your internet connection and try again.');
+      } on http.ClientException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Unable to reach Giga Ride servers. Please check your internet connection.');
+      } on TimeoutException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Connection timed out. The server took too long to respond. Please try again.');
+      } catch (e) {
+        final str = e.toString();
+        if (str.contains('SocketException') || str.contains('timed out') || str.contains('ClientException')) {
+          throw Exception('Network connection timed out. Please check your internet connection and try again.');
+        }
+        rethrow;
+      }
+    }
+    throw Exception('Network connection timed out. Please try again.');
+  }
+
+  Future<http.Response> _safePatch(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await _safePatch(uri, headers: headers, body: body).timeout(timeout);
+      } on SocketException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Network connection timed out. Please check your internet connection and try again.');
+      } on http.ClientException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Unable to reach Giga Ride servers. Please check your internet connection.');
+      } on TimeoutException catch (_) {
+        if (attempt == 0) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        throw Exception('Connection timed out. The server took too long to respond. Please try again.');
+      } catch (e) {
+        final str = e.toString();
+        if (str.contains('SocketException') || str.contains('timed out') || str.contains('ClientException')) {
+          throw Exception('Network connection timed out. Please check your internet connection and try again.');
+        }
+        rethrow;
+      }
+    }
+    throw Exception('Network connection timed out. Please try again.');
+  }
+
+
   // --- Authentication Suite ---
   Future<Map<String, dynamic>> sendPhoneOtp(String phoneNumber, {bool isSignUp = false, bool isLogin = false}) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/send-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phoneNumber': phoneNumber, if (isSignUp) 'isSignUp': true, if (isLogin) 'isLogin': true}),
@@ -37,7 +154,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> checkAvailability({String? phoneNumber, String? email}) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/check-availability'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phoneNumber': ?phoneNumber, 'email': ?email}),
@@ -48,7 +165,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> sendEmailLoginOtp(String email) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/send-email-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'isLogin': true}),
@@ -61,7 +178,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> loginWithEmailOtp(String email, String otpCode) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/login-email-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'otpCode': otpCode}),
@@ -81,7 +198,7 @@ class ApiService {
 
 
   Future<Map<String, dynamic>> forgotPassword(String identifier) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/forgot-password'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'identifier': identifier}),
@@ -94,7 +211,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> resetPassword(String phoneNumber, String otpCode, String newPassword) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/reset-password'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phoneNumber': phoneNumber, 'otpCode': otpCode, 'newPassword': newPassword}),
@@ -107,7 +224,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> sendEmailOtp(String email) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/send-email-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
@@ -120,7 +237,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> verifyEmailOtp(String email, String otpCode) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/verify-email'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'otpCode': otpCode}),
@@ -133,7 +250,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> verifyPhoneOtp(String phoneNumber, String otpCode) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/verify-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phoneNumber': phoneNumber, 'otpCode': otpCode}),
@@ -160,7 +277,7 @@ class ApiService {
     required String vehicleColor,
     String? nin,
   }) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -187,7 +304,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> login(String identifier, String password) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'identifier': identifier, 'password': password}),
@@ -212,7 +329,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getMe() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/auth/me'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -227,7 +344,7 @@ class ApiService {
   // --- KYC & RegTech Identitypass Suite ---
   Future<Map<String, dynamic>> verifyNIN(String nin, String firstName, String lastName, {String? dob}) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/kyc/verify-nin'),
       headers: {
         'Content-Type': 'application/json',
@@ -250,7 +367,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> verifyDriversLicense(String licenseNumber, String firstName, String lastName, {String? dob}) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/kyc/verify-license'),
       headers: {
         'Content-Type': 'application/json',
@@ -274,7 +391,7 @@ class ApiService {
   // --- Dedicated Virtual Account & Wallet Suite ---
   Future<Map<String, dynamic>> getDedicatedVirtualAccount() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/payments/virtual-account'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -288,7 +405,7 @@ class ApiService {
 
   // --- Subscriptions Suite ---
   Future<List<dynamic>> getSubscriptionPlans() async {
-    final response = await http.get(Uri.parse('$baseUrl/api/subscriptions/plans'));
+    final response = await _safeGet(Uri.parse('$baseUrl/api/subscriptions/plans'));
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
       return data['data'];
@@ -298,7 +415,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getSubscriptionStatus() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/subscriptions/status'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -312,7 +429,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> purchaseSubscription(String planId) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/subscriptions/purchase'),
       headers: {
         'Content-Type': 'application/json',
@@ -330,7 +447,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> initializeCardPayment(String planId) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/payments/initialize'),
       headers: {
         'Content-Type': 'application/json',
@@ -348,7 +465,7 @@ class ApiService {
 
   Future<List<dynamic>> getSavedCards() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/payments/cards'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -361,7 +478,7 @@ class ApiService {
 
   Future<List<dynamic>> getCardTransactions() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/payments/cards/transactions'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -374,7 +491,7 @@ class ApiService {
 
   Future<List<dynamic>> getStatement() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/payments/wallet/statement'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -391,7 +508,7 @@ class ApiService {
     required String planId,
   }) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/payments/cards/charge-saved'),
       headers: {
         'Content-Type': 'application/json',
@@ -413,7 +530,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> verifyCardTransaction(String reference) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/payments/cards/verify'),
       headers: {
         'Content-Type': 'application/json',
@@ -431,7 +548,7 @@ class ApiService {
   // --- In-App Notifications Suite ---
   Future<Map<String, dynamic>> getNotifications() async {
     final token = await getToken();
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse('$baseUrl/api/notifications'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -445,7 +562,7 @@ class ApiService {
 
   Future<void> markNotificationRead(String id) async {
     final token = await getToken();
-    await http.patch(
+    await _safePatch(
       Uri.parse('$baseUrl/api/notifications/$id/read'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -453,7 +570,7 @@ class ApiService {
 
   Future<void> markAllNotificationsRead() async {
     final token = await getToken();
-    await http.patch(
+    await _safePatch(
       Uri.parse('$baseUrl/api/notifications/read-all'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -467,7 +584,7 @@ class ApiService {
     String bankCode = '000',
   }) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/payments/wallet/withdraw'),
       headers: {
         'Content-Type': 'application/json',
@@ -489,7 +606,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getCryptoRate() async {
-    final response = await http.get(Uri.parse('$baseUrl/api/payments/crypto/rate'));
+    final response = await _safeGet(Uri.parse('$baseUrl/api/payments/crypto/rate'));
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['success'] == true) {
       return data['data'];
@@ -503,7 +620,7 @@ class ApiService {
     String network = 'TRC20',
   }) async {
     final token = await getToken();
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('$baseUrl/api/payments/crypto/usdt/withdraw'),
       headers: {
         'Content-Type': 'application/json',
@@ -522,9 +639,41 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to execute USDT crypto withdrawal');
   }
 
+  Future<List<dynamic>> fetchAvailableBroadcastedRides() async {
+    final token = await getToken();
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/rides/feed/available'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> updateRideStatus(String rideId, String status) async {
+    final token = await getToken();
+    final response = await _safePatch(
+      Uri.parse('$baseUrl/api/rides/$rideId/status'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'status': status}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? data;
+    }
+    throw Exception(data['message'] ?? 'Failed to update ride status');
+  }
+
   Future<void> deleteAccount() async {
     final token = await getToken();
-    await http.post(
+    await _safePost(
       Uri.parse('$baseUrl/api/auth/delete-account'),
       headers: {
         'Content-Type': 'application/json',
