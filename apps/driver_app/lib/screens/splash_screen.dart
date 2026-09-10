@@ -53,9 +53,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         onTimeout: () => throw Exception('Prefs timeout'),
       );
 
-      final hasSeenOnboarding = prefs.getBool('driver_seen_onboarding') ?? false;
+      // Accept BOTH key variants for backward compatibility
+      final hasSeenOnboarding =
+          (prefs.getBool('driver_seen_onboarding') ?? false) ||
+          (prefs.getBool('hasSeenDriverOnboarding') ?? false);
 
-      // Resilient Auth check: 8 seconds maximum wait with fast-path
+      // Auth check runs FIRST — an authenticated driver NEVER sees onboarding
       bool authed = false;
       try {
         authed = await provider.checkAuth().timeout(
@@ -68,20 +71,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
       if (!mounted) return;
 
-      if (!hasSeenOnboarding) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-        );
-      } else if (!authed) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
-        );
-      } else {
-        // Authenticated: check KYC status
-        final kycStatus = provider.driverProfile?['kyc_status'];
-
+      // Authenticated: go directly to active trip or shell — never onboarding
+      if (authed) {
         // If there's an active trip mid-flight (app was killed by OS), go straight to ActiveTripScreen
         if (provider.activeTrip != null &&
             ['ACCEPTED', 'ARRIVED', 'IN_TRANSIT'].contains(
@@ -97,7 +88,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           return;
         }
 
+        final kycStatus = provider.driverProfile?['kyc_status'];
         final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
+
 
         // Check if location permission is already active — if so, skip the gate and open DriverShell directly!
         bool hasLocationAccess = false;
@@ -124,6 +117,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
           );
         }
+      } else {
+        // Not authenticated — show onboarding if first time, login screen if returning user
+        if (!mounted) return;
+        if (!hasSeenOnboarding) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
+          );
+        }
       }
     } catch (_) {
       if (!mounted) return;
@@ -133,6 +140,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

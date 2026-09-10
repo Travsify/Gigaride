@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
+import '../core/app_snackbar.dart';
 import '../providers/driver_provider.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
@@ -120,15 +121,10 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     // 💵 Listen for passenger confirming cash or bank transfer
     provider.socket.onCashPaymentReceived = (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Passenger confirmed Cash / Bank Transfer payment!'),
-            backgroundColor: AppConstants.successColor,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        AppSnackBar.success(context, '✅ Passenger confirmed Cash / Bank Transfer payment!');
       }
     };
+
 
     // 💡 Keep driver navigation screen awake throughout trip
     WakelockPlus.enable();
@@ -514,15 +510,11 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     if (_currentStep == 'ACCEPTED') {
       provider.updateTripStatus('ARRIVED', overrideRideId: rideId);
       setState(() => _currentStep = 'ARRIVED');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Status updated: You arrived at pickup point.'), backgroundColor: AppConstants.primaryColor),
-      );
+      AppSnackBar.success(context, '📍 Arrived at pickup point — waiting for passenger.');
     } else if (_currentStep == 'ARRIVED') {
       provider.updateTripStatus('IN_TRANSIT', overrideRideId: rideId);
       setState(() => _currentStep = 'IN_TRANSIT');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Trip started! Safe driving.'), backgroundColor: AppConstants.primaryColor),
-      );
+      AppSnackBar.success(context, '🚗 Trip started! Safe driving.');
     } else if (_currentStep == 'IN_TRANSIT') {
       final waitEarnings = provider.accruedDriverWaitEarnings;
       final waitElapsedSecs = provider.waitElapsedSeconds;
@@ -531,6 +523,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
       _showCompletionDialog(accruedWaitEarnings: waitEarnings, billableWaitMinutes: billableMins);
     }
   }
+
 
   void _showCompletionDialog({int accruedWaitEarnings = 0, int billableWaitMinutes = 0}) {
     if (_isCompletionDialogShowing) return;

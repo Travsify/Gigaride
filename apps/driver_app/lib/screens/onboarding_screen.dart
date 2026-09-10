@@ -39,18 +39,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
+    // Write BOTH keys so both old and new installs work correctly
+    await prefs.setBool('driver_seen_onboarding', true);
     await prefs.setBool('hasSeenDriverOnboarding', true);
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, a, _) => const PhoneAuthScreen(),
-        transitionsBuilder: (_, a, _, child) =>
+        pageBuilder: (_, a, __) => const PhoneAuthScreen(),
+        transitionsBuilder: (_, a, __, child) =>
             FadeTransition(opacity: a, child: child),
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

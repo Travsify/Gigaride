@@ -36,7 +36,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
     super.initState();
     final provider = context.read<PassengerProvider>();
 
-    // Load persistent chat history from backend
+    // Load persistent chat history from backend — merge with in-memory (no overwrite)
     provider.api.getChatMessages(widget.rideId).then((serverMessages) {
       if (mounted && serverMessages.isNotEmpty) {
         for (final m in serverMessages) {
@@ -46,12 +46,10 @@ class _RideChatSheetState extends State<RideChatSheet> {
       }
     }).catchError((_) {});
 
-    // Listen for incoming messages from driver
+    // Register single socket listener — reassign so only one is ever active
     provider.socket.onChatMessage = (data) {
-      if (mounted) {
-        provider.addChatMessage(widget.rideId, data);
-        _scrollToBottom();
-      }
+      provider.addChatMessage(widget.rideId, data);
+      if (mounted) _scrollToBottom();
     };
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -76,6 +74,9 @@ class _RideChatSheetState extends State<RideChatSheet> {
     HapticFeedback.lightImpact();
     final provider = context.read<PassengerProvider>();
 
+    // Generate a stable local ID so the dedup check works when the server echo arrives
+    final localId = 'local_${DateTime.now().millisecondsSinceEpoch}';
+
     // Send via real-time socket
     provider.socket.sendChatMessage(
       rideId: widget.rideId,
@@ -83,7 +84,9 @@ class _RideChatSheetState extends State<RideChatSheet> {
       text: trimmed,
     );
 
+    // Add locally WITH an id so it's not duplicated when server echo arrives
     provider.addChatMessage(widget.rideId, {
+      'id': localId,
       'senderRole': 'PASSENGER',
       'text': trimmed,
       'timestamp': DateTime.now().toIso8601String(),
