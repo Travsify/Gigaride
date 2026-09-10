@@ -9,6 +9,8 @@ import 'phone_auth_screen.dart';
 import 'home_screen.dart';
 import '../widgets/location_permission_gate.dart';
 
+import 'tracking_screen.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -81,7 +83,16 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
 
       if (isAuthenticated) {
-        _navigateTo(const LocationPermissionGate(nextScreen: HomeScreen()));
+        // If there's an active ride mid-flight (app was killed by OS), restore directly
+        final activeRide = provider.currentRide;
+        if (activeRide != null &&
+            ['ACCEPTED', 'ARRIVED', 'IN_TRANSIT', 'REQUESTED', 'NEGOTIATING'].contains(
+              (activeRide['status'] ?? '').toString().toUpperCase(),
+            )) {
+          _navigateTo(const RideTrackingScreen());
+        } else {
+          _navigateTo(const LocationPermissionGate(nextScreen: HomeScreen()));
+        }
       } else {
         _navigateTo(const PhoneAuthScreen());
       }

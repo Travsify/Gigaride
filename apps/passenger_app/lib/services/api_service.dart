@@ -318,6 +318,19 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to load profile');
   }
 
+  Future<Map<String, dynamic>?> getActiveRideState() async {
+    final token = await getToken();
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/rides/active-state'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>> getEstimate({
     required double pickupLat,
     required double pickupLng,

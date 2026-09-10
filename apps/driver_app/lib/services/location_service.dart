@@ -179,13 +179,20 @@ class LocationService {
     return defaultNigeriaCenter;
   }
 
-  /// Stream of position updates for live tracking
+  /// Stream of position updates for live tracking.
+  /// Mock/spoofed GPS positions are silently filtered out for security.
   static Stream<Position> getPositionStream() {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 3, // Every 3 meters
       ),
-    );
+    ).where((position) {
+      if (position.isMocked) {
+        debugPrint('[LocationService] Blocked mocked GPS position: ${position.latitude},${position.longitude}');
+        return false;
+      }
+      return true;
+    });
   }
 }

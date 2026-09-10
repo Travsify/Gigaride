@@ -10,6 +10,8 @@ import 'kyc_screen.dart';
 import 'driver_shell.dart';
 import '../widgets/location_permission_gate.dart';
 
+import 'active_trip_screen.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -79,6 +81,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       } else {
         // Authenticated: check KYC status
         final kycStatus = provider.driverProfile?['kyc_status'];
+
+        // If there's an active trip mid-flight (app was killed by OS), go straight to ActiveTripScreen
+        if (provider.activeTrip != null &&
+            ['ACCEPTED', 'ARRIVED', 'IN_TRANSIT'].contains(
+              (provider.activeTrip!['status'] ?? '').toString().toUpperCase(),
+            )) {
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ActiveTripScreen(trip: provider.activeTrip!),
+            ),
+          );
+          return;
+        }
+
         final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
 
         // Check if location permission is already active — if so, skip the gate and open DriverShell directly!

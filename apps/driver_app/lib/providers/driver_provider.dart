@@ -80,6 +80,9 @@ class DriverProvider with ChangeNotifier {
       final profile = await api.getMe();
       user = profile;
       driverProfile = profile['driverProfile'];
+      if (profile['activeRide'] != null) {
+        activeTrip = Map<String, dynamic>.from(profile['activeRide']);
+      }
       connectSocket(t);
       // Secondary background refresh so splash screen never waits or times out
       unawaited(Future.wait([
@@ -503,6 +506,22 @@ class DriverProvider with ChangeNotifier {
     }).catchError((_) {
       socket.updateLocation(latitude: 6.5244, longitude: 3.3792, isOnline: isOnline);
     });
+
+    // On socket reconnect after cellular drop — re-sync active ride state from REST
+    socket.onReconnected = () {
+      debugPrint('[DriverProvider] Socket reconnected — syncing active ride state...');
+      api.getActiveRideState().then((ride) {
+        if (ride != null) {
+          if (activeTrip == null) {
+            activeTrip = ride;
+            tripStep = (ride['status'] ?? 'ACCEPTED').toString();
+            notifyListeners();
+          }
+        }
+      }).catchError((e) {
+        debugPrint('[DriverProvider] Failed to sync active ride on reconnect: $e');
+      });
+    };
 
     if (isOnline) {
       _startGpsStreaming();

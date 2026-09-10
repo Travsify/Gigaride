@@ -74,6 +74,8 @@ authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Respon
       subscription = await db.getActiveDriverSubscription(user.id);
     }
 
+    const activeRide = await db.findActiveRideForUser(user.id, user.role);
+
     res.status(200).json({
       success: true,
       data: {
@@ -84,6 +86,7 @@ authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Respon
         email: user.email,
         driverProfile,
         subscription,
+        activeRide,
       },
     });
   } catch (error: any) {

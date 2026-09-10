@@ -55,6 +55,20 @@ rideRouter.post('/estimate', async (req, res: Response): Promise<void> => {
   }
 });
 
+// Fetch active ride state for user (for app startup & socket reconnect sync)
+rideRouter.get(
+  '/active-state',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const activeRide = await db.findActiveRideForUser(req.user!.userId, req.user!.role);
+      res.status(200).json({ success: true, data: activeRide });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // Create a ride request
 rideRouter.post(
   '/request',

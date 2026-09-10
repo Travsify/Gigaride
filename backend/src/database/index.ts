@@ -1567,6 +1567,24 @@ export class DatabaseService {
     }));
   }
 
+  public async findActiveRideForUser(userId: string, role: string): Promise<any | null> {
+    const ride = this.store.rides.find((r) => {
+      const isActive = ['ACCEPTED', 'ARRIVED', 'IN_TRANSIT', 'REQUESTED', 'NEGOTIATING'].includes(r.status);
+      if (!isActive) return false;
+      if (role === 'DRIVER') return r.driver_id === userId;
+      return r.rider_id === userId;
+    });
+
+    if (!ride) return null;
+
+    return {
+      ...ride,
+      rider: this.store.users.find((u) => u.id === ride.rider_id),
+      driver: ride.driver_id ? this.store.users.find((u) => u.id === ride.driver_id) : null,
+      driverProfile: ride.driver_id ? this.store.driver_profiles.find((d) => d.driver_id === ride.driver_id) : null,
+    };
+  }
+
   public async getAvailableBroadcastedRides(): Promise<any[]> {
     const TEN_MINUTES_MS = 10 * 60 * 1000;
     const now = Date.now();
@@ -1639,6 +1657,9 @@ export class DatabaseService {
   ): Promise<RideRow | undefined> {
     const ride = this.store.rides.find((r) => r.id === rideId);
     if (ride) {
+      if (status === 'ACCEPTED' && ride.status === 'ACCEPTED' && ride.driver_id && ride.driver_id !== driverId) {
+        throw new Error('This ride has already been accepted by another driver.');
+      }
       ride.status = status;
       if (driverId) ride.driver_id = driverId;
       if (agreedFare) ride.agreed_fare_ngn = agreedFare;

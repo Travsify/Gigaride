@@ -103,6 +103,9 @@ class PassengerProvider with ChangeNotifier {
     try {
       final profile = await api.getMe();
       user = profile;
+      if (profile['activeRide'] != null) {
+        currentRide = Map<String, dynamic>.from(profile['activeRide']);
+      }
       connectSocket(t);
       return true;
     } catch (_) {

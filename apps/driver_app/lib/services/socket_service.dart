@@ -26,6 +26,13 @@ class SocketService {
     socket!.onConnect((_) {
       isConnected = true;
       print('[Socket] Driver connected to live dispatch gateway');
+      if (onReconnected != null) onReconnected!();
+    });
+
+    socket!.onReconnect((_) {
+      isConnected = true;
+      print('[Socket] Driver reconnected after cellular drop');
+      if (onReconnected != null) onReconnected!();
     });
 
     socket!.onDisconnect((_) {
@@ -148,6 +155,7 @@ class SocketService {
   Function(Map<String, dynamic>)? onCallConnected;
   Function(Map<String, dynamic>)? onCallTokenReady;
   Function(Map<String, dynamic>)? onCallEnded;
+  Function()? onReconnected;
 
   // In-App Calling Actions
   void initiateCall({required String rideId, required String receiverId}) {
