@@ -372,6 +372,19 @@ class ApiService {
     return [];
   }
 
+  Future<List<dynamic>> getStatement() async {
+    final token = await getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/payments/wallet/statement'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
   Future<Map<String, dynamic>> chargeSavedCard({
     required String cardId,
     required int amountNgn,

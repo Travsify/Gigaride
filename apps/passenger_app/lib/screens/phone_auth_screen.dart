@@ -765,7 +765,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
               Text(
                 _isSignUp
                     ? (_signUpStep == 1 ? 'Step 1 of 2: Verify your phone number via SMS' : 'Step 2 of 2: Set credentials & verify your email')
-                    : 'Sign in with your phone or email to book rides and access your living wallet.',
+                    : 'Sign in with your phone or email to book rides and access your wallet.',
                 style: const TextStyle(color: AppConstants.textMuted, fontSize: 13),
               ),
 

@@ -26,7 +26,7 @@ class RideTrackingScreen extends StatefulWidget {
 class _RideTrackingScreenState extends State<RideTrackingScreen> {
   bool _walletPaymentSuccess = false;
   bool _cashPaymentConfirmed = false;
-  int _selectedPaymentTab = 0; // 0 = Living Wallet, 1 = Cash / Bank Transfer
+  int _selectedPaymentTab = 0; // 0 = Wallet, 1 = Cash / Bank Transfer
   bool _isSettlingWallet = false;
   bool _sosDispatched = false;
   int _driverRating = 5;
@@ -493,14 +493,14 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   void _handleWalletPayment(PassengerProvider provider) async {
     setState(() => _isSettlingWallet = true);
     try {
-      await provider.payWithLivingWallet();
+      await provider.payWithWallet();
       setState(() {
         _walletPaymentSuccess = true;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Fare successfully settled from your Living Wallet! Driver received 100%.'),
+            content: Text('✅ Fare successfully settled from your Wallet! Driver received 100%.'),
             backgroundColor: AppConstants.successColor,
             behavior: SnackBarBehavior.floating,
           ),
@@ -899,7 +899,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                               const Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
                               const SizedBox(width: 8),
                               Text(
-                                _walletPaymentSuccess ? 'Paid via Giga Living Wallet' : 'Paid via Cash / Bank Transfer',
+                                _walletPaymentSuccess ? 'Paid via Giga Wallet' : 'Paid via Cash / Bank Transfer',
                                 style: const TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                             ],
@@ -908,7 +908,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           const Text('Driver received 100% directly without commission.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                         ] else ...[
                           const Text(
-                            'Choose your preferred payment option below: Instant Living Wallet or Cash/Transfer directly to driver.',
+                            'Choose your preferred payment option below: Instant Wallet or Cash/Transfer directly to driver.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
                           ),
@@ -928,7 +928,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        // Tab 0: Living Wallet
+                        // Tab 0: Wallet
                         Expanded(
                           child: InkWell(
                             onTap: () {
@@ -950,7 +950,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                                 children: [
                                   Icon(Icons.account_balance_wallet_rounded, color: _selectedPaymentTab == 0 ? AppConstants.accentColor : Colors.white70, size: 24),
                                   const SizedBox(height: 6),
-                                  const Text('Living Wallet', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const Text('Wallet', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 3),
                                   Text(
                                     'Bal: ${currencyFormat.format(provider.walletBalance)}',
@@ -997,7 +997,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
                     const SizedBox(height: 14),
 
-                    // Tab 0 Content: Living Wallet Action Card
+                    // Tab 0 Content: Wallet Action Card
                     if (_selectedPaymentTab == 0) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -1011,7 +1011,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Available Living Wallet:', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                                const Text('Available Wallet:', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                                 Text(
                                   currencyFormat.format(provider.walletBalance),
                                   style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
@@ -1032,7 +1032,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                                     : const Icon(Icons.flash_on_rounded, size: 18),
                                 label: Text(
-                                  _isSettlingWallet ? 'Processing Wallet Transfer...' : 'Pay Fare with Living Wallet',
+                                  _isSettlingWallet ? 'Processing Wallet Transfer...' : 'Pay Fare with Wallet',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 onPressed: _isSettlingWallet ? null : () => _handleWalletPayment(provider),
@@ -1142,7 +1142,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           const Icon(Icons.verified_rounded, color: AppConstants.successColor, size: 22),
                           const SizedBox(width: 8),
                           Text(
-                            _walletPaymentSuccess ? 'Payment Settled via Living Wallet' : 'Payment Settled via Cash / Direct Transfer',
+                            _walletPaymentSuccess ? 'Payment Settled via Wallet' : 'Payment Settled via Cash / Direct Transfer',
                             style: const TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ],
@@ -1210,7 +1210,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     ),
                   ),
 
-                  // 💰 Cash Change Rollover to Living Wallet (Keyboard-Safe)
+                  // 💰 Cash Change Rollover to Wallet (Keyboard-Safe)
                   if (!_walletPaymentSuccess) ...[
                     Container(
                       margin: const EdgeInsets.only(top: 14),
@@ -1229,7 +1229,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'No Change? Deposit to Living Wallet',
+                                  'No Change? Deposit to Wallet',
                                   style: TextStyle(color: AppConstants.textLight, fontSize: 13, fontWeight: FontWeight.bold),
                                 ),
                               ),
@@ -1237,7 +1237,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Handed ₦5,000 for a ₦3,500 ride? Have the ₦1,500 change credited to your Living Wallet balance instantly.',
+                            'Handed ₦5,000 for a ₦3,500 ride? Have the ₦1,500 change credited to your Wallet balance instantly.',
                             style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
                           ),
                           const SizedBox(height: 10),
@@ -1246,7 +1246,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                               children: const [
                                 Icon(Icons.check_circle, color: AppConstants.successColor, size: 16),
                                 SizedBox(width: 6),
-                                Text('Change queued for deposit into your Living Wallet!', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text('Change queued for deposit into your Wallet!', style: TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.bold, fontSize: 12)),
                               ],
                             ),
                           ] else ...[
@@ -1295,7 +1295,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                                     setState(() => _changeSettled = true);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('✅ ₦${(tendered - agreed).toString()} change queued for deposit to your Living Wallet!'),
+                                        content: Text('✅ ₦${(tendered - agreed).toString()} change queued for deposit to your Wallet!'),
                                         backgroundColor: AppConstants.successColor,
                                         behavior: SnackBarBehavior.floating,
                                       ),
@@ -1336,7 +1336,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                           'driverName': driver?['driverName'] ?? 'Driver',
                           'vehicleModel': driver?['vehicleModel'] ?? 'Vehicle',
                           'licensePlate': driver?['licensePlate'] ?? 'LAG-000-XX',
-                          'paymentMethod': _walletPaymentSuccess ? 'Giga Living Wallet' : 'Cash / Direct Bank Transfer',
+                          'paymentMethod': _walletPaymentSuccess ? 'Giga Wallet' : 'Cash / Direct Bank Transfer',
                         });
                       },
                     ),

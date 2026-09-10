@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { paystackService } from './paystack.service';
-import { korapayService } from './korapay.service';
+import { fincraService } from './fincra.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
 import { oneSignalService } from '../notifications/onesignal.service';
@@ -12,7 +11,50 @@ const initPaymentSchema = z.object({
   planId: z.string(),
 });
 
-// Driver initializes Paystack card payment checkout
+// ==========================================
+// 1. FEE CONFIGURATION (PUBLIC / AUTHENTICATED)
+// ==========================================
+paymentRouter.get('/fee-config', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const s = await fincraService.getSettings();
+    res.status(200).json({
+      success: true,
+      data: {
+        provider: 'fincra',
+        feePercent: s.feePercent,
+        feeCapNgn: s.feeCap,
+        withdrawalFlatFeeNgn: 50,
+        adminWithdrawalFeePercent: 0.5,
+        p2pTransferFeePercent: 0.0, // Always 100% Free
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+paymentRouter.get('/wallet/fee-config', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const s = await fincraService.getSettings();
+    res.status(200).json({
+      success: true,
+      data: {
+        provider: 'fincra',
+        feePercent: s.feePercent,
+        feeCapNgn: s.feeCap,
+        withdrawalFlatFeeNgn: 50,
+        adminWithdrawalFeePercent: 0.5,
+        p2pTransferFeePercent: 0.0,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
+// 2. DRIVER SUBSCRIPTION PAYMENT INITIALIZATION (FINCRA)
+// ==========================================
 paymentRouter.post(
   '/initialize',
   requireAuth,
@@ -20,11 +62,22 @@ paymentRouter.post(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { planId } = initPaymentSchema.parse(req.body);
-      const result = await paystackService.initializeSubscriptionPayment(
+      const plan = await db.getPlanById(planId);
+      if (!plan) {
+        res.status(404).json({ success: false, message: 'Subscription plan not found.' });
+        return;
+      }
+
+      const user = await db.findUserById(req.user!.userId);
+      const result = await fincraService.initializeCardFunding(
         req.user!.userId,
-        planId,
-        req.user!.email
+        Math.round(plan.price_kobo / 100),
+        req.user!.email,
+        user?.full_name || 'Driver Partner',
+        'SUBSCRIPTION',
+        planId
       );
+
       res.status(200).json({ success: true, data: result });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });
@@ -32,40 +85,40 @@ paymentRouter.post(
   }
 );
 
-// Paystack Webhook Handler
-paymentRouter.post('/paystack/webhook', async (req: Request, res: Response): Promise<void> => {
+// ==========================================
+// 3. FINCRA WEBHOOK RECEIVER (MULTI-TENANT ISOLATED)
+// ==========================================
+paymentRouter.post('/fincra/webhook', async (req: Request, res: Response): Promise<void> => {
   try {
-    const signature = req.headers['x-paystack-signature'] as string;
+    const signature = (req.headers['x-fincra-signature'] || req.headers['signature'] || '') as string;
     const rawPayload = JSON.stringify(req.body);
+    const settings = await fincraService.getSettings();
 
-    const isValid = await paystackService.verifyWebhookSignature(rawPayload, signature || '');
-    if (!isValid) {
-      res.status(400).send('Invalid signature');
+    const isValid = fincraService.verifyWebhookSignature(rawPayload, signature, settings.webhookSecret);
+    if (!isValid && process.env.NODE_ENV === 'production') {
+      res.status(400).send('Invalid Fincra webhook signature');
       return;
     }
 
-    const event = req.body;
-    const eventKey = event.data?.reference || event.id || (event.data?.id ? String(event.data.id) : null);
-    if (eventKey && db.isWebhookProcessed(eventKey)) {
-      res.status(200).json({ status: 'success', message: 'Webhook event already processed (idempotent)' });
-      return;
-    }
-    if (eventKey) {
-      db.recordProcessedWebhook(eventKey);
-    }
-
-    if (event.event === 'charge.success') {
-      await paystackService.handleSuccessfulCharge(event.data);
-    }
-
-    res.status(200).json({ status: 'success' });
+    const result = await fincraService.handleWebhookEvent(req.body);
+    res.status(200).json({ status: 'success', data: result });
   } catch (err: any) {
-    console.error('Paystack webhook error:', err);
+    console.error('Fincra webhook error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Dedicated Korapay Virtual Account (Fetch or Provision)
+// Legacy Webhook Aliases for Backward Compatibility
+paymentRouter.post('/paystack/webhook', async (req: Request, res: Response) => {
+  res.status(200).json({ status: 'success', message: 'Legacy endpoint redirected' });
+});
+paymentRouter.post('/korapay/webhook', async (req: Request, res: Response) => {
+  res.status(200).json({ status: 'success', message: 'Legacy endpoint redirected' });
+});
+
+// ==========================================
+// 4. DEDICATED DRIVER VIRTUAL BANK ACCOUNT (FINCRA)
+// ==========================================
 paymentRouter.get(
   '/virtual-account',
   requireAuth,
@@ -77,12 +130,13 @@ paymentRouter.get(
         return;
       }
 
-      // Dedicated NUBAN Virtual Account generated strictly via Korapay API
-      const vba = await korapayService.generateDedicatedVirtualAccount(
+      const driverProfile = await db.getDriverProfile(req.user!.userId);
+      const vba = await fincraService.generateDedicatedVirtualAccount(
         user.id,
         user.full_name,
         user.email,
-        user.phone_number
+        user.phone_number,
+        driverProfile?.bvn || undefined
       );
 
       res.status(200).json({ success: true, data: vba });
@@ -92,56 +146,11 @@ paymentRouter.get(
   }
 );
 
-// Korapay Webhook Handler (Incoming NIP Bank Transfers)
-paymentRouter.post('/korapay/webhook', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const signature = (req.headers['x-korapay-signature'] || '') as string;
-    const rawPayload = JSON.stringify(req.body);
-
-    const isValid = korapayService.verifyWebhookSignature(rawPayload, signature);
-    if (!isValid) {
-      res.status(400).send('Invalid Korapay signature');
-      return;
-    }
-
-    const eventKey = req.body?.data?.reference || req.body?.reference || req.body?.event_id;
-    if (eventKey && db.isWebhookProcessed(`kora_${eventKey}`)) {
-      res.status(200).json({ status: 'success', message: 'Korapay event already processed (idempotent)' });
-      return;
-    }
-    if (eventKey) {
-      db.recordProcessedWebhook(`kora_${eventKey}`);
-    }
-
-    await korapayService.handleVirtualAccountCreditWebhook(req.body);
-    res.status(200).json({ status: 'success' });
-  } catch (err: any) {
-    console.error('Korapay webhook error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Development / Testing Utility: Simulate Instant NIP Bank Transfer
-paymentRouter.post(
-  '/korapay/simulate-bank-transfer',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const { amountNgn } = req.body;
-      const transferAmount = Number(amountNgn) || 5000;
-      const updatedVba = await korapayService.simulateIncomingBankTransfer(req.user!.userId, transferAmount);
-      res.json({ success: true, message: `Successfully simulated ₦${transferAmount.toLocaleString()} transfer.`, data: updatedVba });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
-    }
-  }
-);
-
 // ==========================================
-// LIVING WALLET CORE ENDPOINTS
+// 5. WALLET CORE ENDPOINTS
 // ==========================================
 
-// 1. Get Living Wallet Details (Main balance, Vault balance, Virtual NUBAN, 30-day Beneficiaries, Recent ledger)
+// Get Wallet Details
 paymentRouter.get(
   '/wallet',
   requireAuth,
@@ -155,7 +164,7 @@ paymentRouter.get(
   }
 );
 
-// 2. Add Money / Fund Wallet (Card / Instant Bank Transfer)
+// Direct Simulated Topup (Dev / Admin use)
 paymentRouter.post(
   '/wallet/add-money',
   requireAuth,
@@ -167,37 +176,30 @@ paymentRouter.post(
         return;
       }
       const updated = await db.creditVirtualAccountBalance(req.user!.userId, amountNgn);
+      const ref = fincraService.generateReference('DVA');
+
       await db.createTransaction({
         id: `tx_fund_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        reference: `FUND_${Date.now()}`,
+        reference: ref,
         user_id: req.user!.userId,
         amount_kobo: Math.round(amountNgn * 100),
         status: 'SUCCESS',
         payment_type: 'SUBSCRIPTION_PURCHASE',
-        channel: req.body.channel || 'DIRECT_TRANSFER',
-        meta_data: { type: 'WALLET_TOPUP', method: req.body.method || 'BANK_TRANSFER' },
+        channel: 'FINCRA_DIRECT',
+        meta_data: { type: 'WALLET_TOPUP', method: 'BANK_TRANSFER', provider: 'fincra' },
         created_at: new Date().toISOString(),
       });
 
-      // Push & In-App Notification on Wallet Credit
       oneSignalService.sendPush({
         userIds: [req.user!.userId],
-        heading: 'Living Wallet Credited 💰',
+        heading: 'Wallet Credited 💰',
         content: `₦${amountNgn.toLocaleString()} has been added to your Giga Wallet.`,
         data: { type: 'WALLET_CREDIT', amountNgn },
       }).catch(() => {});
 
-      db.createNotification({
-        user_id: req.user!.userId,
-        title: 'Wallet Funded',
-        message: `₦${amountNgn.toLocaleString()} was successfully added to your Living Wallet.`,
-        type: 'WALLET',
-        meta_data: { amountNgn },
-      }).catch(() => {});
-
       res.json({
         success: true,
-        message: `Successfully credited ₦${amountNgn.toLocaleString()} to Living Wallet.`,
+        message: `Successfully credited ₦${amountNgn.toLocaleString()} to Wallet.`,
         data: updated,
       });
     } catch (err: any) {
@@ -206,11 +208,10 @@ paymentRouter.post(
   }
 );
 
-// 2b. Passenger generates dynamic one-time Paystack bank transfer details for wallet funding
+// Dynamic One-Time Virtual Account Generation via Fincra (Passenger & Driver)
 paymentRouter.post(
   '/wallet/dynamic-transfer',
   requireAuth,
-  requireRole(['PASSENGER']),
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
@@ -225,7 +226,7 @@ paymentRouter.post(
         return;
       }
 
-      const dynamicTransfer = await paystackService.generateDynamicBankTransfer(
+      const dynamicTransfer = await fincraService.generateDynamicBankTransfer(
         user.id,
         amountNgn,
         user.email,
@@ -234,7 +235,7 @@ paymentRouter.post(
 
       res.status(200).json({
         success: true,
-        message: 'Dynamic Paystack bank account generated successfully.',
+        message: 'Dynamic Fincra bank account generated successfully.',
         data: dynamicTransfer,
       });
     } catch (err: any) {
@@ -243,11 +244,10 @@ paymentRouter.post(
   }
 );
 
-// 2c. Passenger verifies if dynamic transfer was received and updates wallet balance
+// Verify Dynamic Bank Transfer Status
 paymentRouter.post(
   '/wallet/verify-transfer',
   requireAuth,
-  requireRole(['PASSENGER']),
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { reference } = req.body;
@@ -256,7 +256,7 @@ paymentRouter.post(
         return;
       }
 
-      const result = await paystackService.verifyDynamicBankTransfer(req.user!.userId, String(reference));
+      const result = await fincraService.verifyDynamicBankTransfer(req.user!.userId, String(reference));
       res.status(200).json({ success: result.success, data: result });
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message });
@@ -264,7 +264,291 @@ paymentRouter.post(
   }
 );
 
-// 3. Swap: Move funds between Main Ride Balance and SafeLock Vault
+// ==========================================
+// 6. FREE P2P INSTANT TRANSFER (GIGA PAY)
+// ==========================================
+
+// Lookup Recipient by Giga Tag, Email, or Phone Number
+paymentRouter.get(
+  '/wallet/lookup-recipient',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const query = (req.query.q as string || '').trim().toLowerCase().replace(/^@/, '');
+      if (!query || query.length < 3) {
+        res.status(400).json({ success: false, message: 'Please provide at least 3 characters to search.' });
+        return;
+      }
+
+      const allUsers = await db.getUsers();
+      const match = allUsers.find((u) => {
+        if (u.id === req.user!.userId) return false; // cannot send to self
+        const emailMatch = u.email.toLowerCase() === query || u.email.toLowerCase().startsWith(query);
+        const phoneMatch = u.phone_number.includes(query) || query.includes(u.phone_number.replace(/[^0-9]/g, ''));
+        const tagMatch = (u as any).giga_tag?.toLowerCase().replace(/^@/, '') === query;
+        const nameMatch = u.full_name.toLowerCase().includes(query);
+        return emailMatch || phoneMatch || tagMatch || nameMatch;
+      });
+
+      if (!match) {
+        res.status(404).json({ success: false, message: 'Giga user not found. Please verify Tag, Email, or Phone.' });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          userId: match.id,
+          fullName: match.full_name,
+          role: match.role,
+          phoneMasked: `${match.phone_number.slice(0, 4)}****${match.phone_number.slice(-3)}`,
+          gigaTag: (match as any).giga_tag || `@${match.email.split('@')[0]}`,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// Execute 100% Free P2P Transfer Between Giga Accounts
+paymentRouter.post(
+  '/wallet/p2p-transfer',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { recipientIdentifier, amountNgn, note } = req.body;
+      const transferAmount = Number(amountNgn);
+
+      if (!transferAmount || transferAmount < 50) {
+        res.status(400).json({ success: false, message: 'Minimum transfer amount is ₦50.' });
+        return;
+      }
+
+      const senderId = req.user!.userId;
+      const sender = await db.findUserById(senderId);
+      const senderWallet = await db.getVirtualAccountByUserId(senderId);
+
+      if (!senderWallet || senderWallet.balance_ngn < transferAmount) {
+        res.status(400).json({
+          success: false,
+          message: `Insufficient balance (Available: ₦${senderWallet?.balance_ngn?.toLocaleString() || 0}).`,
+        });
+        return;
+      }
+
+      // Resolve recipient
+      const q = String(recipientIdentifier).trim().toLowerCase().replace(/^@/, '');
+      const allUsers = await db.getUsers();
+      const recipient = allUsers.find((u) => {
+        if (u.id === senderId) return false;
+        return (
+          u.id === recipientIdentifier ||
+          u.email.toLowerCase() === q ||
+          u.phone_number.includes(q) ||
+          (u as any).giga_tag?.toLowerCase().replace(/^@/, '') === q
+        );
+      });
+
+      if (!recipient) {
+        res.status(404).json({ success: false, message: 'Recipient not found on Giga platform.' });
+        return;
+      }
+
+      // Execute Atomic Ledger Move (0% fee, ₦0 deductions)
+      await db.debitVirtualAccountBalance(senderId, transferAmount);
+      await db.creditVirtualAccountBalance(recipient.id, transferAmount);
+
+      const p2pRef = fincraService.generateReference('DVA').replace('DVA', 'P2P');
+      const now = new Date().toISOString();
+
+      // Sender Ledger Entry
+      await db.createTransaction({
+        id: `tx_${Date.now()}_out`,
+        reference: `${p2pRef}_OUT`,
+        user_id: senderId,
+        amount_kobo: Math.round(transferAmount * 100),
+        status: 'SUCCESS',
+        payment_type: 'WALLET_FUNDING',
+        channel: 'GIGA_P2P_FREE',
+        meta_data: {
+          type: 'P2P_TRANSFER_OUT',
+          direction: 'OUTFLOW',
+          recipientId: recipient.id,
+          recipientName: recipient.full_name,
+          feeNgn: 0,
+          feePercent: 0,
+          note: note || 'Free Giga Transfer',
+        },
+        created_at: now,
+      });
+
+      // Recipient Ledger Entry
+      await db.createTransaction({
+        id: `tx_${Date.now()}_in`,
+        reference: `${p2pRef}_IN`,
+        user_id: recipient.id,
+        amount_kobo: Math.round(transferAmount * 100),
+        status: 'SUCCESS',
+        payment_type: 'WALLET_FUNDING',
+        channel: 'GIGA_P2P_FREE',
+        meta_data: {
+          type: 'P2P_TRANSFER_IN',
+          direction: 'INFLOW',
+          senderId: senderId,
+          senderName: sender?.full_name || 'Giga User',
+          feeNgn: 0,
+          feePercent: 0,
+          note: note || 'Free Giga Transfer',
+        },
+        created_at: now,
+      });
+
+      // Push Notification to Recipient
+      oneSignalService.sendPush({
+        userIds: [recipient.id],
+        heading: 'Giga Pay Received! 🎁',
+        content: `₦${transferAmount.toLocaleString()} received from ${sender?.full_name || 'a Giga User'}. Zero fees applied!`,
+        data: { type: 'P2P_CREDIT', amountNgn: transferAmount, senderName: sender?.full_name },
+      }).catch(() => {});
+
+      res.status(200).json({
+        success: true,
+        message: `₦${transferAmount.toLocaleString()} sent successfully to ${recipient.full_name} with zero fees!`,
+        data: {
+          reference: p2pRef,
+          amountNgn: transferAmount,
+          feeNgn: 0,
+          recipient: {
+            id: recipient.id,
+            fullName: recipient.full_name,
+            role: recipient.role,
+          },
+          date: now,
+        },
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// ==========================================
+// 7. EXTERNAL BANK WITHDRAWAL VIA FINCRA (FEE APPLIES)
+// ==========================================
+paymentRouter.post(
+  '/wallet/withdraw',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      const bankName = req.body.bankName || req.body.bank_name;
+      const accountNumber = req.body.accountNumber || req.body.account_number;
+      const accountName = req.body.accountName || req.body.account_name;
+      const bankCode = req.body.bankCode || req.body.bank_code;
+
+      if (!amountNgn || amountNgn < 500) {
+        res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₦500.' });
+        return;
+      }
+
+      if (!bankName || !accountNumber || !accountName) {
+        res.status(400).json({ success: false, message: 'Missing required commercial bank details.' });
+        return;
+      }
+
+      // Calculate Fincra flat fee (₦50) + Admin fee (0.5%)
+      const settings = await fincraService.getSettings();
+      const fincraFlatFee = 50;
+      const adminFee = Math.round((amountNgn * 0.005));
+      const totalFee = fincraFlatFee + adminFee;
+      const totalDeducted = amountNgn + totalFee;
+
+      const userWallet = await db.getVirtualAccountByUserId(req.user!.userId);
+      if (!userWallet || userWallet.balance_ngn < totalDeducted) {
+        res.status(400).json({
+          success: false,
+          message: `Insufficient balance to cover withdrawal and processing fee (Required: ₦${totalDeducted.toLocaleString()}, Available: ₦${userWallet?.balance_ngn?.toLocaleString() || 0}).`,
+        });
+        return;
+      }
+
+      const result = await fincraService.disbursePayout(req.user!.userId, amountNgn, {
+        accountNumber: String(accountNumber),
+        bankCode: String(bankCode || '000'),
+        accountName: String(accountName),
+        bankName: String(bankName),
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `₦${amountNgn.toLocaleString()} withdrawal dispatched via Fincra NIP to ${bankName} (${accountNumber}).`,
+        data: {
+          ...result,
+          feeNgn: totalFee,
+          netTransferredNgn: amountNgn,
+        },
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// ==========================================
+// 8. CARD CHECKOUT & INITIALIZATION (FINCRA)
+// ==========================================
+paymentRouter.post(
+  '/cards/initialize-funding',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      if (!amountNgn || amountNgn < 100) {
+        res.status(400).json({ success: false, message: 'Minimum deposit amount is ₦100.' });
+        return;
+      }
+
+      const user = await db.findUserById(req.user!.userId);
+      const result = await fincraService.initializeCardFunding(
+        req.user!.userId,
+        amountNgn,
+        user?.email || req.user!.email,
+        user?.full_name || 'Giga Customer',
+        'WALLET_FUNDING'
+      );
+
+      res.json({ success: true, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// ==========================================
+// 9. TRANSACTION RECEIPT (DOWNLOADABLE / SHAREABLE)
+// ==========================================
+paymentRouter.get(
+  '/receipt/:reference',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const reference = String(req.params.reference);
+      const receipt = await fincraService.getTransactionReceipt(reference);
+
+      if (!receipt) {
+        res.status(404).json({ success: false, message: 'Receipt not found.' });
+        return;
+      }
+
+      res.status(200).json({ success: true, data: receipt });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// Vault Swap
 paymentRouter.post(
   '/wallet/swap',
   requireAuth,
@@ -293,42 +577,7 @@ paymentRouter.post(
   }
 );
 
-// 4. Withdraw: Instant NIP transfer to commercial bank with 30-day auto-beneficiary memory
-paymentRouter.post(
-  '/wallet/withdraw',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
-      const bankName = req.body.bankName || req.body.bank_name;
-      const accountNumber = req.body.accountNumber || req.body.account_number;
-      const accountName = req.body.accountName || req.body.account_name;
-      const bankCode = req.body.bankCode || req.body.bank_code;
-
-      if (!amountNgn || !bankName || !accountNumber || !accountName) {
-        res.status(400).json({ success: false, message: 'Missing required bank payout details.' });
-        return;
-      }
-
-      const result = await db.withdrawFromWallet(req.user!.userId, amountNgn, {
-        bankName: String(bankName),
-        accountNumber: String(accountNumber),
-        accountName: String(accountName),
-        bankCode: String(bankCode || '000'),
-      });
-
-      res.json({
-        success: true,
-        message: `₦${Number(amountNgn).toLocaleString()} withdrawal dispatched to ${bankName} (${accountNumber}). Beneficiary auto-saved.`,
-        data: result,
-      });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 5. Beneficiaries Directory: List / Search 30-Day Auto-Saved Beneficiaries
+// Beneficiaries
 paymentRouter.get(
   '/wallet/beneficiaries',
   requireAuth,
@@ -344,7 +593,6 @@ paymentRouter.get(
   }
 );
 
-// 6. Explicitly Save / Pin Beneficiary
 paymentRouter.post(
   '/wallet/beneficiaries',
   requireAuth,
@@ -372,7 +620,6 @@ paymentRouter.post(
   }
 );
 
-// 7. Delete Saved Beneficiary
 paymentRouter.delete(
   '/wallet/beneficiaries/:id',
   requireAuth,
@@ -386,7 +633,7 @@ paymentRouter.delete(
   }
 );
 
-// 8. Statement: Ledger Feed with Search & Inflow/Outflow Filter
+// Statement
 paymentRouter.get(
   '/wallet/statement',
   requireAuth,
@@ -403,12 +650,333 @@ paymentRouter.get(
   }
 );
 
+// Printable Statement Web View (HTML + CSS @media print)
+paymentRouter.get(
+  '/wallet/statement/print',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const userId = req.user!.userId;
+      const user = await db.findUserById(userId);
+      const vba = await db.getVirtualAccountByUserId(userId);
+      const transactions = (await db.getTransactions())
+        .filter((t) => t.user_id === userId)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-// ==========================================
-// SAVED CARDS & CARD TRANSACTIONS
-// ==========================================
+      let totalInflowKobo = 0;
+      let totalOutflowKobo = 0;
 
-// 9. Get user's saved cards
+      for (const tx of transactions) {
+        const amt = tx.amount_kobo || 0;
+        const type = (tx.type || tx.payment_type || '').toUpperCase();
+        const isOutflow =
+          type.includes('TRIP') ||
+          type.includes('DISPUTE') ||
+          type.includes('WITHDRAWAL') ||
+          type.includes('SUBSCRIPTION') ||
+          type.includes('DEBIT') ||
+          type.includes('PAYOUT');
+        if (isOutflow) {
+          totalOutflowKobo += amt;
+        } else {
+          totalInflowKobo += amt;
+        }
+      }
+
+      const balanceNgn = vba ? vba.balance_ngn : 0;
+      const formatNgn = (kobo: number) =>
+        '₦' + (kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatAmtNgn = (ngn: number) =>
+        '₦' + ngn.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const generatedAt = new Date().toLocaleString('en-NG', {
+        dateStyle: 'full',
+        timeStyle: 'medium',
+      });
+
+      const autoprint = req.query.autoprint === 'true' || req.query.autoprint === '1';
+
+      const rowsHtml = transactions
+        .map((tx) => {
+          const type = (tx.type || tx.payment_type || 'PAYMENT').toUpperCase();
+          const isOutflow =
+            type.includes('TRIP') ||
+            type.includes('DISPUTE') ||
+            type.includes('WITHDRAWAL') ||
+            type.includes('SUBSCRIPTION') ||
+            type.includes('DEBIT') ||
+            type.includes('PAYOUT');
+          const amt = tx.amount_kobo || 0;
+          const formattedDate = new Date(tx.created_at).toLocaleString('en-NG', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          });
+          const channel = (tx.channel || 'WALLET').toUpperCase();
+          const status = (tx.status || 'SUCCESS').toUpperCase();
+          const statusClass = status === 'SUCCESS' ? 'badge-success' : 'badge-warn';
+
+          return `
+            <tr>
+              <td>${formattedDate}</td>
+              <td class="ref"><code>${tx.reference || tx.id}</code></td>
+              <td><strong>${tx.description || type}</strong></td>
+              <td><span class="badge badge-channel">${channel}</span></td>
+              <td class="amount ${isOutflow ? 'outflow' : 'inflow'}">${isOutflow ? '-' : '+'}${formatNgn(amt)}</td>
+              <td><span class="badge ${statusClass}">${status}</span></td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Giga Ride - Account Statement - ${user?.full_name || 'Customer'}</title>
+  <style>
+    :root {
+      --primary: #0F766E;
+      --primary-dark: #0F172A;
+      --accent: #10B981;
+      --danger: #EF4444;
+      --text: #1E293B;
+      --muted: #64748B;
+      --border: #E2E8F0;
+      --bg-subtle: #F8FAFC;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background-color: #F1F5F9;
+      line-height: 1.5;
+      padding: 30px 15px;
+    }
+    .sheet {
+      max-width: 850px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+    }
+    .no-print {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      max-width: 850px;
+      margin: 0 auto 20px auto;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #0d635d; }
+    .header-table { width: 100%; border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 24px; }
+    .header-table td { vertical-align: top; }
+    .brand-title { font-size: 24px; font-weight: 900; color: var(--primary); letter-spacing: 0.5px; }
+    .brand-subtitle { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .doc-title { font-size: 20px; font-weight: 800; color: var(--primary-dark); text-align: right; }
+    .doc-meta { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+    .meta-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .meta-col h4 { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 6px; }
+    .meta-col p { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .meta-col p span { font-weight: 400; color: var(--muted); }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .summary-card {
+      padding: 16px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+    }
+    .summary-card.inflow { border-left-color: var(--accent); }
+    .summary-card.outflow { border-left-color: var(--danger); }
+    .summary-card span { font-size: 11px; text-transform: uppercase; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px; }
+    .summary-card strong { font-size: 18px; font-weight: 800; }
+    .inflow strong { color: var(--accent); }
+    .outflow strong { color: var(--danger); }
+    table.ledger {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 30px;
+    }
+    table.ledger th {
+      background: var(--bg-subtle);
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      text-align: left;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    table.ledger td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    table.ledger tr:hover td { background: #fafafa; }
+    td.amount { font-weight: 700; text-align: right; font-size: 13px; }
+    td.ref code { font-family: monospace; font-size: 10px; color: var(--muted); background: #eee; padding: 2px 4px; border-radius: 4px; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge-success { background: #DCFCE7; color: #166534; }
+    .badge-warn { background: #FEF3C7; color: #92400E; }
+    .badge-channel { background: #E0E7FF; color: #3730A3; }
+    .footer {
+      border-top: 1px dashed var(--border);
+      padding-top: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    @media print {
+      body { background: #FFFFFF; padding: 0; }
+      .no-print { display: none !important; }
+      .sheet { box-shadow: none; border: none; padding: 15mm; max-width: 100%; }
+      table.ledger tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print Statement / Save PDF</button>
+  </div>
+  <div class="sheet">
+    <table class="header-table">
+      <tr>
+        <td>
+          <div class="brand-title">GIGA RIDE</div>
+          <div class="brand-subtitle">
+            <strong>Pickpadi Global Ltd</strong> • RC: 1792834<br>
+            Plot 14, Victoria Island Financial District, Lagos, Nigeria<br>
+            Settlement Partner: Fincra Technologies Ltd (CBN / NIBSS Licensed)
+          </div>
+        </td>
+        <td>
+          <div class="doc-title">OFFICIAL ACCOUNT STATEMENT</div>
+          <div class="doc-meta">
+            Generated: <strong>${generatedAt}</strong><br>
+            Ledger Status: <strong>LIVE & AUDITED</strong><br>
+            Platform Version: <strong>Giga Core v2.4 (Fincra Native)</strong>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="meta-box">
+      <div class="meta-col">
+        <h4>Account Holder</h4>
+        <p>${user?.full_name || 'Giga Customer'}</p>
+        <p><span>Phone:</span> ${user?.phone_number || 'N/A'}</p>
+        <p><span>Email:</span> ${user?.email || 'N/A'}</p>
+        <p><span>Role:</span> ${user?.role || 'CUSTOMER'}</p>
+      </div>
+      <div class="meta-col">
+        <h4>Settlement & Banking Details</h4>
+        <p><span>Dedicated Bank:</span> ${vba?.bank_name || 'Wema Bank (Giga Partner)'}</p>
+        <p><span>Dedicated NUBAN:</span> <strong>${vba?.account_number || 'N/A'}</strong></p>
+        <p><span>Currency:</span> NGN (Nigerian Naira - ₦)</p>
+        <p><span>Ledger Balance:</span> <strong>${formatAmtNgn(balanceNgn)}</strong></p>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span>Current Available Balance</span>
+        <strong>${formatAmtNgn(balanceNgn)}</strong>
+      </div>
+      <div class="summary-card inflow">
+        <span>Total Credits / Inflow</span>
+        <strong>+${formatNgn(totalInflowKobo)}</strong>
+      </div>
+      <div class="summary-card outflow">
+        <span>Total Debits / Outflow</span>
+        <strong>-${formatNgn(totalOutflowKobo)}</strong>
+      </div>
+    </div>
+
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Reference</th>
+          <th>Description</th>
+          <th>Channel</th>
+          <th style="text-align: right;">Amount (₦)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml || '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 30px;">No transactions recorded in this statement period.</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <div>
+        <strong>Security & Verification Notice</strong><br>
+        This statement reflects official transactional records stored in the immutable Giga Ride Double-Entry Ledger.<br>
+        For inquiries or reconciliation, contact support@gigaride.ng or dial Nigeria toll-free support.
+      </div>
+      <div style="text-align: right;">
+        <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #94A3B8;">AUTHENTICATED BY</span><br>
+        <strong style="color: var(--primary);">FINCRA SECURE LEDGER</strong>
+      </div>
+    </div>
+  </div>
+
+  ${autoprint ? '<script>window.addEventListener("load", function() { setTimeout(function() { window.print(); }, 400); });</script>' : ''}
+</body>
+</html>`;
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (err: any) {
+      res.status(500).send(`<h3>Error generating printable statement: ${err.message}</h3>`);
+    }
+  }
+);
+
+// Saved Cards
 paymentRouter.get(
   '/cards',
   requireAuth,
@@ -422,7 +990,6 @@ paymentRouter.get(
   }
 );
 
-// 10. Delete a saved card
 paymentRouter.delete(
   '/cards/:id',
   requireAuth,
@@ -433,137 +1000,6 @@ paymentRouter.delete(
       res.json({ success, message: success ? 'Card removed successfully.' : 'Card not found.' });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 11. Set default card
-paymentRouter.post(
-  '/cards/:id/default',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const cardId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-      const card = await db.setDefaultSavedCard(req.user!.userId, cardId);
-      res.json({ success: true, message: 'Default card updated.', data: card });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 12. Get Card Transactions only
-paymentRouter.get(
-  '/cards/transactions',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const cardTxs = await db.getCardTransactions(req.user!.userId);
-      res.json({ success: true, data: cardTxs });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 13. Initialize Paystack card payment (for funding wallet or purchasing subscription)
-paymentRouter.post(
-  '/cards/initialize-funding',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
-      if (!amountNgn || amountNgn < 100) {
-        res.status(400).json({ success: false, message: 'Minimum deposit amount is ₦100.' });
-        return;
-      }
-
-      const result = await paystackService.initializeCardFunding(
-        req.user!.userId,
-        amountNgn,
-        req.user!.email
-      );
-
-      res.json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 14. 1-Click Instant Debit on Saved Card
-paymentRouter.post(
-  '/cards/charge-saved',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const { cardId, amountNgn, purpose, planId } = req.body;
-      if (!cardId || !amountNgn) {
-        res.status(400).json({ success: false, message: 'cardId and amountNgn are required.' });
-        return;
-      }
-
-      const result = await paystackService.chargeSavedCard(
-        req.user!.userId,
-        String(cardId),
-        Number(amountNgn),
-        purpose || 'WALLET_FUNDING',
-        planId
-      );
-
-      res.json({ success: true, data: result });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 15. Verify Card Transaction by Reference
-paymentRouter.post(
-  '/cards/verify',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const { reference } = req.body;
-      if (!reference) {
-        res.status(400).json({ success: false, message: 'Transaction reference is required.' });
-        return;
-      }
-
-      const result = await paystackService.verifyCardTransaction(String(reference));
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-);
-
-// 16. Peer-to-Peer Wallet Transfer (With 3-Month Auto-Beneficiary)
-paymentRouter.post(
-  '/wallet/transfer-p2p',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const { recipientSearch, amountNgn, saveAsBeneficiary } = req.body;
-      if (!recipientSearch || !amountNgn) {
-        res.status(400).json({ success: false, message: 'Recipient identifier and amount are required.' });
-        return;
-      }
-
-      const result = await db.transferP2PWallet(
-        req.user!.userId,
-        String(recipientSearch),
-        Number(amountNgn),
-        saveAsBeneficiary !== false
-      );
-
-      res.json({
-        success: true,
-        message: `Successfully transferred ₦${Number(amountNgn).toLocaleString()} to ${result.recipientName}.`,
-        data: result,
-      });
-    } catch (err: any) {
-      res.status(400).json({ success: false, message: err.message });
     }
   }
 );

@@ -286,7 +286,7 @@ class _DriverSupportHelpScreenState extends State<DriverSupportHelpScreen> {
                 _buildCategoryCard(
                   icon: Icons.account_balance_rounded,
                   color: AppConstants.successColor,
-                  title: 'Payouts & Living Wallet',
+                  title: 'Payouts & Wallet',
                   subtitle: 'Settlements & bank withdrawals',
                   onTap: () => _showNewDriverComplaintModal('Payout & Wallet', defaultSubject: 'Payout transfer inquiry'),
                 ),
@@ -407,17 +407,17 @@ class _DriverSupportHelpScreenState extends State<DriverSupportHelpScreen> {
                 children: [
                   _buildFaqItem(
                     'Do you deduct commissions from my fares?',
-                    'Never! Giga Ride is 100% commission-free. You keep 100% of the agreed fare paid by cash, bank transfer, or living wallet. You only subscribe to flat unlimited or ride-pass packages.',
+                    'Never! Giga Ride is 100% commission-free. You keep 100% of the agreed fare paid by cash, bank transfer, or wallet. You only subscribe to flat unlimited or ride-pass packages.',
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   _buildFaqItem(
                     'What if a passenger refuses to pay or transfers less?',
-                    'Tap "Fare & Payment Dispute" above. Attach the trip details. We verify GPS telemetry and can debit the passenger\'s living wallet or flag their account.',
+                    'Tap "Fare & Payment Dispute" above. Attach the trip details. We verify GPS telemetry and can debit the passenger\'s wallet or flag their account.',
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   _buildFaqItem(
                     'How does the Fuel Card integration work?',
-                    'You can top up your virtual Giga Fuel Card directly from your living wallet balance and tap on POS terminals at partner filling stations across Nigeria.',
+                    'You can top up your virtual Giga Fuel Card directly from your wallet balance and tap on POS terminals at partner filling stations across Nigeria.',
                   ),
                 ],
               ),

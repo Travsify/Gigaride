@@ -316,8 +316,8 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to create ride request');
   }
 
-  // --- Living Wallet API Suite ---
-  Future<Map<String, dynamic>> getLivingWallet() async {
+  // --- Wallet API Suite ---
+  Future<Map<String, dynamic>> getWalletDetails() async {
     final token = await getToken();
     final response = await http.get(
       Uri.parse('$baseUrl/api/payments/wallet'),
@@ -327,7 +327,7 @@ class ApiService {
     if (response.statusCode == 200 && data['success'] == true) {
       return data['data'];
     }
-    throw Exception(data['message'] ?? 'Failed to load living wallet');
+    throw Exception(data['message'] ?? 'Failed to load wallet');
   }
 
   Future<Map<String, dynamic>> addMoney(int amountNgn, {String method = 'BANK_TRANSFER'}) async {
@@ -579,7 +579,7 @@ class ApiService {
     return [];
   }
 
-  // Pay for completed ride using Giga Living Wallet
+  // Pay for completed ride using Giga Wallet
   Future<Map<String, dynamic>> payRideWithWallet(String rideId) async {
     final token = await getToken();
     final response = await http.post(

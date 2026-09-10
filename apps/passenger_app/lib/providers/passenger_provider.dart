@@ -477,8 +477,8 @@ class PassengerProvider with ChangeNotifier {
     );
   }
 
-  // Pay for ride using Giga Living Wallet
-  Future<Map<String, dynamic>> payWithLivingWallet() async {
+  // Pay for ride using Giga Wallet
+  Future<Map<String, dynamic>> payWithWallet() async {
     if (currentRide == null) throw Exception('No active ride to settle');
     isLoading = true;
     notifyListeners();

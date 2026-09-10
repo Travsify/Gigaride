@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../services/api_service.dart';
+import '../services/statement_pdf_service.dart';
 
 class WalletScreen extends StatefulWidget {
   final bool isTab;
@@ -42,7 +43,7 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _loadWalletData() async {
     setState(() => _isLoading = true);
     try {
-      final data = await _api.getLivingWallet();
+      final data = await _api.getWalletDetails();
       final bens = await _api.getBeneficiaries(search: _beneficiarySearchCtrl.text.trim(), days: 90);
       final stmts = await _api.getStatement();
       final cards = await _api.getSavedCards();
@@ -105,7 +106,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Fund Living Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConstants.textLight)),
+                        const Text('Fund Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConstants.textLight)),
                         IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
                       ],
                     ),
@@ -376,7 +377,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                               const SizedBox(height: 6),
                               const Text('Account Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                              Text(dynamicTransfer!['accountName'] ?? 'Giga Living Wallet', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(dynamicTransfer!['accountName'] ?? 'Giga Wallet', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
                               const SizedBox(height: 8),
                               const Text('Amount to Pay Exactly', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                               Text(
@@ -413,7 +414,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                 if (mounted) await _loadWalletData();
                                 messenger.showSnackBar(
                                   SnackBar(
-                                    content: Text('✓ ${_currencyFormat.format(dynamicTransfer!['amountNgn'] ?? 0)} successfully credited to your Living Wallet!'),
+                                    content: Text('✓ ${_currencyFormat.format(dynamicTransfer!['amountNgn'] ?? 0)} successfully credited to your Wallet!'),
                                     backgroundColor: AppConstants.successColor,
                                   ),
                                 );
@@ -995,12 +996,70 @@ class _WalletScreenState extends State<WalletScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Living Statement & Card Ledger', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConstants.textLight)),
+                      const Text('Statement & Card Ledger', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConstants.textLight)),
                       IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
                     ],
                   ),
                   const Text('Complete immutable ledger of all wallet inflows, card transactions, and payouts.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+
+                  // Print & Share Official PDF Statement Action Bar
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.print_rounded, size: 16),
+                          label: const Text('Print Statement', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConstants.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () async {
+                            final user = _walletData?['user'];
+                            final va = _walletData?['virtualAccount'];
+                            await StatementPdfService.printStatement(
+                              userName: user?['full_name'] ?? 'Giga Passenger',
+                              userEmail: user?['email'] ?? '',
+                              userPhone: user?['phone_number'] ?? '',
+                              currentBalanceNgn: (va?['balance_ngn'] ?? 0) as num,
+                              transactions: _statement,
+                              nuban: va?['account_number'],
+                              bankName: va?['bank_name'],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.share_rounded, size: 16),
+                          label: const Text('Share PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppConstants.accentColor,
+                            side: const BorderSide(color: AppConstants.accentColor),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () async {
+                            final user = _walletData?['user'];
+                            final va = _walletData?['virtualAccount'];
+                            await StatementPdfService.shareStatement(
+                              userName: user?['full_name'] ?? 'Giga Passenger',
+                              userEmail: user?['email'] ?? '',
+                              userPhone: user?['phone_number'] ?? '',
+                              currentBalanceNgn: (va?['balance_ngn'] ?? 0) as num,
+                              transactions: _statement,
+                              nuban: va?['account_number'],
+                              bankName: va?['bank_name'],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: _statement.isEmpty
                         ? const Center(child: Text('No transactions recorded yet.', style: TextStyle(color: AppConstants.textMuted)))
@@ -1159,7 +1218,7 @@ class _WalletScreenState extends State<WalletScreen> {
         automaticallyImplyLeading: !widget.isTab,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Living Wallet', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
+        title: const Text('Wallet', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: Icon(_hideBalance ? Icons.visibility_off : Icons.visibility, color: AppConstants.textMuted),
@@ -1207,7 +1266,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             children: [
                               Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle)),
                               const SizedBox(width: 6),
-                              const Text('Active Living Wallet', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Text('Active Wallet', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                           Container(
@@ -1266,7 +1325,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 24),
 
                 // 2. CORE ACTION PILLARS
-                const Text('Living Actions', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
+                const Text('Wallet Actions', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1281,7 +1340,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
                 const SizedBox(height: 28),
 
-                // 3. 3-MONTH LIVING RECIPIENTS MEMORY & SEARCH
+                // 3. 3-MONTH RECIPIENTS MEMORY & SEARCH
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

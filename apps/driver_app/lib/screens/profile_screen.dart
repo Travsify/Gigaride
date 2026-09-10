@@ -154,8 +154,8 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 'Driver Partners must maintain strict passenger confidentiality. Passenger phone numbers are masked. Drivers are strictly prohibited from storing, extracting, stalking, or contacting passengers outside the platform for personal purposes. Pickpadi Global Ltd enforces zero tolerance for verbal abuse, sexual advances, or physical altercations.',
               ),
               _buildPolicySection(
-                '7. Cash Settlement & Living Wallet Change Rollover',
-                'Drivers may collect fares via cash, direct bank transfer, or Living Wallet settlement. When a passenger tenders excess cash, the Driver Partner agrees to credit the exact change to the passenger\'s Living Wallet using the in-app Change Settlement utility to eliminate cash change disputes.',
+                '7. Cash Settlement & Wallet Change Rollover',
+                'Drivers may collect fares via cash, direct bank transfer, or Wallet settlement. When a passenger tenders excess cash, the Driver Partner agrees to credit the exact change to the passenger\'s Wallet using the in-app Change Settlement utility to eliminate cash change disputes.',
               ),
               _buildPolicySection(
                 '8. Criminal Background & Medical Fitness Warranty',

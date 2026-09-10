@@ -69,7 +69,7 @@ class RideReceiptDialog extends StatelessWidget {
 
     final paymentMethod = (rideData['paymentMethod'] ??
             rideData['payment_method'] ??
-            'Giga Living Wallet (Instant Settlement)')
+            'Giga Wallet (Instant Settlement)')
         .toString();
 
     return Container(

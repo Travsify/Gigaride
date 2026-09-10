@@ -548,7 +548,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Cash Change Rollover to Living Wallet ──
+                  // ── Cash Change Rollover to Wallet ──
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(

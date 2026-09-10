@@ -320,7 +320,7 @@ export interface VirtualBankAccountRow {
   bank_name: string;
   bank_code: string;
   account_name: string;
-  provider: 'korapay' | 'paystack';
+  provider: 'fincra' | 'korapay' | 'paystack';
   balance_ngn: number;
   vault_balance_ngn?: number;
   is_active: boolean;
@@ -379,7 +379,18 @@ export interface PlatformSettingsRow {
   prembly_api_key?: string;
   prembly_app_id?: string;
   prembly_auto_approve?: boolean;
-  // Paystack Card Payments
+  // Fincra Payment Gateway, Virtual Accounts & Payouts
+  fincra_base_url?: string;
+  fincra_secret_key?: string;
+  fincra_public_key?: string;
+  fincra_business_id?: string;
+  fincra_webhook_secret?: string;
+  fincra_fee_percent?: number;
+  fincra_fee_cap?: number;
+  fincra_withdrawal_flat_fee_ngn?: number;
+  admin_withdrawal_fee_percent?: number;
+
+  // Paystack Card Payments (Legacy)
   paystack_secret_key?: string;
   paystack_public_key?: string;
   paystack_webhook_secret?: string;
@@ -457,6 +468,15 @@ export class DatabaseService {
       paystack_secret_key: process.env.PAYSTACK_SECRET_KEY || '',
       paystack_public_key: process.env.PAYSTACK_PUBLIC_KEY || '',
       paystack_webhook_secret: '',
+      fincra_base_url: process.env.FINCRA_BASE_URL || 'https://api.fincra.com',
+      fincra_secret_key: process.env.FINCRA_SECRET_KEY || '',
+      fincra_public_key: process.env.FINCRA_PUBLIC_KEY || '',
+      fincra_business_id: process.env.FINCRA_BUSINESS_ID || '',
+      fincra_webhook_secret: process.env.FINCRA_WEBHOOK_SECRET || '',
+      fincra_fee_percent: 1.5,
+      fincra_fee_cap: 2000,
+      fincra_withdrawal_flat_fee_ngn: 50,
+      admin_withdrawal_fee_percent: 0.5,
       korapay_secret_key: '',
       korapay_public_key: '',
       korapay_encryption_key: '',
@@ -960,6 +980,14 @@ export class DatabaseService {
 
   public async findUserById(id: string): Promise<UserRow | undefined> {
     return this.store.users.find((u) => u.id === id);
+  }
+
+  public async getUsers(): Promise<UserRow[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      const res = await this.pgPool.query('SELECT * FROM users');
+      return res.rows;
+    }
+    return [...this.store.users];
   }
 
   public async getPassengers(): Promise<(UserRow & { totalRides: number; virtualAccount: VirtualBankAccountRow | null })[]> {
@@ -1730,6 +1758,14 @@ export class DatabaseService {
     return this.store.virtual_bank_accounts.find((v) => v.account_number === accountNumber);
   }
 
+  public async getVirtualAccounts(): Promise<VirtualBankAccountRow[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      const res = await this.pgPool.query('SELECT * FROM virtual_bank_accounts');
+      return res.rows;
+    }
+    return [...this.store.virtual_bank_accounts];
+  }
+
   public async createOrUpdateVirtualAccount(acc: VirtualBankAccountRow): Promise<VirtualBankAccountRow> {
     const existingIndex = this.store.virtual_bank_accounts.findIndex((v) => v.user_id === acc.user_id);
     if (existingIndex >= 0) {
@@ -1935,6 +1971,10 @@ export class DatabaseService {
     return false;
   }
 
+  public async getWalletDetails(userId: string): Promise<any> {
+    return this.getLivingWalletDetails(userId);
+  }
+
   public async getLivingWalletDetails(userId: string): Promise<any> {
     let acc = this.store.virtual_bank_accounts.find((v) => v.user_id === userId);
     const user = this.store.users.find((u) => u.id === userId);
@@ -2116,7 +2156,7 @@ export class DatabaseService {
       await this.saveOrUpdateBeneficiary(senderId, {
         account_name: recipient.full_name,
         account_number: recipient.phone_number,
-        bank_name: 'Giga Living Wallet',
+        bank_name: 'Giga Wallet',
         bank_code: 'GIGA_P2P',
       });
     }

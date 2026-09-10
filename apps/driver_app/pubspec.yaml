@@ -48,6 +48,9 @@ dependencies:
   wakelock_plus: ^1.3.4
   audioplayers: ^6.1.0
   path_provider: ^2.1.5
+  pdf: ^3.11.1
+  printing: ^5.13.1
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

@@ -133,7 +133,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     children: [
                       Icon(Icons.account_balance_wallet_outlined, color: Colors.greenAccent, size: 20),
                       SizedBox(width: 10),
-                      Text('Living Wallet Balance', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('Wallet Balance', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
                   ElevatedButton(

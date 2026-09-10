@@ -263,6 +263,14 @@
         <span id="payoutPendingBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">0</span>
       </button>
 
+      <button onclick="switchTab('fincra')" id="tabBtn_fincra" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-bolt-lightning w-4 text-center text-sm text-teal-400"></i>
+          <span>Fincra Live Console</span>
+        </div>
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">LIVE</span>
+      </button>
+
       <button onclick="switchTab('staff')" id="tabBtn_staff" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800/60">
         <div class="flex items-center space-x-3">
           <i class="fa-solid fa-user-gear w-4 text-center text-sm text-indigo-400"></i>
@@ -588,7 +596,7 @@
               <i class="fa-solid fa-users text-teal-400"></i>
               <span>Passenger Directory & Governance Desk</span>
             </h2>
-            <p class="text-xs text-slate-400">Manage Nigerian riders, verify Korapay virtual accounts, audit wallet float balances, grant goodwill credits, or enforce suspensions.</p>
+            <p class="text-xs text-slate-400">Manage Nigerian riders, verify Fincra virtual accounts, audit wallet float balances, grant goodwill credits, or enforce suspensions.</p>
           </div>
           <div class="flex items-center space-x-2">
             <input type="text" id="passengerSearchInput" oninput="filterPassengers()" placeholder="Search rider name, phone, email..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none w-64" />
@@ -988,7 +996,7 @@
               <i class="fa-solid fa-scale-balanced text-teal-400"></i>
               <span>FinTech Float & Solvency Reconciliation Desk</span>
             </h2>
-            <p class="text-xs text-slate-400">Real-time aggregate reconciliation across Korapay DVA escrow floats, driver subscription revenue, and LASG road levy liabilities.</p>
+            <p class="text-xs text-slate-400">Real-time aggregate reconciliation across Fincra DVA escrow floats, driver subscription revenue, and LASG road levy liabilities.</p>
           </div>
           <button onclick="loadReconciliation()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-1.5 rounded-lg font-bold border border-slate-700 transition flex items-center gap-1.5">
             <i class="fa-solid fa-arrows-rotate"></i> Re-Calculate Float
@@ -999,7 +1007,7 @@
           <div class="bg-slate-950 border border-teal-500/30 rounded-xl p-4">
             <div class="flex justify-between items-start">
               <p class="text-[11px] font-bold uppercase text-slate-400">Passenger Wallet Float</p>
-              <span class="text-[10px] bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded font-bold">Korapay Escrow</span>
+              <span class="text-[10px] bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded font-bold">Fincra Escrow</span>
             </div>
             <p id="reconPassengerFloat" class="text-2xl font-black text-teal-400 mt-2">₦0</p>
             <p class="text-[10px] text-slate-500 mt-1">Available in passenger balances</p>
@@ -1057,24 +1065,24 @@
           </button>
         </div>
 
-        <!-- Paystack & Bank Transfer Reconciliation -->
+        <!-- Fincra & Bank Transfer Reconciliation -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-base font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-credit-card text-teal-400"></i>
               <span>Payment Gateway Reconciliation</span>
             </h3>
-            <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">Paystack Webhooks</span>
+            <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">Fincra Webhooks</span>
           </div>
           <p class="text-xs text-slate-400 mb-6">
-            All driver subscription top-ups via debit cards, Moniepoint dedicated virtual NUBANs, and USSD are tracked in real-time.
+            All driver subscription top-ups via debit cards, Fincra dedicated virtual NUBANs, and bank transfers are tracked in real-time.
           </p>
           <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4 flex justify-between items-center">
             <span class="text-xs text-slate-400">Total Subscription Revenue:</span>
             <span id="financeTotalRevenue" class="text-2xl font-bold text-emerald-400">₦0</span>
           </div>
-          <button onclick="alert('Paystack transaction reconciliation ledger is fully verified.')" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2">
-            <i class="fa-solid fa-arrows-rotate"></i> Reconcile Paystack Ledger
+          <button onclick="alert('Fincra transaction reconciliation ledger is fully verified.')" class="w-full bg-teal-600 hover:bg-teal-500 text-white text-xs py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrows-rotate"></i> Reconcile Fincra Ledger
           </button>
         </div>
 
@@ -1151,7 +1159,7 @@
             <i class="fa-solid fa-plug-circle-bolt text-teal-400"></i>
             <span>FinTech & RegTech Platform Integrations</span>
           </h2>
-          <p class="text-xs text-slate-400">Configure real-time credentials for Prembly, Paystack, Korapay, Resend, Twilio, and automated driver replenishment.</p>
+          <p class="text-xs text-slate-400">Configure real-time credentials for Prembly, Fincra, Resend, Twilio, and automated driver replenishment.</p>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" onclick="loadIntegrationSettings()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 border border-slate-700">
@@ -1198,97 +1206,82 @@
               <div class="pt-2 flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
                 <div>
                   <p class="font-bold text-white text-xs">Auto-Approve Verified Drivers</p>
-                  <p class="text-[11px] text-slate-400">Automatically activate driver account and provision Korapay DVA upon NIN/FRSC match</p>
+                  <p class="text-[11px] text-slate-400">Automatically activate driver account and provision Fincra DVA upon NIN/FRSC match</p>
                 </div>
                 <input type="checkbox" id="int_prembly_auto_approve" class="w-4 h-4 accent-teal-500 rounded cursor-pointer" />
               </div>
             </div>
           </div>
 
-          <!-- CARD 2: PAYSTACK CARD PAYMENTS -->
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+          <!-- CARD 2: FINCRA TECHNOLOGIES (PRIMARY SETTLEMENT & VIRTUAL ACCOUNTS) -->
+          <div class="bg-slate-900 border border-teal-500/30 rounded-2xl p-5 shadow-lg space-y-4 md:col-span-2">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
               <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
-                  <i class="fa-regular fa-credit-card"></i>
+                <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center font-bold">
+                  <i class="fa-solid fa-bolt-lightning text-lg"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white">Paystack Card Gateway</h3>
-                  <p class="text-[11px] text-slate-400">Passenger Card Checkout & Recurring Debit</p>
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    Fincra Technologies Gateway
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">NATIVE RAILS</span>
+                  </h3>
+                  <p class="text-[11px] text-slate-400">Primary settlement engine for Dedicated Virtual NUBANs, Card Checkouts, Sub-accounts, and NIP Bank Transfers.</p>
                 </div>
               </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">PCI-DSS</span>
+              <span class="px-2.5 py-1 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Multi-Tenant Isolated
+              </span>
             </div>
 
-            <div class="space-y-3 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
-                <label class="block text-slate-300 font-bold mb-1">Paystack Public Key</label>
-                <input type="text" id="int_paystack_public_key" placeholder="pk_live_... / pk_test_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
-              </div>
-
-              <div>
-                <label class="block text-slate-300 font-bold mb-1">Paystack Secret Key</label>
-                <input type="text" id="int_paystack_secret_key" placeholder="sk_live_... / sk_test_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
+                <label class="block text-slate-300 font-bold mb-1">Fincra Public Key</label>
+                <input type="text" id="int_fincra_public_key" placeholder="pk_live_... / pk_test_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
               </div>
 
               <div>
-                <label class="block text-slate-300 font-bold mb-1">Paystack Webhook Secret</label>
-                <input type="text" id="int_paystack_webhook_secret" placeholder="Webhook signature secret" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
+                <label class="block text-slate-300 font-bold mb-1">Fincra Secret / API Key</label>
+                <input type="text" id="int_fincra_secret_key" placeholder="sk_live_... / sk_test_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
               </div>
 
-              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
-                <div class="truncate mr-2">
-                  <span class="text-[10px] text-slate-500 block">Webhook Callback Endpoint:</span>
-                  <span class="text-[11px] text-blue-400 font-mono">https://gigaride.ng/api/payments/paystack/webhook</span>
-                </div>
-                <button type="button" onclick="navigator.clipboard.writeText('https://gigaride.ng/api/payments/paystack/webhook'); alert('Copied webhook URL!');" class="px-2 py-1 bg-slate-800 text-slate-300 text-[10px] rounded hover:bg-slate-700">Copy</button>
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Fincra Business ID</label>
+                <input type="text" id="int_fincra_business_id" placeholder="bus_... (Your Fincra Merchant ID)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
               </div>
-            </div>
-          </div>
 
-          <!-- CARD 3: KORAPAY DEDICATED VIRTUAL ACCOUNTS -->
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center font-bold">
-                  <i class="fa-solid fa-building-columns"></i>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-white">Korapay Dedicated Virtual Accounts</h3>
-                  <p class="text-[11px] text-slate-400">Dynamic Bank Transfers (Wema, Providus, Sterling)</p>
-                </div>
+              <div>
+                <label class="block text-slate-300 font-bold mb-1">Webhook Signature Secret</label>
+                <input type="text" id="int_fincra_webhook_secret" placeholder="Fincra Webhook Signature Secret" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
               </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">NIP DVA</span>
-            </div>
 
-            <div class="space-y-3 text-xs">
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-slate-300 font-bold mb-1">Public Key</label>
-                  <input type="text" id="int_korapay_public_key" placeholder="pk_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
+                  <label class="block text-slate-300 font-bold mb-1">Fee Percentage (%)</label>
+                  <input type="number" step="0.1" id="int_fincra_fee_percent" placeholder="1.5" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-xs focus:border-teal-500 outline-none" />
                 </div>
                 <div>
-                  <label class="block text-slate-300 font-bold mb-1">Merchant ID</label>
-                  <input type="text" id="int_korapay_merchant_id" placeholder="MER-..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
+                  <label class="block text-slate-300 font-bold mb-1">Fee Cap (₦)</label>
+                  <input type="number" id="int_fincra_fee_cap" placeholder="2000" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-xs focus:border-teal-500 outline-none" />
                 </div>
               </div>
 
-              <div>
-                <label class="block text-slate-300 font-bold mb-1">Secret Key</label>
-                <input type="text" id="int_korapay_secret_key" placeholder="sk_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-slate-300 font-bold mb-1">NIP Payout Flat Fee (₦)</label>
+                  <input type="number" id="int_fincra_withdrawal_flat_fee_ngn" placeholder="50" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-xs focus:border-teal-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-slate-300 font-bold mb-1">Admin Payout Fee (%)</label>
+                  <input type="number" step="0.1" id="int_admin_withdrawal_fee_percent" placeholder="0.5" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-xs focus:border-teal-500 outline-none" />
+                </div>
               </div>
 
-              <div>
-                <label class="block text-slate-300 font-bold mb-1">Encryption Key</label>
-                <input type="text" id="int_korapay_encryption_key" placeholder="Encryption key" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-teal-500 outline-none" />
-              </div>
-
-              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between md:col-span-2">
                 <div class="truncate mr-2">
-                  <span class="text-[10px] text-slate-500 block">Webhook Callback Endpoint:</span>
-                  <span class="text-[11px] text-teal-400 font-mono">https://gigaride.ng/api/payments/korapay/webhook</span>
+                  <span class="text-[10px] text-slate-500 block">Webhook Callback Endpoint (Instant & Idempotent):</span>
+                  <span class="text-[11px] text-teal-400 font-mono">https://gigaride.ng/api/payments/fincra/webhook</span>
                 </div>
-                <button type="button" onclick="navigator.clipboard.writeText('https://gigaride.ng/api/payments/korapay/webhook'); alert('Copied webhook URL!');" class="px-2 py-1 bg-slate-800 text-slate-300 text-[10px] rounded hover:bg-slate-700">Copy</button>
+                <button type="button" onclick="navigator.clipboard.writeText('https://gigaride.ng/api/payments/fincra/webhook'); alert('Copied Fincra webhook URL!');" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-teal-300 text-[10px] font-bold rounded">Copy URL</button>
               </div>
             </div>
           </div>
@@ -1406,7 +1399,7 @@
               <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
                 <div>
                   <p class="font-bold text-white text-xs">Master Auto Top-Up Engine</p>
-                  <p class="text-[11px] text-slate-400">Enable automated background renewals against driver Korapay Virtual Accounts</p>
+                  <p class="text-[11px] text-slate-400">Enable automated background renewals against driver Fincra Virtual Accounts</p>
                 </div>
                 <input type="checkbox" id="int_auto_topup_enabled" class="w-4 h-4 accent-emerald-500 rounded cursor-pointer" />
               </div>
@@ -1605,9 +1598,9 @@
           <div>
             <h2 class="text-lg font-bold text-white flex items-center space-x-2">
               <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i>
-              <span>Driver Payouts & Settlement Desk (Korapay NIP)</span>
+              <span>Driver Payouts & Settlement Desk (Fincra NIP)</span>
             </h2>
-            <p class="text-xs text-slate-400">Process driver earnings withdrawals from Korapay virtual bank accounts directly to personal Nigerian commercial banks via instant NIP.</p>
+            <p class="text-xs text-slate-400">Process driver earnings withdrawals from Fincra virtual bank accounts directly to personal Nigerian commercial banks via instant NIP.</p>
           </div>
           <div class="flex items-center space-x-2">
             <button onclick="loadDriverPayouts('ALL')" class="payout-filter-btn px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs" data-filter="ALL">All</button>
@@ -1637,6 +1630,126 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: FINCRA ACTIVITIES & SETTLEMENT CONSOLE ==================== -->
+    <div id="tab_fincra" class="tab-content hidden space-y-6">
+      <!-- Fincra Hub Header -->
+      <div class="bg-gradient-to-r from-teal-950/60 via-slate-900 to-slate-900 border border-teal-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center text-lg font-bold">
+                <i class="fa-solid fa-bolt-lightning"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-black text-white tracking-wide flex items-center gap-2">
+                  Fincra Live Settlement Hub
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-widest flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live NIP Engine
+                  </span>
+                </h2>
+                <p class="text-xs text-slate-400">Real-time telemetry of all Giga platform inflows, dedicated virtual NUBANs, card collections, and instant bank disbursements via Fincra API.</p>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="loadFincraConsole()" class="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-teal-600/30 transition flex items-center gap-2">
+              <i class="fa-solid fa-rotate"></i>
+              <span>Refresh Ledger</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Settled Volume</span>
+            <div id="fincra_total_gross" class="text-xl font-black text-emerald-400">₦0.00</div>
+            <span class="text-[10px] text-slate-500 mt-1 block">Live wallet and DVA funding</span>
+          </div>
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Disbursed Payouts</span>
+            <div id="fincra_total_payouts" class="text-xl font-black text-teal-300">₦0.00</div>
+            <span class="text-[10px] text-slate-500 mt-1 block">Driver withdrawals via instant NIP</span>
+          </div>
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gateway Fees Incurred</span>
+            <div id="fincra_total_fees" class="text-xl font-black text-amber-400">₦0.00</div>
+            <div id="fincra_fee_rule" class="text-[10px] text-slate-500 mt-1">1.5% capped at ₦2,000</div>
+          </div>
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Active Fincra DVAs</span>
+            <div id="fincra_active_vba_count" class="text-xl font-black text-cyan-400">0</div>
+            <span class="text-[10px] text-slate-500 mt-1 block">Provisioned NUBANs on Wema / Fincra</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters & Live Activity Ledger -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center space-x-2">
+            <h3 class="text-base font-bold text-white">Immutable Transaction Ledger</h3>
+            <span id="fincra_tx_badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">0 records</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+              <input type="text" id="fincra_search_input" onkeyup="if(event.key==='Enter') loadFincraConsole()" placeholder="Search GIGA_... or Name" class="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:border-teal-500 outline-none w-48 sm:w-64" />
+            </div>
+            <select id="fincra_type_filter" onchange="loadFincraConsole()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:border-teal-500 outline-none">
+              <option value="">All Transaction Types</option>
+              <option value="DVA_FUNDING">DVA Bank Transfer (Inflow)</option>
+              <option value="CARD_PAYIN">Card Checkout</option>
+              <option value="WITHDRAWAL">Driver Payout / Withdrawal</option>
+              <option value="P2P_TRANSFER">P2P Giga Tag Transfer</option>
+              <option value="SUBSCRIPTION">Driver Subscription</option>
+            </select>
+            <select id="fincra_status_filter" onchange="loadFincraConsole()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:border-teal-500 outline-none">
+              <option value="">All Statuses</option>
+              <option value="SUCCESS">SUCCESS</option>
+              <option value="PENDING">PENDING</option>
+              <option value="FAILED">FAILED</option>
+            </select>
+            <button onclick="loadFincraConsole()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+              Filter
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Date & Time</th>
+                <th class="py-3 px-3">Giga Unique Ref</th>
+                <th class="py-3 px-3">Type & Channel</th>
+                <th class="py-3 px-3">Customer / Beneficiary</th>
+                <th class="py-3 px-3 text-right">Gross Amount</th>
+                <th class="py-3 px-3 text-right">Gateway Fee</th>
+                <th class="py-3 px-3 text-center">Status</th>
+                <th class="py-3 px-3 text-right">Audit & Receipt</th>
+              </tr>
+            </thead>
+            <tbody id="fincraTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="8" class="py-8 text-center text-slate-500">Loading Fincra settlement ledger...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div id="fincraPagination" class="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-400">
+          <span id="fincraPageInfo">Page 1 of 1</span>
+          <div class="flex items-center space-x-2">
+            <button id="fincraPrevBtn" onclick="changeFincraPage(-1)" class="px-2.5 py-1 rounded bg-slate-800 text-slate-300 disabled:opacity-40" disabled>Previous</button>
+            <button id="fincraNextBtn" onclick="changeFincraPage(1)" class="px-2.5 py-1 rounded bg-slate-800 text-slate-300 disabled:opacity-40" disabled>Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2141,25 +2254,25 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL: LIVING WALLET & BENEFICIARIES INSPECTOR ==================== -->
-  <div id="livingWalletModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <!-- ==================== MODAL: WALLET & BENEFICIARIES INSPECTOR ==================== -->
+  <div id="walletModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
           <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-wallet text-amber-400"></i> Living Wallet & 30-Day Beneficiary Audit
+            <i class="fa-solid fa-wallet text-amber-400"></i> Wallet & 30-Day Beneficiary Audit
           </h3>
           <p class="text-xs text-slate-400 mt-0.5" id="lwPassengerSubtitle">Passenger Wallet Dossier</p>
         </div>
-        <button onclick="closeModal('livingWalletModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="closeModal('walletModal')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <!-- Living Wallet Balances & Virtual NUBAN -->
+      <!-- Wallet Balances & Virtual NUBAN -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <!-- Main Wallet Card -->
         <div class="bg-slate-950 border border-teal-500/30 rounded-xl p-4">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-400 font-semibold">Available Living Float</span>
+            <span class="text-xs text-slate-400 font-semibold">Available Wallet Float</span>
             <span class="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded font-bold">Unrestricted</span>
           </div>
           <p id="lwMainBalance" class="text-2xl font-black text-white mt-1">₦0</p>
@@ -2211,6 +2324,32 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: FINCRA TRANSACTION RECEIPT & AUDIT ==================== -->
+  <div id="fincraReceiptModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-receipt text-teal-400"></i>
+          <h3 class="text-sm font-bold text-white">Giga Ride - Settlement Receipt & Audit</h3>
+        </div>
+        <button onclick="closeModal('fincraReceiptModal')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="fincraReceiptContent" class="p-6 space-y-4 text-xs text-slate-300">
+        <!-- Dynamically rendered receipt details -->
+      </div>
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950 flex justify-end gap-2">
+        <button onclick="printFincraReceiptModal()" class="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold flex items-center gap-1.5 text-xs">
+          <i class="fa-solid fa-print"></i> Print Official Receipt
+        </button>
+        <button onclick="closeModal('fincraReceiptModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-xs">
+          Close
+        </button>
       </div>
     </div>
   </div>
@@ -2615,7 +2754,7 @@
       <form id="rejectPayoutForm" onsubmit="submitRejectPayout(event)" class="space-y-3 text-xs">
         <input type="hidden" id="rejectPayoutId" />
         <p class="text-slate-400">
-          Rejecting this payout will automatically credit the withdrawal amount back to the driver's Korapay virtual account balance.
+          Rejecting this payout will automatically credit the withdrawal amount back to the driver's Fincra virtual account balance.
         </p>
         <div>
           <label class="block text-slate-300 font-bold mb-1">Rejection Reason (Mandatory):</label>
@@ -2902,7 +3041,7 @@
     const tabHeadings = {
       overview: { name: 'Overview', desc: 'System Operations & Fleet Pulse' },
       drivers: { name: 'Drivers & KYC', desc: 'Driver Verification & Regulatory Compliance' },
-      passengers: { name: 'Passenger Directory', desc: 'Rider Wallets, Korapay Virtual NUBANs, Float Escrows & Goodwill Credits' },
+      passengers: { name: 'Passenger Directory', desc: 'Rider Wallets, Fincra Dedicated NUBANs, Float Escrows & Goodwill Credits' },
       rides: { name: 'Historical Rides & Telemetry', desc: 'Trip Telemetry, Complete Fare Economics & High-Res GPS Route Tracing' },
       scheduled: { name: 'Scheduled Trips', desc: 'Pre-Booked Airport Runs, Interstate Corridors & VIP Driver Pre-Assignment' },
       compliance: { name: 'Compliance Radar', desc: 'Proactive 30/15/7-Day FRSC & LASDRI Regulatory License Tracking' },
@@ -2915,9 +3054,10 @@
       cities: { name: 'City Zones & Geofencing', desc: 'Localized Fuel Tariffs, Tolls & Airport Surcharges per City Cluster' },
       promos: { name: 'Marketing & Promo Engine', desc: 'Rider Acquisition Vouchers, Discount Caps & City Campaigns' },
       finance: { name: 'Finance & Reconcile', desc: 'Subscriptions, FinTech Float Escrow & LASG Road Levies' },
-      payouts: { name: 'Driver Payouts Desk', desc: 'Korapay Automated Settlement & NIP Commercial Bank Transfer Desk' },
+      payouts: { name: 'Driver Payouts Desk', desc: 'Fincra Automated Settlement & NIP Commercial Bank Transfer Desk' },
+      fincra: { name: 'Fincra Live Console', desc: 'Real-Time Settlement Telemetry, Virtual NUBANs, Pay-in/Payout Audits & Multi-Tenant Ledger' },
       staff: { name: 'Admin Staff & RBAC', desc: 'Operations Personnel Roles, Access Privileges & Account Governance' },
-      integrations: { name: 'FinTech & RegTech Integrations', desc: 'Prembly, Paystack, Korapay, Resend, Twilio & Auto Top-Up Engine' },
+      integrations: { name: 'FinTech & RegTech Integrations', desc: 'Prembly, Fincra, Resend, Twilio & Auto Top-Up Engine' },
       settings: { name: 'Fuel Levers', desc: 'Dynamic PMS Pricing & Base Fare Knobs' },
       backups: { name: 'Disaster Recovery & Snapshots', desc: 'Immutable Store Snapshots & Point-in-Time Database Exports' },
       failure_radar: { name: 'Failure Radar & African Moats', desc: 'System Integrity, Anti-Fraud Defence, and Market-Winning African Moats' },
@@ -2986,6 +3126,7 @@
         if (tabId === 'promos') loadPromoCodes();
         if (tabId === 'finance') { loadFinance(); loadReconciliation(); }
         if (tabId === 'payouts') loadDriverPayouts('ALL');
+        if (tabId === 'fincra') loadFincraConsole();
         if (tabId === 'staff') loadStaff();
         if (tabId === 'integrations') loadIntegrationSettings();
         if (tabId === 'settings') loadSettings();
@@ -3190,13 +3331,13 @@
               </div>
             </div>
 
-            <!-- Korapay Dedicated Virtual Bank Account Card -->
+            <!-- Fincra Dedicated Virtual Bank Account Card -->
             ${d.virtualAccount ? `
               <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-4 rounded-xl border border-teal-500/40 relative overflow-hidden">
                 <div class="flex justify-between items-start mb-2">
                   <div>
                     <span class="text-[10px] font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
-                      <i class="fa-solid fa-building-columns"></i> Dedicated Virtual Bank Account (Korapay NIP)
+                      <i class="fa-solid fa-building-columns"></i> Dedicated Virtual Bank Account (Fincra NIP)
                     </span>
                     <p class="text-xs font-semibold text-slate-300 mt-0.5">${d.virtualAccount.bank_name}</p>
                   </div>
@@ -3543,14 +3684,14 @@
           document.getElementById('int_prembly_app_id').value = s.prembly_app_id || '';
           document.getElementById('int_prembly_auto_approve').checked = s.prembly_auto_approve !== false;
 
-          document.getElementById('int_paystack_public_key').value = s.paystack_public_key || '';
-          document.getElementById('int_paystack_secret_key').value = s.paystack_secret_key || '';
-          document.getElementById('int_paystack_webhook_secret').value = s.paystack_webhook_secret || '';
-
-          document.getElementById('int_korapay_public_key').value = s.korapay_public_key || '';
-          document.getElementById('int_korapay_secret_key').value = s.korapay_secret_key || '';
-          document.getElementById('int_korapay_merchant_id').value = s.korapay_merchant_id || '';
-          document.getElementById('int_korapay_encryption_key').value = s.korapay_encryption_key || '';
+          if (document.getElementById('int_fincra_public_key')) document.getElementById('int_fincra_public_key').value = s.fincra_public_key || '';
+          if (document.getElementById('int_fincra_secret_key')) document.getElementById('int_fincra_secret_key').value = s.fincra_secret_key || '';
+          if (document.getElementById('int_fincra_business_id')) document.getElementById('int_fincra_business_id').value = s.fincra_business_id || '';
+          if (document.getElementById('int_fincra_webhook_secret')) document.getElementById('int_fincra_webhook_secret').value = s.fincra_webhook_secret || '';
+          if (document.getElementById('int_fincra_fee_percent')) document.getElementById('int_fincra_fee_percent').value = s.fincra_fee_percent !== undefined ? s.fincra_fee_percent : 1.5;
+          if (document.getElementById('int_fincra_fee_cap')) document.getElementById('int_fincra_fee_cap').value = s.fincra_fee_cap !== undefined ? s.fincra_fee_cap : 2000;
+          if (document.getElementById('int_fincra_withdrawal_flat_fee_ngn')) document.getElementById('int_fincra_withdrawal_flat_fee_ngn').value = s.fincra_withdrawal_flat_fee_ngn !== undefined ? s.fincra_withdrawal_flat_fee_ngn : 50;
+          if (document.getElementById('int_admin_withdrawal_fee_percent')) document.getElementById('int_admin_withdrawal_fee_percent').value = s.admin_withdrawal_fee_percent !== undefined ? s.admin_withdrawal_fee_percent : 0.5;
 
           document.getElementById('int_resend_api_key').value = s.resend_api_key || '';
           if (document.getElementById('int_onesignal_app_id')) document.getElementById('int_onesignal_app_id').value = s.onesignal_app_id || '';
@@ -3580,14 +3721,14 @@
         prembly_app_id: document.getElementById('int_prembly_app_id').value.trim(),
         prembly_auto_approve: document.getElementById('int_prembly_auto_approve').checked,
 
-        paystack_public_key: document.getElementById('int_paystack_public_key').value.trim(),
-        paystack_secret_key: document.getElementById('int_paystack_secret_key').value.trim(),
-        paystack_webhook_secret: document.getElementById('int_paystack_webhook_secret').value.trim(),
-
-        korapay_public_key: document.getElementById('int_korapay_public_key').value.trim(),
-        korapay_secret_key: document.getElementById('int_korapay_secret_key').value.trim(),
-        korapay_merchant_id: document.getElementById('int_korapay_merchant_id').value.trim(),
-        korapay_encryption_key: document.getElementById('int_korapay_encryption_key').value.trim(),
+        fincra_public_key: document.getElementById('int_fincra_public_key') ? document.getElementById('int_fincra_public_key').value.trim() : '',
+        fincra_secret_key: document.getElementById('int_fincra_secret_key') ? document.getElementById('int_fincra_secret_key').value.trim() : '',
+        fincra_business_id: document.getElementById('int_fincra_business_id') ? document.getElementById('int_fincra_business_id').value.trim() : '',
+        fincra_webhook_secret: document.getElementById('int_fincra_webhook_secret') ? document.getElementById('int_fincra_webhook_secret').value.trim() : '',
+        fincra_fee_percent: document.getElementById('int_fincra_fee_percent') ? parseFloat(document.getElementById('int_fincra_fee_percent').value) : 1.5,
+        fincra_fee_cap: document.getElementById('int_fincra_fee_cap') ? parseInt(document.getElementById('int_fincra_fee_cap').value, 10) : 2000,
+        fincra_withdrawal_flat_fee_ngn: document.getElementById('int_fincra_withdrawal_flat_fee_ngn') ? parseInt(document.getElementById('int_fincra_withdrawal_flat_fee_ngn').value, 10) : 50,
+        admin_withdrawal_fee_percent: document.getElementById('int_admin_withdrawal_fee_percent') ? parseFloat(document.getElementById('int_admin_withdrawal_fee_percent').value) : 0.5,
 
         resend_api_key: document.getElementById('int_resend_api_key').value.trim(),
         onesignal_app_id: document.getElementById('int_onesignal_app_id') ? document.getElementById('int_onesignal_app_id').value.trim() : '',
@@ -3625,6 +3766,252 @@
       } catch (err) {
         alert(err.message);
       }
+    }
+
+    // ==================== FINCRA LIVE SETTLEMENT HUB ====================
+    let fincraCurrentPage = 1;
+    let fincraTotalPages = 1;
+    let fincraCache = [];
+
+    async function loadFincraConsole(page = 1) {
+      fincraCurrentPage = page;
+      const search = document.getElementById('fincra_search_input') ? document.getElementById('fincra_search_input').value.trim() : '';
+      const type = document.getElementById('fincra_type_filter') ? document.getElementById('fincra_type_filter').value : '';
+      const status = document.getElementById('fincra_status_filter') ? document.getElementById('fincra_status_filter').value : '';
+
+      const tbody = document.getElementById('fincraTableBody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Fetching live Fincra ledger...</td></tr>`;
+      }
+
+      try {
+        // 1. Load Stats
+        const statsRes = await fetch(`${API_BASE}/api/admin/fincra/stats`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const statsData = await statsRes.json();
+        if (statsData.success && statsData.data) {
+          const s = statsData.data;
+          const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          if (document.getElementById('fincra_total_gross')) document.getElementById('fincra_total_gross').textContent = fmt(s.totalGrossVolumeNgn);
+          if (document.getElementById('fincra_total_payouts')) document.getElementById('fincra_total_payouts').textContent = fmt(s.totalDisbursedPayoutsNgn);
+          if (document.getElementById('fincra_total_fees')) document.getElementById('fincra_total_fees').textContent = fmt(s.totalFeesIncurredNgn);
+          if (document.getElementById('fincra_active_vba_count')) document.getElementById('fincra_active_vba_count').textContent = s.activeVirtualAccountsCount || 0;
+          if (document.getElementById('fincra_fee_rule')) {
+            document.getElementById('fincra_fee_rule').textContent = `${s.feePercentageConfigured || 1.5}% capped at ₦${(s.feeCapConfiguredNgn || 2000).toLocaleString('en-NG')}`;
+          }
+        }
+
+        // 2. Load Activities
+        const queryParams = new URLSearchParams({
+          page: fincraCurrentPage,
+          limit: 25,
+          ...(search ? { search } : {}),
+          ...(type ? { type } : {}),
+          ...(status ? { status } : {})
+        });
+
+        const actRes = await fetch(`${API_BASE}/api/admin/fincra/activities?${queryParams.toString()}`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const actData = await actRes.json();
+
+        if (actData.success && actData.data) {
+          const { activities, total, pages } = actData.data;
+          fincraTotalPages = pages || 1;
+          fincraCache = activities || [];
+
+          const badge = document.getElementById('fincra_tx_badge');
+          if (badge) badge.textContent = `${total || 0} records`;
+
+          const pageInfo = document.getElementById('fincraPageInfo');
+          if (pageInfo) pageInfo.textContent = `Page ${fincraCurrentPage} of ${fincraTotalPages}`;
+
+          const prevBtn = document.getElementById('fincraPrevBtn');
+          const nextBtn = document.getElementById('fincraNextBtn');
+          if (prevBtn) prevBtn.disabled = fincraCurrentPage <= 1;
+          if (nextBtn) nextBtn.disabled = fincraCurrentPage >= fincraTotalPages;
+
+          if (!activities || activities.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">No Fincra settlement records found matching your filters.</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = activities.map((tx, idx) => {
+            const dateStr = new Date(tx.created_at).toLocaleString('en-NG', { dateStyle: 'short', timeStyle: 'short' });
+            const amtNgn = Number(tx.amount_ngn || (tx.amount_kobo ? tx.amount_kobo / 100 : 0)).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+            const feeNgn = Number(tx.fee_amount_ngn || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+            const isPayout = (tx.activity_type || tx.type || '').includes('WITHDRAWAL') || (tx.activity_type || tx.type || '').includes('PAYOUT');
+            const statusClass = tx.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : (tx.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30');
+
+            return `
+              <tr class="hover:bg-slate-800/40 transition">
+                <td class="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap">${dateStr}</td>
+                <td class="py-3 px-3 font-mono font-bold text-teal-300 text-[11px]">
+                  <span class="cursor-pointer hover:underline" onclick="inspectFincraTransaction(${idx})">${tx.giga_reference || tx.reference}</span>
+                </td>
+                <td class="py-3 px-3">
+                  <span class="font-bold text-white block text-[11px]">${tx.activity_type || tx.type || 'PAYMENT'}</span>
+                  <span class="text-[10px] text-slate-500 uppercase">${tx.channel || 'FINCRA_DVA'}</span>
+                </td>
+                <td class="py-3 px-3">
+                  <span class="font-semibold text-slate-200 block text-[11px]">${tx.customer_name || 'Giga User'}</span>
+                  <span class="text-[10px] text-slate-400">${tx.customer_phone || tx.account_number || ''}</span>
+                </td>
+                <td class="py-3 px-3 text-right font-black ${isPayout ? 'text-amber-400' : 'text-emerald-400'} text-[12px]">
+                  ${isPayout ? '-' : '+'}₦${amtNgn}
+                </td>
+                <td class="py-3 px-3 text-right text-slate-400 font-mono text-[11px]">
+                  ₦${feeNgn}
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <span class="px-2 py-0.5 rounded text-[9px] font-bold border ${statusClass}">${tx.status || 'SUCCESS'}</span>
+                </td>
+                <td class="py-3 px-3 text-right">
+                  <button onclick="inspectFincraTransaction(${idx})" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-[10px] font-bold">
+                    <i class="fa-solid fa-receipt mr-1"></i> Receipt
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-red-400">Failed to load Fincra activities: ${err.message}</td></tr>`;
+        }
+      }
+    }
+
+    function changeFincraPage(delta) {
+      const newPage = fincraCurrentPage + delta;
+      if (newPage >= 1 && newPage <= fincraTotalPages) {
+        loadFincraConsole(newPage);
+      }
+    }
+
+    let activeReceiptData = null;
+
+    function inspectFincraTransaction(index) {
+      const tx = fincraCache[index];
+      if (!tx) return;
+      activeReceiptData = tx;
+
+      const modal = document.getElementById('fincraReceiptModal');
+      const content = document.getElementById('fincraReceiptContent');
+      if (!modal || !content) return;
+
+      const amtNgn = Number(tx.amount_ngn || (tx.amount_kobo ? tx.amount_kobo / 100 : 0)).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      const feeNgn = Number(tx.fee_amount_ngn || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      const dateStr = new Date(tx.created_at).toLocaleString('en-NG', { dateStyle: 'full', timeStyle: 'medium' });
+
+      content.innerHTML = `
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-2">
+          <span class="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Total Transaction Value</span>
+          <div class="text-2xl font-black text-emerald-400">₦${amtNgn}</div>
+          <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            ${tx.status || 'SUCCESS'}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-[11px] mt-4">
+          <div>
+            <span class="text-slate-500 block">Giga Reference:</span>
+            <strong class="font-mono text-teal-300 break-all">${tx.giga_reference || tx.reference}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Fincra Gateway ID:</span>
+            <strong class="font-mono text-slate-300 break-all">${tx.fincra_reference || tx.meta_data?.fincraReference || 'FINCRA_VERIFIED'}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Customer / Driver:</span>
+            <strong class="text-white">${tx.customer_name || 'Giga User'}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Contact Info:</span>
+            <strong class="text-slate-300">${tx.customer_phone || tx.customer_email || 'N/A'}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Transaction Type:</span>
+            <strong class="text-white">${tx.activity_type || tx.type || 'PAYMENT'}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Settlement Channel:</span>
+            <strong class="text-slate-300">${tx.channel || 'FINCRA_DVA'}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Gateway Fee:</span>
+            <strong class="text-amber-400">₦${feeNgn}</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Settled At:</span>
+            <strong class="text-slate-300">${dateStr}</strong>
+          </div>
+        </div>
+
+        <div class="p-3 bg-teal-950/40 rounded-lg border border-teal-500/20 text-[10px] text-teal-300 mt-4">
+          <i class="fa-solid fa-shield-halved mr-1"></i>
+          This transaction is immutably validated on the Giga Ride double-entry ledger and settled through Fincra Technologies CBN-licensed infrastructure.
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+    }
+
+    function printFincraReceiptModal() {
+      if (!activeReceiptData) return;
+      const tx = activeReceiptData;
+      const amtNgn = Number(tx.amount_ngn || (tx.amount_kobo ? tx.amount_kobo / 100 : 0)).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      const feeNgn = Number(tx.fee_amount_ngn || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      const dateStr = new Date(tx.created_at).toLocaleString('en-NG', { dateStyle: 'full', timeStyle: 'medium' });
+
+      const printWin = window.open('', '_blank', 'width=700,height=800');
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Giga Ride Receipt - ${tx.giga_reference || tx.reference}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; }
+            .header { border-bottom: 2px solid #0F766E; padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 20px; font-weight: 900; color: #0F766E; }
+            .subtitle { font-size: 11px; color: #64748b; }
+            .amount-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 25px; }
+            .amount { font-size: 28px; font-weight: 900; color: #10B981; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 30px; }
+            td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            td.lbl { color: #64748b; width: 40%; font-weight: 600; }
+            td.val { font-weight: bold; }
+            .footer { font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px; }
+          </style>
+        </head>
+        <body onload="window.print()">
+          <div class="header">
+            <div class="title">GIGA RIDE</div>
+            <div class="subtitle">Pickpadi Global Ltd • RC 1792834 • Official Settlement Receipt</div>
+          </div>
+          <div class="amount-box">
+            <div style="font-size: 11px; color: #64748b; font-weight: bold;">TOTAL SETTLED AMOUNT</div>
+            <div class="amount">₦${amtNgn}</div>
+            <div style="font-size: 11px; font-weight: bold; color: #10B981;">TRANSACTION SUCCESSFUL</div>
+          </div>
+          <table>
+            <tr><td class="lbl">Giga Reference</td><td class="val"><code>${tx.giga_reference || tx.reference}</code></td></tr>
+            <tr><td class="lbl">Fincra Gateway ID</td><td class="val">${tx.fincra_reference || tx.meta_data?.fincraReference || 'FINCRA_NIP'}</td></tr>
+            <tr><td class="lbl">Customer / Beneficiary</td><td class="val">${tx.customer_name || 'Giga User'}</td></tr>
+            <tr><td class="lbl">Phone / Email</td><td class="val">${tx.customer_phone || tx.customer_email || 'N/A'}</td></tr>
+            <tr><td class="lbl">Transaction Type</td><td class="val">${tx.activity_type || tx.type || 'PAYMENT'}</td></tr>
+            <tr><td class="lbl">Settlement Channel</td><td class="val">${tx.channel || 'FINCRA_DVA'}</td></tr>
+            <tr><td class="lbl">Gateway Fee</td><td class="val">₦${feeNgn}</td></tr>
+            <tr><td class="lbl">Date & Time</td><td class="val">${dateStr}</td></tr>
+          </table>
+          <div class="footer">
+            This electronic receipt confirms instantaneous settlement through Fincra Technologies Ltd and Giga Core Rails.
+          </div>
+        </body>
+        </html>
+      `);
+      printWin.document.close();
     }
 
     async function testEmailIntegration() {
@@ -3741,7 +4128,7 @@
     }
 
     async function refundCardTransaction(txId) {
-      const reason = prompt('Please enter the customer-service reason for this Paystack refund (e.g. Duplicate charge or driver dispute):');
+      const reason = prompt('Please enter the customer-service reason for this Fincra refund (e.g. Duplicate charge or driver dispute):');
       if (!reason || reason.trim().length < 3) return;
 
       try {
@@ -4238,8 +4625,8 @@
             </span>
           </td>
           <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-            <button onclick="inspectLivingWallet('${p.id}', '${p.full_name}')" class="bg-amber-500/20 hover:bg-amber-500 hover:text-white text-amber-300 text-xs px-2.5 py-1 rounded font-bold border border-amber-500/30 transition">
-              <i class="fa-solid fa-wallet"></i> Living Wallet
+            <button onclick="inspectWallet('${p.id}', '${p.full_name}')" class="bg-amber-500/20 hover:bg-amber-500 hover:text-white text-amber-300 text-xs px-2.5 py-1 rounded font-bold border border-amber-500/30 transition">
+              <i class="fa-solid fa-wallet"></i> Wallet
             </button>
             <button onclick="openPassengerCreditModal('${p.id}', '${p.full_name}')" class="bg-teal-600/20 hover:bg-teal-600 hover:text-white text-teal-300 text-xs px-2.5 py-1 rounded font-bold border border-teal-500/30 transition">
               + Credit
@@ -4874,7 +5261,7 @@
     }
 
     // =========================================================================
-    // ENTERPRISE MODULE 1: DRIVER PAYOUTS DESK (KORAPAY NIP)
+    // ENTERPRISE MODULE 1: DRIVER PAYOUTS DESK (FINCRA NIP)
     // =========================================================================
     let currentPayoutFilter = 'ALL';
 
@@ -4953,7 +5340,7 @@
     }
 
     async function processPayout(payoutId, action) {
-      if (action === 'APPROVE' && !confirm('Approve this payout? A live Korapay NIP settlement transfer will be dispatched to the driver commercial bank account.')) return;
+      if (action === 'APPROVE' && !confirm('Approve this payout? A live Fincra NIP settlement transfer will be dispatched to the driver commercial bank account.')) return;
 
       try {
         const res = await fetch(`${API_BASE}/api/admin/payouts/${payoutId}/action`, {
@@ -5721,17 +6108,17 @@
     }
 
     // =========================================================================
-    // ENTERPRISE MODULE 10: LIVING WALLET & 30-DAY BENEFICIARIES INSPECTOR
+    // ENTERPRISE MODULE 10: WALLET & 30-DAY BENEFICIARIES INSPECTOR
     // =========================================================================
     let lwCurrentBeneficiaries = [];
-    async function inspectLivingWallet(passengerId, passengerName) {
+    async function inspectWallet(passengerId, passengerName) {
       document.getElementById('lwPassengerSubtitle').textContent = `${passengerName || 'Passenger'} (${passengerId})`;
       document.getElementById('lwMainBalance').textContent = '₦...';
       document.getElementById('lwVaultBalance').textContent = '₦...';
       document.getElementById('lwNuban').textContent = 'Loading...';
       document.getElementById('lwBankName').textContent = '';
       document.getElementById('lwBeneficiariesTbody').innerHTML = '<tr><td colspan="3" class="py-4 text-center text-slate-500">Loading 30-day auto-remembered beneficiaries...</td></tr>';
-      document.getElementById('livingWalletModal').classList.remove('hidden');
+      document.getElementById('walletModal').classList.remove('hidden');
 
       try {
         const res = await fetch(`${API_BASE}/api/payments/wallet`, {
@@ -5750,7 +6137,7 @@
           renderLwBeneficiaries(lwCurrentBeneficiaries);
         }
       } catch (err) {
-        console.error('Error inspecting living wallet:', err);
+        console.error('Error inspecting wallet:', err);
       }
     }
 
@@ -5816,20 +6203,20 @@
         if (gwContainer && r.gateways) {
           const gws = [
             {
-              name: 'Korapay Virtual Accounts & NIP Rail',
-              type: 'Instant Bank Transfer & Dynamic NUBAN',
-              configured: r.gateways.korapay?.configured,
-              status: r.gateways.korapay?.status || 'ONLINE',
-              icon: 'fa-building-columns',
-              color: 'emerald'
+              name: 'Fincra Settlement & Virtual NUBANs',
+              type: 'Instant DVA Funding, Sub-accounts & NIP Rail',
+              configured: r.gateways.fincra?.configured,
+              status: r.gateways.fincra?.status || 'ONLINE',
+              icon: 'fa-bolt-lightning',
+              color: 'teal'
             },
             {
-              name: 'Paystack Multi-Channel Checkout',
-              type: 'Card, USSD & QR Payment Rail',
-              configured: r.gateways.paystack?.configured,
-              status: r.gateways.paystack?.status || 'ONLINE',
+              name: 'Fincra Card & Multi-Channel Checkout',
+              type: 'Card, Bank Transfer & Dynamic Checkout Rail',
+              configured: r.gateways.fincra?.configured,
+              status: r.gateways.fincra?.status || 'ONLINE',
               icon: 'fa-credit-card',
-              color: 'sky'
+              color: 'emerald'
             },
             {
               name: 'Resend Transactional Email Engine',

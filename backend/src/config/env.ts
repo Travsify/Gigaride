@@ -9,11 +9,16 @@ export const ENV = {
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/giga_ride',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  // Paystack Card Payments
-  PAYSTACK_BASE_URL: process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co',
-  PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || '',
-  PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY || '',
-  PAYSTACK_WEBHOOK_SECRET: process.env.PAYSTACK_WEBHOOK_SECRET || '',
+  // Fincra Payment Gateway, Virtual Accounts & Instant Payouts
+  FINCRA_BASE_URL: process.env.FINCRA_BASE_URL || 'https://api.fincra.com',
+  FINCRA_SECRET_KEY: process.env.FINCRA_SECRET_KEY || '',
+  FINCRA_PUBLIC_KEY: process.env.FINCRA_PUBLIC_KEY || '',
+  FINCRA_BUSINESS_ID: process.env.FINCRA_BUSINESS_ID || '',
+  FINCRA_WEBHOOK_SECRET: process.env.FINCRA_WEBHOOK_SECRET || '',
+  FINCRA_FEE_PERCENT: parseFloat(process.env.FINCRA_FEE_PERCENT || '1.5'),
+  FINCRA_FEE_CAP: parseFloat(process.env.FINCRA_FEE_CAP || '2000'),
+  FINCRA_WITHDRAWAL_FEE_NGN: parseFloat(process.env.FINCRA_WITHDRAWAL_FEE_NGN || '50'),
+  ADMIN_WITHDRAWAL_FEE_PERCENT: parseFloat(process.env.ADMIN_WITHDRAWAL_FEE_PERCENT || '0.5'),
 
   // OneSignal Push Notifications
   ONESIGNAL_APP_ID: process.env.ONESIGNAL_APP_ID || '',
@@ -25,7 +30,11 @@ export const ENV = {
   PREMBLY_APP_ID: process.env.PREMBLY_APP_ID || '',
   PREMBLY_PUBLIC_KEY: process.env.PREMBLY_PUBLIC_KEY || '',
 
-  // Korapay Virtual Accounts & Payouts
+  // Legacy fallback placeholders for transition
+  PAYSTACK_BASE_URL: process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co',
+  PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || '',
+  PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY || '',
+  PAYSTACK_WEBHOOK_SECRET: process.env.PAYSTACK_WEBHOOK_SECRET || '',
   KORAPAY_SECRET_KEY: process.env.KORAPAY_SECRET_KEY || '',
   KORAPAY_PUBLIC_KEY: process.env.KORAPAY_PUBLIC_KEY || '',
   KORAPAY_ENCRYPTION_KEY: process.env.KORAPAY_ENCRYPTION_KEY || '',

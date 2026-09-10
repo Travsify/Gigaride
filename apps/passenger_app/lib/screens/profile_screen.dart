@@ -207,7 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildPolicySection(
                 '2. Mutual Dynamic Fare Haggling & 0% Platform Cut',
-                'Trip fares are negotiated and agreed upon directly between Rider and Driver Partner in real time via in-app bidding. Drivers retain 100% of the agreed fare with zero platform percentage deductions. Riders agree to pay the agreed fare upon reaching the final destination either via cash, direct bank transfer, or Giga Living Wallet.',
+                'Trip fares are negotiated and agreed upon directly between Rider and Driver Partner in real time via in-app bidding. Drivers retain 100% of the agreed fare with zero platform percentage deductions. Riders agree to pay the agreed fare upon reaching the final destination either via cash, direct bank transfer, or Giga Wallet.',
               ),
               _buildPolicySection(
                 '3. Trip Status, Cancellation & Running Trips',
@@ -215,11 +215,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildPolicySection(
                 '4. Fare Payment, Theft of Services & Criminal Default',
-                'Willful refusal or intentional evasion of paying the agreed trip fare upon arrival at destination constitutes theft of services and fraud under the Nigerian Criminal Code and Penal Code. Pickpadi Global Ltd and Driver Partners reserve the right to report defaulters to the Nigeria Police Force, blacklist device terminals, report defaults to credit rating bureaus, and initiate automated recovery via linked cards or Living Wallet balances.',
+                'Willful refusal or intentional evasion of paying the agreed trip fare upon arrival at destination constitutes theft of services and fraud under the Nigerian Criminal Code and Penal Code. Pickpadi Global Ltd and Driver Partners reserve the right to report defaulters to the Nigeria Police Force, blacklist device terminals, report defaults to credit rating bureaus, and initiate automated recovery via linked cards or Wallet balances.',
               ),
               _buildPolicySection(
                 '5. Vehicle Soiling, Cleanliness & Detailing Fee',
-                'Riders are required to maintain vehicle cleanliness. If a passenger soils, spills liquids or food, vomits, or damages vehicle upholstery, interior fittings, or windows, a mandatory cleaning and detailing fee of between ₦10,000 and ₦30,000 (or the verified professional detailing invoice) shall be assessed and immediately debited from the rider\'s Living Wallet or linked debit card payable to the Driver Partner.',
+                'Riders are required to maintain vehicle cleanliness. If a passenger soils, spills liquids or food, vomits, or damages vehicle upholstery, interior fittings, or windows, a mandatory cleaning and detailing fee of between ₦10,000 and ₦30,000 (or the verified professional detailing invoice) shall be assessed and immediately debited from the rider\'s Wallet or linked debit card payable to the Driver Partner.',
               ),
               _buildPolicySection(
                 '6. Third-Party Bookings ("Booking for a Friend") & Minors',
@@ -314,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         content: const Text(
-          'In compliance with data protection laws, deleting your account will permanently scrub your profile, trip receipts, and living wallet. This action is irreversible.',
+          'In compliance with data protection laws, deleting your account will permanently scrub your profile, trip receipts, and wallet. This action is irreversible.',
           style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.4),
         ),
         actions: [

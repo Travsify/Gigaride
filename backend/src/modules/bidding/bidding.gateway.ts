@@ -759,7 +759,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
       }
     });
 
-    // --- 💵 Rollover Cash Change Directly to Passenger's Living Wallet ---
+    // --- 💵 Rollover Cash Change Directly to Passenger's Wallet ---
     socket.on('ride:settle_change_to_wallet', async (data: { rideId: string; tenderedNgn: number; agreedFareNgn: number }) => {
       try {
         const changeNgn = data.tenderedNgn - data.agreedFareNgn;
@@ -808,7 +808,7 @@ export function setupBiddingGateway(io: SocketIOServer) {
         oneSignalService.sendPush({
           userIds: [ride.rider_id],
           heading: '₦' + changeNgn.toLocaleString('en-NG') + ' Change Deposited!',
-          content: 'Your driver rollover change was credited to your Living Wallet. New balance: ₦' + result.passengerBalance.toLocaleString('en-NG'),
+          content: 'Your driver rollover change was credited to your Wallet. New balance: ₦' + result.passengerBalance.toLocaleString('en-NG'),
           data: { type: 'WALLET_TOPUP', rideId: ride.id },
         }).catch(() => {});
 

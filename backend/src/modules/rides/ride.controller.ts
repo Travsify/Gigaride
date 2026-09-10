@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { rideService } from './ride.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
+import { fincraService } from '../payments/fincra.service';
 
 export const rideRouter = Router();
 
@@ -206,3 +207,44 @@ rideRouter.post(
     }
   }
 );
+
+// Automatic Driver Virtual Bank Account for Cash/Transfer Payment Screen
+rideRouter.get(
+  '/:id/driver-bank-account',
+  requireAuth,
+  requireRole(['PASSENGER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const ride = await db.getRideById(String(req.params.id));
+      if (!ride || !ride.driver_id) {
+        res.status(404).json({ success: false, message: 'Driver or ride not found.' });
+        return;
+      }
+      const driver = await db.findUserById(ride.driver_id);
+      let vba = await db.getVirtualAccountByUserId(ride.driver_id);
+      if (!vba || !vba.account_number) {
+        vba = await fincraService.generateDedicatedVirtualAccount(
+          driver!.id,
+          driver!.full_name,
+          driver!.email,
+          driver!.phone_number
+        );
+      }
+      const fareNgn = ride.agreed_fare_ngn || ride.suggested_fare_ngn || 0;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          accountNumber: vba.account_number,
+          bankName: vba.bank_name,
+          accountName: vba.account_name,
+          agreedFareNgn: fareNgn,
+          driverName: driver?.full_name || 'Giga Driver Partner',
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+

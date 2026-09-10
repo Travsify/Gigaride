@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import '../services/api_service.dart';
+import '../services/statement_pdf_service.dart';
 
 class DriverWalletScreen extends StatefulWidget {
   const DriverWalletScreen({super.key});
@@ -17,6 +18,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
   final ApiService _api = ApiService();
   List<dynamic> _savedCards = [];
   List<dynamic> _cardTransactions = [];
+  List<dynamic> _statement = [];
 
   @override
   void initState() {
@@ -31,10 +33,12 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
     try {
       final cards = await _api.getSavedCards();
       final txs = await _api.getCardTransactions();
+      final stmt = await _api.getStatement();
       if (mounted) {
         setState(() {
           _savedCards = cards;
           _cardTransactions = txs;
+          _statement = stmt;
         });
       }
     } catch (_) {}
@@ -144,7 +148,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Earnings & Living Wallet', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Earnings & Wallet', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: AppConstants.textMuted),
@@ -353,9 +357,67 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
 
               const SizedBox(height: 24),
 
-              // CARD & SUBSCRIPTION TRANSACTIONS
-              const Text('Card & Subscription Transactions', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
+              // TRANSACTIONS & STATEMENT LEDGER
+              const Text('Statement & Transaction Ledger', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
+
+              // Print & Share Official PDF Statement Action Bar
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.print_rounded, size: 16),
+                      label: const Text('Print Statement', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        final user = provider.user;
+                        final allTxs = _statement.isNotEmpty ? _statement : _cardTransactions;
+                        await StatementPdfService.printStatement(
+                          userName: user?['fullName'] ?? user?['full_name'] ?? 'Giga Driver',
+                          userEmail: user?['email'] ?? '',
+                          userPhone: user?['phone_number'] ?? user?['phoneNumber'] ?? '',
+                          currentBalanceNgn: (vba?['balance_ngn'] ?? 0) as num,
+                          transactions: allTxs,
+                          nuban: vba?['account_number'],
+                          bankName: vba?['bank_name'],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share_rounded, size: 16),
+                      label: const Text('Share PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppConstants.accentColor,
+                        side: const BorderSide(color: AppConstants.accentColor),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        final user = provider.user;
+                        final allTxs = _statement.isNotEmpty ? _statement : _cardTransactions;
+                        await StatementPdfService.shareStatement(
+                          userName: user?['fullName'] ?? user?['full_name'] ?? 'Giga Driver',
+                          userEmail: user?['email'] ?? '',
+                          userPhone: user?['phone_number'] ?? user?['phoneNumber'] ?? '',
+                          currentBalanceNgn: (vba?['balance_ngn'] ?? 0) as num,
+                          transactions: allTxs,
+                          nuban: vba?['account_number'],
+                          bankName: vba?['bank_name'],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
 
               if (_cardTransactions.isEmpty)
                 Container(

@@ -171,7 +171,7 @@ export class ResendService {
       </p>
       <div style="background-color: #1F2937; border-left: 4px solid #10B981; padding: 14px 18px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; color: #F3F4F6; font-weight: bold; font-size: 14px;">What makes Giga Ride different?</p>
-        <p style="margin: 6px 0 0 0; color: #9CA3AF; font-size: 13px;">• Direct driver-to-passenger bidding<br>• Instant driver arrival tracking<br>• Built-in Naira Living Wallet for fast cashless payments</p>
+        <p style="margin: 6px 0 0 0; color: #9CA3AF; font-size: 13px;">• Direct driver-to-passenger bidding<br>• Instant driver arrival tracking<br>• Built-in Naira Wallet for fast cashless payments</p>
       </div>
       <p style="color: #D1D5DB; font-size: 14px;">Open your Giga Ride app to request your first ride today!</p>
     `;

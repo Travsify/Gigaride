@@ -543,6 +543,40 @@ adminRouter.put(
   }
 );
 
+// 26b. Fincra Activities Live Audit Feed (100% Precision & Multi-Tenant Isolated)
+adminRouter.get(
+  '/fincra/activities',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const search = req.query.search as string | undefined;
+      const type = req.query.type as string | undefined;
+      const status = req.query.status as string | undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 25;
+      const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+
+      const result = await adminService.getFincraActivities({ search, type, status, limit, page });
+      res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+// 26c. Fincra Aggregated Analytics & Settlement Metrics
+adminRouter.get(
+  '/fincra/stats',
+  requireAdminRole(['SUPER_ADMIN', 'FINANCE_ADMIN']),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const stats = await adminService.getFincraStats();
+      res.status(200).json({ success: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
 // 27. Test Resend Email Dispatch
 adminRouter.post(
   '/integrations/test-email',

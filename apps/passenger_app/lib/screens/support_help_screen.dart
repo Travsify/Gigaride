@@ -290,9 +290,9 @@ class _SupportHelpScreenState extends State<SupportHelpScreen> {
                 _buildCategoryCard(
                   icon: Icons.account_balance_wallet_rounded,
                   color: AppConstants.accentColor,
-                  title: 'Living Wallet',
+                  title: 'Wallet',
                   subtitle: 'Deposit, transfer or refund',
-                  onTap: () => _showNewComplaintModal('Living Wallet', defaultSubject: 'Wallet funding / transfer inquiry'),
+                  onTap: () => _showNewComplaintModal('Wallet', defaultSubject: 'Wallet funding / transfer inquiry'),
                 ),
               ],
             ),
@@ -405,8 +405,8 @@ class _SupportHelpScreenState extends State<SupportHelpScreen> {
               child: Column(
                 children: [
                   _buildFaqItem(
-                    'How does the Living Wallet refund work?',
-                    'If a ride is cancelled after payment or if there is an agreed cash change discrepancy, funds are credited immediately to your Living Wallet. You can withdraw to your commercial bank anytime with zero fees.',
+                    'How does the Wallet refund work?',
+                    'If a ride is cancelled after payment or if there is an agreed cash change discrepancy, funds are credited immediately to your Wallet. You can withdraw to your commercial bank anytime with zero fees.',
                   ),
                   const Divider(color: Colors.white10, height: 1),
                   _buildFaqItem(

@@ -550,7 +550,7 @@ export class PaystackService {
       const cardLabel = authorization ? `${authorization.brand?.toUpperCase()} •••• ${authorization.last4}` : 'Card';
       oneSignalService.sendPush({
         userIds: [userId],
-        heading: 'Living Wallet Credited 💳',
+        heading: 'Wallet Credited 💳',
         content: `₦${amountNgn.toLocaleString()} was successfully added to your wallet via ${cardLabel}.`,
         data: { type: 'WALLET_CARD_FUNDING', amountNgn },
       }).catch(() => {});
@@ -558,7 +558,7 @@ export class PaystackService {
       db.createNotification({
         user_id: userId,
         title: 'Card Payment Successful',
-        message: `₦${amountNgn.toLocaleString()} was credited to your Living Wallet from ${cardLabel}.`,
+        message: `₦${amountNgn.toLocaleString()} was credited to your Wallet from ${cardLabel}.`,
         type: 'WALLET',
         meta_data: { amountNgn, reference, card: cardLabel },
       }).catch(() => {});
@@ -716,7 +716,7 @@ export class PaystackService {
 
       oneSignalService.sendPush({
         userIds: [userId],
-        heading: 'Living Wallet Credited 💰',
+        heading: 'Wallet Credited 💰',
         content: `₦${amountNgn.toLocaleString()} received via Paystack Bank Transfer.`,
         data: { type: 'WALLET_TRANSFER_FUNDING', amountNgn },
       }).catch(() => {});
@@ -724,7 +724,7 @@ export class PaystackService {
       db.createNotification({
         user_id: userId,
         title: 'Bank Transfer Received 💰',
-        message: `₦${amountNgn.toLocaleString()} was credited to your Living Wallet from Paystack Bank Transfer.`,
+        message: `₦${amountNgn.toLocaleString()} was credited to your Wallet from Paystack Bank Transfer.`,
         type: 'WALLET',
         meta_data: { amountNgn, reference },
       }).catch(() => {});

@@ -116,7 +116,7 @@ class SocketService {
       }
     });
 
-    // 💵 Cash Change Credited to Living Wallet
+    // 💵 Cash Change Credited to Wallet
     socket!.on('wallet:change_credited', (data) {
       if (data != null && onWalletChangeCredited != null) {
         onWalletChangeCredited!(Map<String, dynamic>.from(data));
@@ -168,7 +168,7 @@ class SocketService {
     });
   }
 
-  // 💵 Settle Cash Change into Living Wallet
+  // 💵 Settle Cash Change into Wallet
   void settleChangeToWallet({
     required String rideId,
     required int tenderedNgn,

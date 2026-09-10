@@ -20,12 +20,15 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   }
 
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined;
+  if (!token && typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
+
+  if (!token) {
     res.status(401).json({ success: false, message: 'Authentication required. Please provide a valid Bearer token.' });
     return;
   }
-
-  const token = authHeader.split(' ')[1];
   try {
     const payload = authService.verifyToken(token);
     req.user = payload;
