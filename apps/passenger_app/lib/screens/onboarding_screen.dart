@@ -1,53 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 import 'phone_auth_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
-
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingItem> _items = const [
-    OnboardingItem(
-      badge: 'FAIR BIDDING',
-      title: 'Name Your Own Fare.\nZero Crazy Surges.',
-      description:
-          'Tired of 3x price hikes during Lagos rain or peak hours? On Giga Ride, you propose what you want to pay and choose directly from nearby verified drivers.',
-      icon: Icons.price_check_rounded,
-      accentColor: AppConstants.primaryLight,
-    ),
-    OnboardingItem(
-      badge: 'FINANCIAL FREEDOM',
-      title: 'Living Wallet &\nSafeLock Vault.',
-      description:
-          'Fund instantly with your personal dedicated Wema/Giga NUBAN. Lock your monthly transport budget into SafeLock so you never run stranded.',
-      icon: Icons.account_balance_wallet_rounded,
-      accentColor: AppConstants.accentColor,
-    ),
-    OnboardingItem(
-      badge: 'PRE-SCHEDULED VIP',
-      title: 'Guaranteed Airport &\nInterstate Travel.',
-      description:
-          'Catch your flight at MMA2 or Nnamdi Azikiwe with peace of mind. Pre-book vetted VIP drivers with flight tracking and guaranteed arrival.',
-      icon: Icons.flight_takeoff_rounded,
-      accentColor: Color(0xFF38BDF8), // Sky Blue
-    ),
-    OnboardingItem(
-      badge: 'NDPR DATA SHIELD',
-      title: 'Your Phone Number Is\nNever Shared With Drivers.',
-      description:
-          'Complete peace of mind under NDPR compliance. All in-app VoIP audio calls and estate gate chat are encrypted with zero personal phone leaks.',
-      icon: Icons.verified_user_rounded,
-      accentColor: Color(0xFF10B981), // Emerald
-    ),
+  final List<String> _images = const [
+    'assets/images/onboarding_1.png',
+    'assets/images/onboarding_2.png',
+    'assets/images/onboarding_3.png',
+    'assets/images/onboarding_4.png',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   void _onFinish() async {
     final prefs = await SharedPreferences.getInstance();
@@ -55,268 +43,165 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
+      PageRouteBuilder(
+        pageBuilder: (_, a, __) => const PhoneAuthScreen(),
+        transitionsBuilder: (_, a, __, child) =>
+            FadeTransition(opacity: a, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLast = _currentPage == _images.length - 1;
     return Scaffold(
-      backgroundColor: AppConstants.darkBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar: Brand + Skip Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: AppConstants.primaryLight.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'GIGA RIDE',
-                        style: TextStyle(
-                          color: AppConstants.textLight,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  TextButton(
-                    onPressed: _onFinish,
-                    child: const Text(
-                      'Skip',
-                      style: TextStyle(
-                        color: AppConstants.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+      backgroundColor: const Color(0xFF0A1628),
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // Full-screen image carousel
+          PageView.builder(
+            controller: _pageController,
+            itemCount: _images.length,
+            onPageChanged: (i) => setState(() => _currentPage = i),
+            itemBuilder: (_, i) => Image.asset(
+              _images[i],
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+          ),
+          // Bottom gradient scrim
+          Positioned(
+            left: 0, right: 0, bottom: 0, height: 230,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    const Color(0xFF0A1628).withOpacity(0.98),
+                    const Color(0xFF0A1628).withOpacity(0.85),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-
-            // PageView Carousel
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _items.length,
-                onPageChanged: (idx) => setState(() => _currentPage = idx),
-                itemBuilder: (context, index) {
-                  final item = _items[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
+          ),
+          // Skip button top-right
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _onFinish,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: const Text('Skip',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Bottom CTA
+          Positioned(
+            left: 0, right: 0, bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(_images.length, (i) {
+                        final active = i == _currentPage;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: active ? 28 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: active
+                                ? const Color(0xFF2DC79F)
+                                : Colors.white24,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (!isLast) {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 380),
+                              curve: Curves.easeInOut,
+                            );
+                          } else {
+                            _onFinish();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2DC79F),
+                          foregroundColor: Colors.white,
+                          elevation: 8,
+                          shadowColor: const Color(0xFF2DC79F).withOpacity(0.5),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: Text(
+                          isLast ? 'Get Started →' : 'Continue →',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Hero Icon Badge
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: item.accentColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: item.accentColor.withOpacity(0.35),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: item.accentColor.withOpacity(0.2),
-                                blurRadius: 28,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            item.icon,
-                            size: 42,
-                            color: item.accentColor,
-                          ),
-                        ),
-
-                        const SizedBox(height: 36),
-
-                        // Pill Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: item.accentColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: item.accentColor.withOpacity(0.4),
-                            ),
-                          ),
-                          child: Text(
-                            item.badge,
+                        const Text('Already have an account? ',
                             style: TextStyle(
-                              color: item.accentColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Headline
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            color: AppConstants.textLight,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                            height: 1.15,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Subtitle
-                        Text(
-                          item.description,
-                          style: const TextStyle(
-                            color: AppConstants.textMuted,
-                            fontSize: 15,
-                            height: 1.5,
-                          ),
+                                color: Colors.white54, fontSize: 13)),
+                        GestureDetector(
+                          onTap: _onFinish,
+                          child: const Text('Sign In',
+                              style: TextStyle(
+                                  color: Color(0xFF2DC79F),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
                         ),
                       ],
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
             ),
-
-            // Bottom Bar: Dots & Action CTA
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
-              child: Column(
-                children: [
-                  // Dot Indicators
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(_items.length, (index) {
-                      final isActive = index == _currentPage;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: isActive ? 28 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? AppConstants.primaryLight
-                              : AppConstants.surfaceBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    }),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Action Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_currentPage < _items.length - 1) {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        } else {
-                          _onFinish();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppConstants.primaryColor,
-                        foregroundColor: Colors.white,
-                        elevation: 6,
-                        shadowColor: AppConstants.primaryColor.withOpacity(0.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Text(
-                        _currentPage == _items.length - 1
-                            ? 'Get Started'
-                            : 'Continue',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Sign in link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Already have an account? ',
-                        style: TextStyle(color: AppConstants.textMuted, fontSize: 13),
-                      ),
-                      GestureDetector(
-                        onTap: _onFinish,
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            color: AppConstants.primaryLight,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
-
-class OnboardingItem {
-  final String badge;
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color accentColor;
-
-  const OnboardingItem({
-    required this.badge,
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.accentColor,
-  });
 }
