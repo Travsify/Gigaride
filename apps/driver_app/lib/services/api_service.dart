@@ -521,4 +521,15 @@ class ApiService {
     }
     throw Exception(data['message'] ?? 'Failed to execute USDT crypto withdrawal');
   }
+
+  Future<void> deleteAccount() async {
+    final token = await getToken();
+    await http.post(
+      Uri.parse('$baseUrl/api/auth/delete-account'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+  }
 }

@@ -1,111 +1,80 @@
-name: iOS App Store & TestFlight Builder
+name: Build iOS IPA & Artifacts
 
 on:
   workflow_dispatch:
-    inputs:
-      target_app:
-        description: 'Target Application to Build'
-        required: true
-        default: 'both'
-        type: choice
-        options:
-          - both
-          - passenger
-          - driver
   push:
     branches:
       - main
-    paths:
-      - 'apps/**'
-      - '.github/workflows/build_ios.yml'
 
 jobs:
   build-ios:
-    name: Build iOS Applications
-    runs-on: macos-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
+    name: Build Passenger & Driver iOS Apps
+    runs-on: macos-14
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.38.5'
           channel: 'stable'
           cache: true
 
-      - name: Verify Flutter & Xcode Environment
-        run: |
-          flutter --version
-          xcodebuild -version
+      - name: Check Flutter Doctor
+        run: flutter doctor -v
 
-      # ==========================================
-      # 1. BUILD PASSENGER APP (iOS)
-      # ==========================================
-      - name: Build Passenger iOS App
-        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'passenger' || github.event_name == 'push' }}
-        working-directory: apps/passenger_app
+      # --- Build Passenger iOS App ---
+      - name: Install Passenger App Dependencies
         run: |
-          echo "Installing dependencies..."
+          cd apps/passenger_app
           flutter pub get
-          echo "Building iOS framework without codesign..."
-          flutter build ios --release --no-codesign
-          echo "Packaging payload into downloadable .ipa..."
-          mkdir -p build/ios/iphoneos/Payload
-          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-          cd build/ios/iphoneos && zip -r GigaRide-Passenger-unsigned.ipa Payload
 
-      - name: Upload Passenger iOS IPA Artifact
-        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'passenger' || github.event_name == 'push' }}
+      - name: Build Passenger App iOS (Unsigned IPA / Payload)
+        run: |
+          cd apps/passenger_app
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../gigaride-passenger.ipa Payload
+          cd ../../..
+
+      # --- Build Driver iOS App ---
+      - name: Install Driver App Dependencies
+        run: |
+          cd apps/driver_app
+          flutter pub get
+
+      - name: Build Driver App iOS (Unsigned IPA / Payload)
+        run: |
+          cd apps/driver_app
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../gigaride-driver.ipa Payload
+          cd ../../..
+
+      # --- Upload Downloadable IPA Artifacts ---
+      - name: Upload Passenger IPA
         uses: actions/upload-artifact@v4
         with:
-          name: GigaRide-Passenger-iOS
-          path: apps/passenger_app/build/ios/iphoneos/GigaRide-Passenger-unsigned.ipa
-          retention-days: 14
+          name: gigaride-passenger-ios-ipa
+          path: apps/passenger_app/gigaride-passenger.ipa
+          if-no-files-found: error
 
-      # ==========================================
-      # 2. BUILD DRIVER APP (iOS)
-      # ==========================================
-      - name: Build Driver iOS App
-        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'driver' || github.event_name == 'push' }}
-        working-directory: apps/driver_app
-        run: |
-          echo "Installing dependencies..."
-          flutter pub get
-          echo "Building iOS framework without codesign..."
-          flutter build ios --release --no-codesign
-          echo "Packaging payload into downloadable .ipa..."
-          mkdir -p build/ios/iphoneos/Payload
-          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-          cd build/ios/iphoneos && zip -r GigaDriver-unsigned.ipa Payload
-
-      - name: Upload Driver iOS IPA Artifact
-        if: ${{ inputs.target_app == 'both' || inputs.target_app == 'driver' || github.event_name == 'push' }}
+      - name: Upload Driver IPA
         uses: actions/upload-artifact@v4
         with:
-          name: GigaDriver-iOS
-          path: apps/driver_app/build/ios/iphoneos/GigaDriver-unsigned.ipa
-          retention-days: 14
-
-      - name: Publish Latest iOS IPA Release
-        uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: latest-ios
-          name: "Latest iOS Test Builds (GigaRide & GigaDriver)"
-          body: |
-            Automated iOS release builds for direct device testing.
-            
-            ### Installation Methods:
-            - **Sideloadly / AltStore / Scarlet / TrollStore**: Sideload `.ipa` directly to your iPhone or iPad.
-            - **Direct Artifacts**: Also accessible via GitHub Actions run artifacts.
-          prerelease: true
-          files: |
-            apps/passenger_app/build/ios/iphoneos/GigaRide-Passenger-unsigned.ipa
-            apps/driver_app/build/ios/iphoneos/GigaDriver-unsigned.ipa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          name: gigaride-driver-ios-ipa
+          path: apps/driver_app/gigaride-driver.ipa
+          if-no-files-found: error
