@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../core/constants.dart';
 import '../services/api_service.dart';
@@ -313,7 +313,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen> {
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (context, index) => const SizedBox(height: 10),
                           itemBuilder: (ctx, i) {
                             final ride = filtered[i];
                             final status = (ride['status'] ?? 'COMPLETED').toString();
