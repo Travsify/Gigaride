@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/passenger_provider.dart';
 import '../services/agora_voice_service.dart';
@@ -11,6 +12,7 @@ class InAppCallScreen extends StatefulWidget {
   final String driverId;
   final String driverName;
   final String? vehicleInfo;
+  final String? driverPhone;
   final bool isIncoming;
 
   const InAppCallScreen({
@@ -19,6 +21,7 @@ class InAppCallScreen extends StatefulWidget {
     required this.driverId,
     required this.driverName,
     this.vehicleInfo,
+    this.driverPhone,
     this.isIncoming = false,
   });
 
@@ -84,14 +87,17 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
         });
         _startTimer();
 
-        final channel = data?['channelName'] ?? 'ride_${widget.rideId}';
-        final token = data?['agoraToken'] as String?;
-        final appId = data?['agoraAppId'] as String?;
-        AgoraVoiceService.instance.joinChannel(
-          channelId: channel,
-          token: token,
-          appId: appId,
-        );
+        // Only join if we haven't already joined from token_ready
+        if (!AgoraVoiceService.instance.isJoined) {
+          final channel = data?['channelName'] ?? 'ride_${widget.rideId}';
+          final token = data?['agoraToken'] as String?;
+          final appId = data?['agoraAppId'] as String?;
+          AgoraVoiceService.instance.joinChannel(
+            channelId: channel,
+            token: token,
+            appId: appId,
+          );
+        }
       }
     };
 
@@ -264,7 +270,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                 ],
               ),
 
-              // NDPR Privacy Assurance Card
+              // NDPR Privacy Assurance Card with Cellular Fallback option
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -272,23 +278,55 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.white10),
                 ),
-                child: const Row(
+                child: Column(
                   children: [
-                    Icon(Icons.lock_rounded, color: AppConstants.accentColor, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('NDPR Privacy Shield Active', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
-                          SizedBox(height: 2),
-                          Text('All communications are 100% encrypted in-app audio. Driver personal phone number is securely masked.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                        ],
-                      ),
+                    const Row(
+                      children: [
+                        Icon(Icons.lock_rounded, color: AppConstants.accentColor, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('NDPR Privacy Shield Active', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 2),
+                              Text('All communications are encrypted in-app audio.', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
+                    if (widget.driverPhone != null && widget.driverPhone!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () async {
+                          final uri = Uri.parse('tel:${widget.driverPhone}');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.phone_forwarded_rounded, color: AppConstants.primaryLight, size: 14),
+                              SizedBox(width: 6),
+                              Text('Having voice issues? Call via Cellular Network', style: TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+
+              const SizedBox(height: 12),
 
               // Call Controls Area
               Padding(

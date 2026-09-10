@@ -69,6 +69,9 @@ class AgoraVoiceService {
 
       // 4. Configure Audio Pipeline: Enable voice, disable video, set earpiece/speakerphone
       await _engine!.enableAudio();
+      await _engine!.enableLocalAudio(true); // Explicitly enable mic hardware capture
+      await _engine!.adjustRecordingSignalVolume(100); // Max mic volume
+      await _engine!.adjustPlaybackSignalVolume(100); // Max incoming volume
       await _engine!.disableVideo();
       await _engine!.setAudioProfile(
         profile: AudioProfileType.audioProfileSpeechStandard,
@@ -92,6 +95,12 @@ class AgoraVoiceService {
     int uid = 0,
     String? appId,
   }) async {
+    // Prevent double-joining the same channel (drops the local audio track)
+    if (_isJoined) {
+      debugPrint('[AgoraVoice] Already joined channel, ignoring duplicate join request');
+      return;
+    }
+
     final ready = await initialize(appId: appId);
     if (!ready || _engine == null) {
       debugPrint('[AgoraVoice] Engine not ready, cannot join channel');

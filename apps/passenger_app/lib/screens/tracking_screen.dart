@@ -258,6 +258,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final name = driver?['driverName'] ?? 'Driver';
     final driverId = driver?['driverId'] ?? 'driver';
     final vehicle = '${driver?['vehicleModel'] ?? 'Vehicle'} • ${driver?['licensePlate'] ?? ''}';
+    final phone = driver?['phone'] ?? driver?['phoneNumber'] ?? driver?['driverPhone'];
 
     Navigator.push(
       context,
@@ -267,6 +268,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
           driverId: driverId,
           driverName: name,
           vehicleInfo: vehicle,
+          driverPhone: phone,
         ),
       ),
     );
