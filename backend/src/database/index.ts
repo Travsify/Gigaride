@@ -390,6 +390,13 @@ export interface PlatformSettingsRow {
   fincra_withdrawal_flat_fee_ngn?: number;
   admin_withdrawal_fee_percent?: number;
 
+  // Maplerad Crypto Rail (USDT Funding -> Naira Wallet Conversion)
+  maplerad_base_url?: string;
+  maplerad_secret_key?: string;
+  maplerad_public_key?: string;
+  maplerad_webhook_secret?: string;
+  maplerad_usdt_ngn_rate?: number;
+
   // Paystack Card Payments (Legacy)
   paystack_secret_key?: string;
   paystack_public_key?: string;
@@ -477,6 +484,11 @@ export class DatabaseService {
       fincra_fee_cap: 2000,
       fincra_withdrawal_flat_fee_ngn: 50,
       admin_withdrawal_fee_percent: 0.5,
+      maplerad_base_url: process.env.MAPLERAD_BASE_URL || 'https://api.maplerad.com/v1',
+      maplerad_secret_key: process.env.MAPLERAD_SECRET_KEY || '',
+      maplerad_public_key: process.env.MAPLERAD_PUBLIC_KEY || '',
+      maplerad_webhook_secret: process.env.MAPLERAD_WEBHOOK_SECRET || '',
+      maplerad_usdt_ngn_rate: parseFloat(process.env.MAPLERAD_USDT_NGN_FALLBACK_RATE || '1550'),
       korapay_secret_key: '',
       korapay_public_key: '',
       korapay_encryption_key: '',

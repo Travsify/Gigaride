@@ -459,14 +459,66 @@ class ApiService {
     );
   }
 
-  Future<void> deleteAccount() async {
+  Future<Map<String, dynamic>> withdrawToBank({
+    required int amountNgn,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String bankCode = '000',
+  }) async {
     final token = await getToken();
-    await http.post(
-      Uri.parse('$baseUrl/api/auth/delete-account'),
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/wallet/withdraw'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
+      body: jsonEncode({
+        'amountNgn': amountNgn,
+        'bankName': bankName,
+        'accountNumber': accountNumber,
+        'accountName': accountName,
+        'bankCode': bankCode,
+      }),
     );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? data;
+    }
+    throw Exception(data['message'] ?? 'Failed to execute bank withdrawal');
+  }
+
+  Future<Map<String, dynamic>> getCryptoRate() async {
+    final response = await http.get(Uri.parse('$baseUrl/api/payments/crypto/rate'));
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    return {'rateNgn': 1550, 'supportedNetworks': ['TRC20', 'BEP20', 'POLYGON', 'ERC20']};
+  }
+
+  Future<Map<String, dynamic>> withdrawCryptoUsdt({
+    required int amountNgn,
+    required String targetAddress,
+    String network = 'TRC20',
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/crypto/usdt/withdraw'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'amountNgn': amountNgn,
+        'targetAddress': targetAddress,
+        'network': network,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? data;
+    }
+    throw Exception(data['message'] ?? 'Failed to execute USDT crypto withdrawal');
   }
 }

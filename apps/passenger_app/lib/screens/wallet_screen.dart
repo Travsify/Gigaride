@@ -82,9 +82,13 @@ class _WalletScreenState extends State<WalletScreen> {
   // ACTION 1: ADD MONEY (CARD & BANK MODAL)
   // ==========================================
   void _showAddMoneyModal() {
-    int selectedTab = 0; // 0 = Card, 1 = Bank Transfer
+    int selectedTab = 0; // 0 = Card, 1 = Bank Transfer, 2 = USDT Crypto
     final amountCtrl = TextEditingController(text: '5000');
+    final usdtCtrl = TextEditingController(text: '20');
     Map<String, dynamic>? dynamicTransfer;
+    Map<String, dynamic>? cryptoDeposit;
+    String selectedNetwork = 'TRC20';
+    int cryptoRateNgn = 1550;
     bool isGenerating = false;
     bool isVerifying = false;
 
@@ -112,7 +116,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Method Selector Tabs
+                    // Method Selector Tabs (Card, Bank Transfer, USDT Crypto)
                     Row(
                       children: [
                         Expanded(
@@ -122,21 +126,21 @@ class _WalletScreenState extends State<WalletScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
                                 color: selectedTab == 0 ? AppConstants.primaryColor : AppConstants.darkBg,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: selectedTab == 0 ? AppConstants.primaryLight : Colors.white10),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.credit_card_rounded, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Debit / Credit Card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  Icon(Icons.credit_card_rounded, color: Colors.white, size: 15),
+                                  SizedBox(width: 4),
+                                  Text('Card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: InkWell(
                             onTap: () => setModalState(() => selectedTab = 1),
@@ -144,15 +148,45 @@ class _WalletScreenState extends State<WalletScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
                                 color: selectedTab == 1 ? AppConstants.primaryColor : AppConstants.darkBg,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: selectedTab == 1 ? AppConstants.primaryLight : Colors.white10),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.account_balance_rounded, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Bank Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  Icon(Icons.account_balance_rounded, color: Colors.white, size: 15),
+                                  SizedBox(width: 4),
+                                  Text('Bank Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              setModalState(() => selectedTab = 2);
+                              try {
+                                final r = await _api.getCryptoRate();
+                                if (r['rateNgn'] != null) {
+                                  setModalState(() => cryptoRateNgn = (r['rateNgn'] as num).toInt());
+                                }
+                              } catch (_) {}
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selectedTab == 2 ? const Color(0xFF0D9488) : AppConstants.darkBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: selectedTab == 2 ? Colors.tealAccent : Colors.white10),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.currency_bitcoin_rounded, color: Colors.tealAccent, size: 15),
+                                  SizedBox(width: 4),
+                                  Text('USDT Crypto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                                 ],
                               ),
                             ),
@@ -432,6 +466,322 @@ class _WalletScreenState extends State<WalletScreen> {
                           child: TextButton(
                             onPressed: () => setModalState(() => dynamicTransfer = null),
                             child: const Text('Cancel / Choose Different Amount', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                          ),
+                        ),
+                      ],
+                    ],
+
+                    if (selectedTab == 2) ...[
+                      // ==========================================
+                      // TAB 2: USDT CRYPTO FUNDING (MAPLERAD RAIL)
+                      // Strictly converted to Nigerian Naira (₦)
+                      // ==========================================
+                      if (cryptoDeposit == null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.swap_horizontal_circle_outlined, color: Colors.tealAccent, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Live FX Rate: 1 USDT ≈ ₦${cryptoRateNgn.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                  style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppConstants.darkBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: const Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.shield_outlined, color: AppConstants.accentColor, size: 16),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'USDT is an on-ramp funding rail. Your deposit is converted directly to Nigerian Naira (₦). All Giga rides and platform fees remain 100% priced in Naira.',
+                                  style: TextStyle(color: AppConstants.textMuted, fontSize: 11, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        const Text('Choose Blockchain Network:', style: TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 12)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            {'id': 'TRC20', 'label': 'TRC20 (Tron - Recommended)'},
+                            {'id': 'BEP20', 'label': 'BEP20 (BNB Chain)'},
+                            {'id': 'POLYGON', 'label': 'Polygon'},
+                            {'id': 'ERC20', 'label': 'ERC20 (Ethereum)'},
+                          ].map((net) {
+                            final isSel = selectedNetwork == net['id'];
+                            return ChoiceChip(
+                              label: Text(net['label']!, style: TextStyle(color: isSel ? Colors.white : AppConstants.textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
+                              selected: isSel,
+                              selectedColor: const Color(0xFF0D9488),
+                              backgroundColor: AppConstants.darkBg,
+                              onSelected: (_) => setModalState(() => selectedNetwork = net['id']!),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextField(
+                          controller: usdtCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          onChanged: (_) => setModalState(() {}),
+                          decoration: InputDecoration(
+                            labelText: 'Deposit Amount (USDT)',
+                            labelStyle: const TextStyle(color: AppConstants.textMuted),
+                            prefixText: '₮ ',
+                            prefixStyle: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold),
+                            filled: true,
+                            fillColor: AppConstants.darkBg,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Real-time estimated Naira credit calculation
+                        Builder(builder: (_) {
+                          final parsedUsdt = double.tryParse(usdtCtrl.text.trim()) ?? 20.0;
+                          final estimatedNgn = (parsedUsdt * cryptoRateNgn).round();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(color: AppConstants.darkBg, borderRadius: BorderRadius.circular(8)),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('You will receive in Naira:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                Text('≈ ₦${estimatedNgn.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                  style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 12),
+
+                        Wrap(
+                          spacing: 8,
+                          children: [10, 20, 50, 100].map((amt) {
+                            return ActionChip(
+                              backgroundColor: AppConstants.darkBg,
+                              label: Text('$amt USDT', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: () => setModalState(() => usdtCtrl.text = amt.toString()),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            icon: isGenerating
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.qr_code_rounded, size: 18, color: Colors.white),
+                            label: Text(
+                              isGenerating ? 'Generating Deposit Address...' : 'Get $selectedNetwork Deposit Address',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D9488),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: isGenerating ? null : () async {
+                              final amt = double.tryParse(usdtCtrl.text.trim()) ?? 0.0;
+                              if (amt < 5) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Minimum deposit is 5 USDT.'), backgroundColor: AppConstants.dangerColor),
+                                );
+                                return;
+                              }
+                              final messenger = ScaffoldMessenger.of(context);
+                              setModalState(() => isGenerating = true);
+                              try {
+                                final res = await _api.generateCryptoDeposit(
+                                  network: selectedNetwork,
+                                  expectedUsdt: amt,
+                                );
+                                setModalState(() {
+                                  cryptoDeposit = res;
+                                  isGenerating = false;
+                                });
+                              } catch (e) {
+                                setModalState(() => isGenerating = false);
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('Error: $e'), backgroundColor: AppConstants.dangerColor),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ] else ...[
+                        // DEPOSIT ADDRESS ACTIVE CARD
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppConstants.darkBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.tealAccent.withOpacity(0.4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(color: Colors.tealAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                        child: Text(
+                                          '${cryptoDeposit!['network']} Network',
+                                          style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold, fontSize: 11),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.timer_outlined, size: 12, color: Colors.amberAccent),
+                                        SizedBox(width: 4),
+                                        Text('Valid 2 Hours', style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              const Text('Send USDT to Deposit Address:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black38,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: SelectableText(
+                                        cryptoDeposit!['depositAddress'] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.tealAccent,
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                                      tooltip: 'Copy Address',
+                                      onPressed: () {
+                                        Clipboard.setData(ClipboardData(text: cryptoDeposit!['depositAddress'] ?? ''));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('USDT Address copied!'), backgroundColor: AppConstants.successColor),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Expected Deposit:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                  Text('${cryptoDeposit!['expectedUsdt']} USDT', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Auto-Conversion to Naira:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                  Text(
+                                    '₦${(cryptoDeposit!['estimatedNgn'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                    style: const TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            icon: isVerifying
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
+                            label: Text(
+                              isVerifying ? 'Verifying Blockchain Confirmation...' : 'I Have Sent The USDT',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.successColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: isVerifying ? null : () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              setModalState(() => isVerifying = true);
+                              final ref = cryptoDeposit!['reference'] as String;
+                              try {
+                                final res = await _api.verifyCryptoDeposit(ref);
+                                if (!ctx.mounted) return;
+                                Navigator.pop(ctx);
+                                if (mounted) await _loadWalletData();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(res['message'] ?? '✓ USDT Deposit converted and credited to your Naira wallet!'),
+                                    backgroundColor: AppConstants.successColor,
+                                  ),
+                                );
+                              } catch (e) {
+                                setModalState(() => isVerifying = false);
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('Verification: $e'), backgroundColor: AppConstants.dangerColor),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => setModalState(() => cryptoDeposit = null),
+                            child: const Text('Cancel / Choose Different Network', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                           ),
                         ),
                       ],

@@ -20,6 +20,13 @@ export const ENV = {
   FINCRA_WITHDRAWAL_FEE_NGN: parseFloat(process.env.FINCRA_WITHDRAWAL_FEE_NGN || '50'),
   ADMIN_WITHDRAWAL_FEE_PERCENT: parseFloat(process.env.ADMIN_WITHDRAWAL_FEE_PERCENT || '0.5'),
 
+  // Maplerad Crypto & FX Rail (USDT Funding -> Naira Wallet Conversion)
+  MAPLERAD_BASE_URL: process.env.MAPLERAD_BASE_URL || 'https://api.maplerad.com/v1',
+  MAPLERAD_SECRET_KEY: process.env.MAPLERAD_SECRET_KEY || '',
+  MAPLERAD_PUBLIC_KEY: process.env.MAPLERAD_PUBLIC_KEY || '',
+  MAPLERAD_WEBHOOK_SECRET: process.env.MAPLERAD_WEBHOOK_SECRET || '',
+  MAPLERAD_USDT_NGN_FALLBACK_RATE: parseFloat(process.env.MAPLERAD_USDT_NGN_FALLBACK_RATE || '1550'),
+
   // OneSignal Push Notifications
   ONESIGNAL_APP_ID: process.env.ONESIGNAL_APP_ID || '',
   ONESIGNAL_REST_API_KEY: process.env.ONESIGNAL_REST_API_KEY || '',

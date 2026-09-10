@@ -52,85 +52,302 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
   }
 
   void _showWithdrawModal() {
+    int withdrawMode = 0; // 0 = Bank Account (NIP), 1 = USDT Crypto (Maplerad)
     final amountCtrl = TextEditingController(text: '10000');
     final accountNumCtrl = TextEditingController();
+    final accountNameCtrl = TextEditingController(text: 'Driver Partner');
     final bankCtrl = TextEditingController(text: 'GTBank (Guaranty Trust)');
+    final cryptoAddressCtrl = TextEditingController();
+    String cryptoNetwork = 'TRC20';
+    int cryptoRateNgn = 1550;
+    bool isProcessing = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppConstants.cardBg,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Withdraw to Bank Account', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            const Text('Instant Nigerian Inter-Bank Settlement (NIP)', style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: amountCtrl,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                labelText: 'Amount (₦)',
-                prefixText: '₦ ',
-                filled: true,
-                fillColor: AppConstants.surfaceBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final amt = int.tryParse(amountCtrl.text) ?? 10000;
+          final feeNgn = 50 + (amt * 0.005).round();
+          final totalNgn = amt + feeNgn;
+          final estUsdt = (amt / cryptoRateNgn).toStringAsFixed(2);
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Withdraw Earnings', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Mode Selector: Bank vs USDT Crypto
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setModalState(() => withdrawMode = 0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: withdrawMode == 0 ? AppConstants.primaryColor : AppConstants.surfaceBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: withdrawMode == 0 ? AppConstants.primaryLight : Colors.white10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.account_balance_rounded, color: Colors.white, size: 15),
+                                SizedBox(width: 6),
+                                Text('Bank Account (NIP)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            setModalState(() => withdrawMode = 1);
+                            try {
+                              final r = await _api.getCryptoRate();
+                              if (r['rateNgn'] != null) {
+                                setModalState(() => cryptoRateNgn = (r['rateNgn'] as num).toInt());
+                              }
+                            } catch (_) {}
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: withdrawMode == 1 ? const Color(0xFF0D9488) : AppConstants.surfaceBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: withdrawMode == 1 ? Colors.tealAccent : Colors.white10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.currency_bitcoin_rounded, color: Colors.tealAccent, size: 15),
+                                SizedBox(width: 6),
+                                Text('USDT Crypto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: AppConstants.textLight, fontSize: 16, fontWeight: FontWeight.bold),
+                    onChanged: (_) => setModalState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Amount to Withdraw (₦)',
+                      prefixText: '₦ ',
+                      filled: true,
+                      fillColor: AppConstants.surfaceBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Fee breakdown (Strictly priced in Naira ₦)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: AppConstants.surfaceBg, borderRadius: BorderRadius.circular(10)),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Platform Settlement Fee (₦50 + 0.5%):', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            Text('₦${feeNgn.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total Deducted from Balance:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            Text('₦${totalNgn.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (withdrawMode == 0) ...[
+                    // COMMERCIAL BANK FIELDS
+                    TextField(
+                      controller: bankCtrl,
+                      style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Destination Bank',
+                        filled: true,
+                        fillColor: AppConstants.surfaceBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: accountNumCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 10,
+                      style: const TextStyle(color: AppConstants.textLight, fontSize: 16, letterSpacing: 2),
+                      decoration: InputDecoration(
+                        labelText: '10-Digit NUBAN Number',
+                        hintText: '0123456789',
+                        filled: true,
+                        fillColor: AppConstants.surfaceBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ] else ...[
+                    // USDT CRYPTO FIELDS
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.teal.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.currency_exchange_rounded, color: Colors.tealAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Live Rate: 1 USDT ≈ ₦${cryptoRateNgn.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} | Dispatched: ≈ $estUsdt USDT',
+                              style: const TextStyle(color: Colors.tealAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Wrap(
+                      spacing: 8,
+                      children: ['TRC20', 'BEP20', 'POLYGON'].map((net) {
+                        final isSel = cryptoNetwork == net;
+                        return ChoiceChip(
+                          label: Text(net, style: TextStyle(color: isSel ? Colors.white : AppConstants.textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF0D9488),
+                          backgroundColor: AppConstants.surfaceBg,
+                          onSelected: (_) => setModalState(() => cryptoNetwork = net),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextField(
+                      controller: cryptoAddressCtrl,
+                      style: const TextStyle(color: Colors.tealAccent, fontFamily: 'monospace', fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Destination USDT Wallet Address ($cryptoNetwork)',
+                        hintText: cryptoNetwork == 'TRC20' ? 'T...' : '0x...',
+                        filled: true,
+                        fillColor: AppConstants.surfaceBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: withdrawMode == 1 ? const Color(0xFF0D9488) : AppConstants.successColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: isProcessing ? null : () async {
+                        if (amt < 500) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Minimum withdrawal is ₦500.'), backgroundColor: AppConstants.dangerColor),
+                          );
+                          return;
+                        }
+
+                        final messenger = ScaffoldMessenger.of(context);
+                        setModalState(() => isProcessing = true);
+
+                        try {
+                          if (withdrawMode == 0) {
+                            final accNum = accountNumCtrl.text.trim();
+                            if (accNum.length != 10) {
+                              throw Exception('Please enter a valid 10-digit NUBAN number.');
+                            }
+                            await _api.withdrawToBank(
+                              amountNgn: amt,
+                              bankName: bankCtrl.text.trim(),
+                              accountNumber: accNum,
+                              accountName: accountNameCtrl.text.trim(),
+                            );
+                          } else {
+                            final addr = cryptoAddressCtrl.text.trim();
+                            if (addr.length < 15) {
+                              throw Exception('Please enter a valid USDT destination address.');
+                            }
+                            await _api.withdrawCryptoUsdt(
+                              amountNgn: amt,
+                              targetAddress: addr,
+                              network: cryptoNetwork,
+                            );
+                          }
+
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (mounted) {
+                            context.read<DriverProvider>().loadVirtualAccount();
+                            _loadCardsAndTransactions();
+                          }
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                withdrawMode == 0
+                                    ? '✓ ₦${NumberFormat('#,##0', 'en_US').format(amt)} dispatched via NIP to your bank!'
+                                    : '✓ $estUsdt USDT dispatched to your $cryptoNetwork crypto wallet!',
+                              ),
+                              backgroundColor: AppConstants.successColor,
+                            ),
+                          );
+                        } catch (e) {
+                          setModalState(() => isProcessing = false);
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Withdrawal Error: $e'), backgroundColor: AppConstants.dangerColor),
+                          );
+                        }
+                      },
+                      child: isProcessing
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(
+                              withdrawMode == 0 ? 'Confirm Bank Transfer' : 'Dispatch $estUsdt USDT',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: bankCtrl,
-              style: const TextStyle(color: AppConstants.textLight, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Destination Bank',
-                filled: true,
-                fillColor: AppConstants.surfaceBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: accountNumCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 10,
-              style: const TextStyle(color: AppConstants.textLight, fontSize: 16, letterSpacing: 2),
-              decoration: InputDecoration(
-                labelText: '10-Digit NUBAN Number',
-                hintText: '0123456789',
-                filled: true,
-                fillColor: AppConstants.surfaceBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.successColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                onPressed: () {
-                  final amt = int.tryParse(amountCtrl.text) ?? 10000;
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('✓ ₦${NumberFormat('#,##0', 'en_US').format(amt)} withdrawal dispatched to your bank!'), backgroundColor: AppConstants.successColor),
-                  );
-                },
-                child: const Text('Confirm Instant Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

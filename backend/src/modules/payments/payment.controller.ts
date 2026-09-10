@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { fincraService } from './fincra.service';
+import { mapleradService, UsdtNetwork } from './maplerad.service';
 import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.middleware';
 import { db } from '../../database';
 import { oneSignalService } from '../notifications/onesignal.service';
@@ -104,6 +105,29 @@ paymentRouter.post('/fincra/webhook', async (req: Request, res: Response): Promi
     res.status(200).json({ status: 'success', data: result });
   } catch (err: any) {
     console.error('Fincra webhook error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 3.1 MAPLERAD CRYPTO WEBHOOK RECEIVER (MULTI-TENANT ISOLATED)
+// ==========================================
+paymentRouter.post('/maplerad/webhook', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const signature = (req.headers['x-maplerad-signature'] || req.headers['signature'] || '') as string;
+    const rawPayload = JSON.stringify(req.body);
+    const settings = await mapleradService.getSettings();
+
+    const isValid = mapleradService.verifyWebhookSignature(rawPayload, signature, settings.webhookSecret);
+    if (!isValid && process.env.NODE_ENV === 'production') {
+      res.status(400).send('Invalid Maplerad webhook signature');
+      return;
+    }
+
+    const result = await mapleradService.handleWebhook(req.body);
+    res.status(200).json({ status: 'success', data: result });
+  } catch (err: any) {
+    console.error('Maplerad webhook error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -258,6 +282,119 @@ paymentRouter.post(
 
       const result = await fincraService.verifyDynamicBankTransfer(req.user!.userId, String(reference));
       res.status(200).json({ success: result.success, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// ==========================================
+// 5.5. MAPLERAD USDT CRYPTO FUNDING & CONVERSION (100% NAIRA SETTLEMENT)
+// NOTE: USDT is strictly an on-ramp/funding conversion rail.
+// All fares, trips, commissions, and platform fees are strictly priced in Naira (₦).
+// ==========================================
+
+// Get Live USDT/NGN Exchange Rate & Supported Networks
+paymentRouter.get('/crypto/rate', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const rateInfo = await mapleradService.getLiveUsdtRate();
+    res.status(200).json({ success: true, data: rateInfo });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Generate USDT Deposit Address (TRC20, ERC20, POLYGON, BEP20)
+paymentRouter.post(
+  '/crypto/usdt/fund',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const network = (req.body.network || 'TRC20').toUpperCase() as UsdtNetwork;
+      const expectedUsdt = Number(req.body.expectedUsdt || req.body.amount_usdt || 20);
+
+      if (!['TRC20', 'ERC20', 'POLYGON', 'BEP20'].includes(network)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid network. Supported networks: TRC20, ERC20, POLYGON, BEP20.',
+        });
+        return;
+      }
+
+      if (expectedUsdt < 5) {
+        res.status(400).json({ success: false, message: 'Minimum USDT deposit is 5 USDT.' });
+        return;
+      }
+
+      const depositData = await mapleradService.generateUsdtDepositAddress(
+        req.user!.userId,
+        network,
+        expectedUsdt
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `USDT ${network} deposit address generated. Funds will auto-convert to Naira upon receipt.`,
+        data: depositData,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// Verify USDT Deposit Status & Credit Naira Wallet
+paymentRouter.post(
+  '/crypto/usdt/verify',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        res.status(400).json({ success: false, message: 'Transaction reference is required.' });
+        return;
+      }
+
+      const result = await mapleradService.verifyUsdtDeposit(req.user!.userId, String(reference));
+      res.status(200).json({ success: result.success, data: result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// Liquidate Naira Balance to USDT Crypto Wallet (Fees Priced in Naira!)
+paymentRouter.post(
+  '/crypto/usdt/withdraw',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const amountNgn = Number(req.body.amountNgn || req.body.amount_ngn);
+      const targetAddress = String(req.body.targetAddress || req.body.address || '').trim();
+      const network = (req.body.network || 'TRC20').toUpperCase() as UsdtNetwork;
+
+      if (!amountNgn || amountNgn < 2000) {
+        res.status(400).json({ success: false, message: 'Minimum withdrawal is ₦2,000.' });
+        return;
+      }
+
+      if (!targetAddress || targetAddress.length < 15) {
+        res.status(400).json({ success: false, message: 'Valid USDT destination wallet address is required.' });
+        return;
+      }
+
+      const result = await mapleradService.disburseUsdtPayout(
+        req.user!.userId,
+        amountNgn,
+        targetAddress,
+        network
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `₦${amountNgn.toLocaleString()} converted to ${result.usdtAmount} USDT and dispatched to ${targetAddress.slice(0, 6)}...`,
+        data: result,
+      });
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message });
     }

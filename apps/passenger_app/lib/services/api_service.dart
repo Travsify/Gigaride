@@ -541,6 +541,56 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to verify bank transfer');
   }
 
+  // --- Maplerad USDT Crypto Funding (Auto-Converted to Naira) ---
+  Future<Map<String, dynamic>> getCryptoRate() async {
+    final response = await http.get(Uri.parse('$baseUrl/api/payments/crypto/rate'));
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    return {'rateNgn': 1550, 'supportedNetworks': ['TRC20', 'BEP20', 'POLYGON', 'ERC20']};
+  }
+
+  Future<Map<String, dynamic>> generateCryptoDeposit({
+    required String network,
+    required double expectedUsdt,
+  }) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/crypto/usdt/fund'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'network': network,
+        'expectedUsdt': expectedUsdt,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'];
+    }
+    throw Exception(data['message'] ?? 'Failed to generate USDT deposit address');
+  }
+
+  Future<Map<String, dynamic>> verifyCryptoDeposit(String reference) async {
+    final token = await getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payments/crypto/usdt/verify'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'reference': reference}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? data;
+    }
+    throw Exception(data['message'] ?? 'Failed to verify USDT deposit');
+  }
+
   Future<Map<String, dynamic>> transferP2P({
     required String recipientSearch,
     required int amountNgn,
