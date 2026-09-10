@@ -590,6 +590,7 @@ export class DatabaseService {
         this.seedDefaultPromos();
         this.seedDefaultInspections();
         this.seedDefaultStaff();
+        this.seedDefaultTestAccounts();
         this.saveStore();
       } catch {
         this.saveStore();
@@ -600,6 +601,7 @@ export class DatabaseService {
       this.seedDefaultPromos();
       this.seedDefaultInspections();
       this.seedDefaultStaff();
+      this.seedDefaultTestAccounts();
       this.saveStore();
     }
   }
@@ -958,6 +960,122 @@ export class DatabaseService {
         existing.is_phone_verified = true;
         existing.is_email_verified = true;
       }
+    }
+  }
+
+  private seedDefaultTestAccounts() {
+    // 1. Passenger test account: 08012345678 / passenger@test.com / password123 / OTP 123456
+    const passengerId = 'user_test_passenger';
+    let passenger = this.store.users.find((u) => u.phone_number === '08012345678' || u.email.toLowerCase() === 'passenger@test.com');
+    if (!passenger) {
+      passenger = {
+        id: passengerId,
+        role: 'PASSENGER',
+        full_name: 'Test Passenger',
+        email: 'passenger@test.com',
+        phone_number: '08012345678',
+        password_hash: bcrypt.hashSync('password123', 10),
+        is_phone_verified: true,
+        is_email_verified: true,
+        account_status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      };
+      this.store.users.push(passenger);
+    } else {
+      passenger.role = 'PASSENGER';
+      passenger.password_hash = bcrypt.hashSync('password123', 10);
+      passenger.is_phone_verified = true;
+      passenger.is_email_verified = true;
+      passenger.account_status = 'ACTIVE';
+    }
+
+    // Ensure passenger virtual bank account / wallet balance
+    if (!this.store.virtual_bank_accounts) this.store.virtual_bank_accounts = [];
+    let passAcc = this.store.virtual_bank_accounts.find((v) => v.user_id === passenger!.id);
+    if (!passAcc) {
+      passAcc = {
+        id: `va_passenger_test`,
+        user_id: passenger.id,
+        account_reference: `ref_va_passenger_test`,
+        account_number: '1001234567',
+        bank_name: 'Wema Bank / Korapay',
+        bank_code: '035',
+        account_name: passenger.full_name,
+        provider: 'korapay',
+        balance_ngn: 50000,
+        vault_balance_ngn: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      this.store.virtual_bank_accounts.push(passAcc);
+    } else {
+      passAcc.balance_ngn = Math.max(passAcc.balance_ngn || 0, 50000);
+    }
+
+    // 2. Driver test account: 08087654321 / driver@test.com / password123 / OTP 123456
+    const driverId = 'user_test_driver';
+    let driver = this.store.users.find((u) => u.phone_number === '08087654321' || u.email.toLowerCase() === 'driver@test.com');
+    if (!driver) {
+      driver = {
+        id: driverId,
+        role: 'DRIVER',
+        full_name: 'Test Driver',
+        email: 'driver@test.com',
+        phone_number: '08087654321',
+        password_hash: bcrypt.hashSync('password123', 10),
+        is_phone_verified: true,
+        is_email_verified: true,
+        account_status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      };
+      this.store.users.push(driver);
+    } else {
+      driver.role = 'DRIVER';
+      driver.password_hash = bcrypt.hashSync('password123', 10);
+      driver.is_phone_verified = true;
+      driver.is_email_verified = true;
+      driver.account_status = 'ACTIVE';
+    }
+
+    // Ensure driver profile
+    if (!this.store.driver_profiles) this.store.driver_profiles = [];
+    let driverProfile = this.store.driver_profiles.find((d) => d.driver_id === driver!.id);
+    if (!driverProfile) {
+      driverProfile = {
+        id: `drv_test_driver`,
+        driver_id: driver.id,
+        vehicle_make: 'Toyota',
+        vehicle_model: 'Camry',
+        vehicle_year: 2022,
+        license_plate: 'KJA-452-LG',
+        vehicle_color: 'Silver',
+        kyc_status: 'APPROVED',
+        account_status: 'ACTIVE',
+        rating_average: 4.95,
+        total_trips_completed: 88,
+        is_online: false,
+        created_at: new Date().toISOString(),
+      };
+      this.store.driver_profiles.push(driverProfile);
+    } else {
+      driverProfile.kyc_status = 'APPROVED';
+      driverProfile.account_status = 'ACTIVE';
+    }
+
+    // Ensure driver subscription
+    if (!this.store.driver_subscriptions) this.store.driver_subscriptions = [];
+    let sub = this.store.driver_subscriptions.find((s) => s.driver_id === driver!.id && s.status === 'ACTIVE');
+    if (!sub) {
+      this.store.driver_subscriptions.push({
+        id: `sub_driver_test`,
+        driver_id: driver.id,
+        plan_id: 'plan_monthly',
+        status: 'ACTIVE',
+        remaining_rides: 999,
+        starts_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+      } as any);
     }
   }
 
@@ -2924,6 +3042,9 @@ export class DatabaseService {
     // Reset promo codes to active official codes
     this.store.promo_codes = [];
     this.seedDefaultPromos();
+
+    // Ensure default test accounts are seeded
+    this.seedDefaultTestAccounts();
 
     // Verify platform settings
     if (!this.store.platform_settings) {
