@@ -108,10 +108,18 @@ class SocketService {
         onWaitEnded!(Map<String, dynamic>.from(data));
       }
     });
+
+    // When a ride is taken by another driver or cancelled — remove from driver's list immediately
+    socket!.on('ride:closed', (data) {
+      if (data != null && onRideClosed != null) {
+        onRideClosed!(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
   Function(Map<String, dynamic>)? onWaitStarted;
   Function(Map<String, dynamic>)? onWaitEnded;
+  Function(Map<String, dynamic>)? onRideClosed;
   Function(Map<String, dynamic>)? onRideCancelled;
   Function(Map<String, dynamic>)? onChatMessage;
   Function(Map<String, dynamic>)? onIncomingCall;

@@ -400,6 +400,16 @@ class DriverProvider with ChangeNotifier {
       notifyListeners();
     };
 
+    // When a ride is accepted by another driver or cancelled — remove it from this driver's radar list immediately
+    socket.onRideClosed = (data) {
+      final closedId = (data['rideId'] ?? '').toString();
+      if (closedId.isNotEmpty) {
+        incomingRequests.removeWhere((r) =>
+          (r['rideId'] ?? r['id'] ?? r['ride_id'] ?? '').toString() == closedId);
+        notifyListeners();
+      }
+    };
+
     // Broadcast initial live coordinates and start continuous GPS tracking
     LocationService.getCurrentLocation().then((pos) {
       socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: isOnline);

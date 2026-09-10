@@ -591,6 +591,7 @@ export class DatabaseService {
         this.seedDefaultInspections();
         this.seedDefaultStaff();
         this.seedDefaultTestAccounts();
+        this.purgeStaleRides();
         this.saveStore();
       } catch {
         this.saveStore();
@@ -602,6 +603,7 @@ export class DatabaseService {
       this.seedDefaultInspections();
       this.seedDefaultStaff();
       this.seedDefaultTestAccounts();
+      this.purgeStaleRides();
       this.saveStore();
     }
   }
@@ -1553,14 +1555,64 @@ export class DatabaseService {
   }
 
   public async getAvailableBroadcastedRides(): Promise<any[]> {
-    const available = this.store.rides.filter((r) =>
-      ['REQUESTED', 'NEGOTIATING'].includes(r.status)
-    );
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const available = this.store.rides.filter((r) => {
+      if (!['REQUESTED', 'NEGOTIATING'].includes(r.status)) return false;
+      // Exclude rides older than 2 hours — they are stale/ghost rides
+      const createdAt = r.created_at ? new Date(r.created_at).getTime() : 0;
+      return (now - createdAt) < TWO_HOURS_MS;
+    });
 
     return available.map((r) => ({
-      ...r,
-      rider: this.store.users.find((u) => u.id === r.rider_id),
+      rideId: r.id,
+      id: r.id,
+      pickupAddress: r.pickup_address,
+      dropoffAddress: r.dropoff_address,
+      pickupLat: r.pickup_lat,
+      pickupLng: r.pickup_lng,
+      dropoffLat: r.dropoff_lat,
+      dropoffLng: r.dropoff_lng,
+      distanceKm: r.distance_km,
+      riderOfferNgn: r.rider_offer_ngn,
+      rider_offer_ngn: r.rider_offer_ngn,
+      suggestedFareNgn: r.suggested_fare_ngn,
+      suggested_fare_ngn: r.suggested_fare_ngn,
+      fareNgn: r.rider_offer_ngn || r.suggested_fare_ngn,
+      riderType: r.rider_type || 'SELF',
+      riderName: r.rider_name || null,
+      riderPhone: r.rider_phone || null,
+      notes: r.notes || null,
+      hasWaitTime: r.has_wait_time || false,
+      has_wait_time: r.has_wait_time || false,
+      requestedWaitMinutes: r.requested_wait_minutes || 0,
+      requested_wait_minutes: r.requested_wait_minutes || 0,
+      createdAt: r.created_at,
+      driverPickupDistanceKm: 1.5,
     }));
+  }
+
+  public async purgeStaleRides(): Promise<number> {
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+    let purged = 0;
+
+    for (const ride of this.store.rides) {
+      if (['REQUESTED', 'NEGOTIATING'].includes(ride.status)) {
+        const createdAt = ride.created_at ? new Date(ride.created_at).getTime() : 0;
+        if ((now - createdAt) >= TWO_HOURS_MS) {
+          ride.status = 'CANCELLED';
+          purged++;
+        }
+      }
+    }
+
+    if (purged > 0) {
+      console.log(`[DB] Purged ${purged} stale ride(s) that were stuck in NEGOTIATING/REQUESTED for >2h`);
+      this.saveStore();
+    }
+    return purged;
   }
 
   public async updateRideStatus(

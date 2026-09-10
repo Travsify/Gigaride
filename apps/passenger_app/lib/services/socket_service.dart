@@ -150,8 +150,19 @@ class SocketService {
   Function(Map<String, dynamic>)? onWaitStarted;
   Function(Map<String, dynamic>)? onWaitEnded;
 
-  void broadcastRide(String rideId) {
+  Future<void> broadcastRide(String rideId) async {
+    // Retry until socket is connected (handles race between ride creation and socket handshake)
+    for (int attempt = 0; attempt < 8; attempt++) {
+      if (socket != null && isConnected) {
+        socket!.emit('ride:request', {'rideId': rideId});
+        print('[Socket] Broadcasted ride:request for $rideId (attempt ${attempt + 1})');
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 600));
+    }
+    // Last-ditch attempt regardless of isConnected flag
     socket?.emit('ride:request', {'rideId': rideId});
+    print('[Socket] broadcastRide last-ditch emit for $rideId');
   }
 
   void acceptBid({required String rideId, required String driverId, required int agreedFareNgn}) {

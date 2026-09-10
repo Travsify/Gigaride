@@ -846,6 +846,9 @@ export function setupBiddingGateway(io: SocketIOServer) {
         await db.updateRideStatus(data.rideId, 'CANCELLED');
         const reason = data.reason || 'Ride cancelled by user';
 
+        // Remove from all driver incoming request lists immediately
+        io.emit('ride:closed', { rideId: ride.id });
+
         // Notify both passenger and driver
         io.to(`user:${ride.rider_id}`).emit('ride:cancelled', {
           rideId: ride.id,
