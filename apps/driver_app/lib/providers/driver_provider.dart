@@ -410,6 +410,20 @@ class DriverProvider with ChangeNotifier {
       }
     };
 
+    socket.onRideCancelled = (data) {
+      final cancelledId = (data['rideId'] ?? '').toString();
+      if (cancelledId.isNotEmpty) {
+        incomingRequests.removeWhere((r) =>
+          (r['rideId'] ?? r['id'] ?? r['ride_id'] ?? '').toString() == cancelledId);
+        if (activeTrip != null &&
+            (activeTrip!['rideId'] ?? activeTrip!['id'] ?? '').toString() == cancelledId) {
+          activeTrip = null;
+          tripStep = null;
+        }
+        notifyListeners();
+      }
+    };
+
     // Broadcast initial live coordinates and start continuous GPS tracking
     LocationService.getCurrentLocation().then((pos) {
       socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: isOnline);
@@ -511,15 +525,27 @@ class DriverProvider with ChangeNotifier {
   Future<void> fetchBroadcastedFares() async {
     try {
       final fares = await api.fetchAvailableBroadcastedRides();
-      bool addedAny = false;
+      final Set<String> serverRideIds = fares
+          .map((f) => (f['rideId'] ?? f['id'] ?? f['ride_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      // Remove stale/expired/accepted rides no longer returned by the server
+      final int initialCount = incomingRequests.length;
+      incomingRequests.removeWhere((r) {
+        final id = (r['rideId'] ?? r['id'] ?? r['ride_id'] ?? '').toString();
+        return id.isNotEmpty && !serverRideIds.contains(id);
+      });
+      bool stateChanged = incomingRequests.length != initialCount;
+
       for (final fare in fares) {
         final rId = (fare['rideId'] ?? fare['id'] ?? fare['ride_id'] ?? '').toString();
         if (rId.isNotEmpty && !incomingRequests.any((r) => (r['rideId'] ?? r['id'] ?? r['ride_id']).toString() == rId)) {
           incomingRequests.add(Map<String, dynamic>.from(fare));
-          addedAny = true;
+          stateChanged = true;
         }
       }
-      if (addedAny) {
+      if (stateChanged) {
         notifyListeners();
       }
     } catch (e) {

@@ -31,6 +31,122 @@ export function broadcastFleetAlert(target: 'ALL' | 'DRIVERS' | 'PASSENGERS', al
   }
 }
 
+export async function dispatchRideToDrivers(rideId: string): Promise<boolean> {
+  if (!globalIo) {
+    console.warn(`[Ride Dispatch] Cannot dispatch ride ${rideId} - globalIo not initialized.`);
+    return false;
+  }
+
+  try {
+    const ride = await db.getRideById(rideId);
+    if (!ride) {
+      console.warn(`[Ride Dispatch] Ride ${rideId} not found for dispatch.`);
+      return false;
+    }
+
+    const settings = await db.getPlatformSettings();
+    const baseRadius = settings.search_radius_km || 7.0;
+
+    // Tier 1: Search standard local radius (e.g. 7km)
+    let nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+      ride.pickup_lat,
+      ride.pickup_lng,
+      baseRadius
+    );
+
+    // Tier 2: If no drivers in immediate 7km, expand to 35km (metropolitan area)
+    if (nearbyDrivers.length === 0) {
+      console.log(`[Ride Dispatch] No drivers within ${baseRadius}km of (${ride.pickup_lat}, ${ride.pickup_lng}). Expanding to 35km metro radius...`);
+      nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+        ride.pickup_lat,
+        ride.pickup_lng,
+        35.0
+      );
+    }
+
+    // Tier 3: If still 0, expand to 150km (regional / testing fallback)
+    if (nearbyDrivers.length === 0) {
+      console.log(`[Ride Dispatch] Expanding to 150km regional radius to ensure test devices / nearby city drivers are matched...`);
+      nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
+        ride.pickup_lat,
+        ride.pickup_lng,
+        150.0
+      );
+    }
+
+    // Tier 4: Fallback for testing / dev / zero-radius match
+    if (nearbyDrivers.length === 0) {
+      const allOnline = geoSessionManager.getAllOnlineDrivers();
+      console.log(`[Ride Dispatch] Zero drivers within 150km. Fallback to all ${allOnline.length} online drivers.`);
+      for (const d of allOnline) {
+        nearbyDrivers.push({
+          driverId: d.driverId,
+          distanceKm: calculateHaversineDistanceKm(ride.pickup_lat, ride.pickup_lng, d.latitude, d.longitude),
+          location: d,
+        });
+      }
+    }
+
+    const effectiveFare = ride.rider_offer_ngn || ride.suggested_fare_ngn || 3000;
+
+    console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible drivers. Offer: ₦${effectiveFare}. Pickup: (${ride.pickup_lat}, ${ride.pickup_lng}) "${ride.pickup_address}"`);
+    for (const candidate of nearbyDrivers) {
+      console.log(` -> Driver matched: ${candidate.driverId}, Distance: ${candidate.distanceKm.toFixed(2)}km`);
+    }
+
+    const basePayload = {
+      rideId: ride.id,
+      pickupAddress: ride.pickup_address,
+      dropoffAddress: ride.dropoff_address,
+      pickupLat: ride.pickup_lat,
+      pickupLng: ride.pickup_lng,
+      dropoffLat: ride.dropoff_lat,
+      dropoffLng: ride.dropoff_lng,
+      distanceKm: ride.distance_km,
+      riderOfferNgn: effectiveFare,
+      rider_offer_ngn: effectiveFare,
+      suggestedFareNgn: ride.suggested_fare_ngn || effectiveFare,
+      suggested_fare_ngn: ride.suggested_fare_ngn || effectiveFare,
+      fareNgn: effectiveFare,
+      riderType: ride.rider_type || 'SELF',
+      riderName: ride.rider_name || null,
+      riderPhone: ride.rider_phone || null,
+      notes: ride.notes || null,
+      createdAt: ride.created_at,
+    };
+
+    // Notify each nearby driver individually with their pickup distance
+    for (const candidate of nearbyDrivers) {
+      globalIo.to(`user:${candidate.driverId}`).emit('ride:new_request', {
+        ...basePayload,
+        driverPickupDistanceKm: candidate.distanceKm,
+      });
+    }
+
+    // Ambient broadcast to drivers_pool room so all active drivers receive it
+    globalIo.to('drivers_pool').emit('ride:new_request', {
+      ...basePayload,
+      driverPickupDistanceKm: 1.5,
+    });
+
+    // High-Priority Push Notification to nearby drivers (even if phone screen is locked or app minimized)
+    const driverIds = nearbyDrivers.map(c => c.driverId);
+    if (driverIds.length > 0) {
+      oneSignalService.sendPush({
+        userIds: driverIds,
+        heading: '🚖 New Ride Request Nearby!',
+        content: `Pickup: ${ride.pickup_address} (Offer: ₦${(ride.rider_offer_ngn || ride.suggested_fare_ngn || 0).toLocaleString()})`,
+        data: { type: 'NEW_RIDE_REQUEST', rideId: ride.id }
+      }).catch(e => console.error('[Driver Dispatch Push Error]', e.message));
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error(`[Ride Dispatch Error] Failed to dispatch ride ${rideId}:`, err);
+    return false;
+  }
+}
+
 export function setupBiddingGateway(io: SocketIOServer) {
   globalIo = io;
   // Authentication middleware for Socket.io
@@ -160,8 +276,8 @@ export function setupBiddingGateway(io: SocketIOServer) {
               }
             }
           }
-        } catch (e) {
-          console.error('[Driver Location Forward Error]', e);
+        } catch (err) {
+          console.error('Failed to process driver location update:', err);
         }
       }
     });
@@ -169,106 +285,9 @@ export function setupBiddingGateway(io: SocketIOServer) {
     // --- Passenger creates / broadcasts ride request ---
     socket.on('ride:request', async (data: { rideId: string }) => {
       try {
-        const ride = await db.getRideById(data.rideId);
-        if (!ride) {
-          socket.emit('error', { message: 'Ride request not found.' });
-          return;
-        }
-
-        const settings = await db.getPlatformSettings();
-        const baseRadius = settings.search_radius_km || 7.0;
-
-        // Tier 1: Search standard local radius (e.g. 7km)
-        let nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
-          ride.pickup_lat,
-          ride.pickup_lng,
-          baseRadius
-        );
-
-        // Tier 2: If no drivers in immediate 7km, expand to 35km (metropolitan area)
-        if (nearbyDrivers.length === 0) {
-          console.log(`[Ride Dispatch] No drivers within ${baseRadius}km of (${ride.pickup_lat}, ${ride.pickup_lng}). Expanding to 35km metro radius...`);
-          nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
-            ride.pickup_lat,
-            ride.pickup_lng,
-            35.0
-          );
-        }
-
-        // Tier 3: If still 0, expand to 150km (regional / testing fallback)
-        if (nearbyDrivers.length === 0) {
-          console.log(`[Ride Dispatch] Expanding to 150km regional radius to ensure test devices / nearby city drivers are matched...`);
-          nearbyDrivers = geoSessionManager.findNearbyEligibleDrivers(
-            ride.pickup_lat,
-            ride.pickup_lng,
-            150.0
-          );
-        }
-
-        // Tier 4: Fallback for testing / dev / zero-radius match
-        if (nearbyDrivers.length === 0) {
-          const allOnline = geoSessionManager.getAllOnlineDrivers();
-          console.log(`[Ride Dispatch] Zero drivers within 150km. Fallback to all ${allOnline.length} online drivers.`);
-          for (const d of allOnline) {
-            nearbyDrivers.push({
-              driverId: d.driverId,
-              distanceKm: calculateHaversineDistanceKm(ride.pickup_lat, ride.pickup_lng, d.latitude, d.longitude),
-              location: d,
-            });
-          }
-        }
-
-        const effectiveFare = ride.rider_offer_ngn || ride.suggested_fare_ngn || 3000;
-
-        console.log(`[Ride Dispatch] Broadcasting ride ${ride.id} to ${nearbyDrivers.length} eligible drivers. Offer: ₦${effectiveFare}. Pickup: (${ride.pickup_lat}, ${ride.pickup_lng}) "${ride.pickup_address}"`);
-        for (const candidate of nearbyDrivers) {
-          console.log(` -> Driver matched: ${candidate.driverId}, Distance: ${candidate.distanceKm.toFixed(2)}km`);
-        }
-
-        const basePayload = {
-          rideId: ride.id,
-          pickupAddress: ride.pickup_address,
-          dropoffAddress: ride.dropoff_address,
-          pickupLat: ride.pickup_lat,
-          pickupLng: ride.pickup_lng,
-          dropoffLat: ride.dropoff_lat,
-          dropoffLng: ride.dropoff_lng,
-          distanceKm: ride.distance_km,
-          riderOfferNgn: effectiveFare,
-          rider_offer_ngn: effectiveFare,
-          suggestedFareNgn: ride.suggested_fare_ngn || effectiveFare,
-          suggested_fare_ngn: ride.suggested_fare_ngn || effectiveFare,
-          fareNgn: effectiveFare,
-          riderType: ride.rider_type || 'SELF',
-          riderName: ride.rider_name || null,
-          riderPhone: ride.rider_phone || null,
-          notes: ride.notes || null,
-          createdAt: ride.created_at,
-        };
-
-        // Notify each nearby driver individually with their pickup distance
-        for (const candidate of nearbyDrivers) {
-          io.to(`user:${candidate.driverId}`).emit('ride:new_request', {
-            ...basePayload,
-            driverPickupDistanceKm: candidate.distanceKm,
-          });
-        }
-
-        // Ambient broadcast to drivers_pool room so all active drivers receive it
-        io.to('drivers_pool').emit('ride:new_request', {
-          ...basePayload,
-          driverPickupDistanceKm: 1.5,
-        });
-
-        // High-Priority Push Notification to nearby drivers (even if phone screen is locked or app minimized)
-        const driverIds = nearbyDrivers.map(c => c.driverId);
-        if (driverIds.length > 0) {
-          oneSignalService.sendPush({
-            userIds: driverIds,
-            heading: '🚖 New Ride Request Nearby!',
-            content: `Pickup: ${ride.pickup_address} (Offer: ₦${(ride.rider_offer_ngn || ride.suggested_fare_ngn || 0).toLocaleString()})`,
-            data: { type: 'NEW_RIDE_REQUEST', rideId: ride.id }
-          }).catch(e => console.error('[Driver Dispatch Push Error]', e.message));
+        const success = await dispatchRideToDrivers(data.rideId);
+        if (!success) {
+          socket.emit('error', { message: 'Failed to broadcast ride request.' });
         }
       } catch (err: any) {
         socket.emit('error', { message: err.message });

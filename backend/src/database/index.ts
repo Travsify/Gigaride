@@ -968,14 +968,14 @@ export class DatabaseService {
   private seedDefaultTestAccounts() {
     // 1. Passenger test account: 08012345678 / passenger@test.com / password123 / OTP 123456
     const passengerId = 'user_test_passenger';
-    let passenger = this.store.users.find((u) => u.phone_number === '08012345678' || u.email.toLowerCase() === 'passenger@test.com');
+    let passenger = this.store.users.find((u) => u.phone_number === '08012345678' || u.phone_number === '+2348012345678' || u.email.toLowerCase() === 'passenger@test.com');
     if (!passenger) {
       passenger = {
         id: passengerId,
         role: 'PASSENGER',
         full_name: 'Test Passenger',
         email: 'passenger@test.com',
-        phone_number: '08012345678',
+        phone_number: '+2348012345678',
         password_hash: bcrypt.hashSync('password123', 10),
         is_phone_verified: true,
         is_email_verified: true,
@@ -985,6 +985,7 @@ export class DatabaseService {
       this.store.users.push(passenger);
     } else {
       passenger.role = 'PASSENGER';
+      passenger.phone_number = '+2348012345678';
       passenger.password_hash = bcrypt.hashSync('password123', 10);
       passenger.is_phone_verified = true;
       passenger.is_email_verified = true;
@@ -1016,14 +1017,14 @@ export class DatabaseService {
 
     // 2. Driver test account: 08087654321 / driver@test.com / password123 / OTP 123456
     const driverId = 'user_test_driver';
-    let driver = this.store.users.find((u) => u.phone_number === '08087654321' || u.email.toLowerCase() === 'driver@test.com');
+    let driver = this.store.users.find((u) => u.phone_number === '08087654321' || u.phone_number === '+2348087654321' || u.email.toLowerCase() === 'driver@test.com');
     if (!driver) {
       driver = {
         id: driverId,
         role: 'DRIVER',
         full_name: 'Test Driver',
         email: 'driver@test.com',
-        phone_number: '08087654321',
+        phone_number: '+2348087654321',
         password_hash: bcrypt.hashSync('password123', 10),
         is_phone_verified: true,
         is_email_verified: true,
@@ -1033,6 +1034,7 @@ export class DatabaseService {
       this.store.users.push(driver);
     } else {
       driver.role = 'DRIVER';
+      driver.phone_number = '+2348087654321';
       driver.password_hash = bcrypt.hashSync('password123', 10);
       driver.is_phone_verified = true;
       driver.is_email_verified = true;
@@ -1555,14 +1557,17 @@ export class DatabaseService {
   }
 
   public async getAvailableBroadcastedRides(): Promise<any[]> {
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
     const now = Date.now();
+
+    // Proactively expire any stale negotiating rides
+    this.purgeStaleRides().catch(() => {});
 
     const available = this.store.rides.filter((r) => {
       if (!['REQUESTED', 'NEGOTIATING'].includes(r.status)) return false;
-      // Exclude rides older than 2 hours — they are stale/ghost rides
+      // Exclude rides older than 10 minutes — they are stale/expired rides
       const createdAt = r.created_at ? new Date(r.created_at).getTime() : 0;
-      return (now - createdAt) < TWO_HOURS_MS;
+      return (now - createdAt) < TEN_MINUTES_MS;
     });
 
     return available.map((r) => ({
@@ -1594,14 +1599,14 @@ export class DatabaseService {
   }
 
   public async purgeStaleRides(): Promise<number> {
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
     const now = Date.now();
     let purged = 0;
 
     for (const ride of this.store.rides) {
       if (['REQUESTED', 'NEGOTIATING'].includes(ride.status)) {
         const createdAt = ride.created_at ? new Date(ride.created_at).getTime() : 0;
-        if ((now - createdAt) >= TWO_HOURS_MS) {
+        if ((now - createdAt) >= TEN_MINUTES_MS) {
           ride.status = 'CANCELLED';
           purged++;
         }
@@ -1609,7 +1614,7 @@ export class DatabaseService {
     }
 
     if (purged > 0) {
-      console.log(`[DB] Purged ${purged} stale ride(s) that were stuck in NEGOTIATING/REQUESTED for >2h`);
+      console.log(`[DB] Purged ${purged} stale ride(s) that were stuck in NEGOTIATING/REQUESTED for >10m`);
       this.saveStore();
     }
     return purged;

@@ -5,6 +5,7 @@ import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.mid
 import { db } from '../../database';
 import { fincraService } from '../payments/fincra.service';
 import { agoraService } from '../calls/agora.service';
+import { dispatchRideToDrivers } from '../bidding/bidding.gateway';
 
 export const rideRouter = Router();
 
@@ -63,6 +64,12 @@ rideRouter.post(
     try {
       const dto = createRideSchema.parse(req.body);
       const ride = await rideService.createRide(req.user!.userId, dto);
+      
+      // Auto-dispatch on server side immediately to all eligible drivers & pool
+      dispatchRideToDrivers(ride.id).catch((err) => {
+        console.error('[Auto-Dispatch Failed]', err);
+      });
+
       res.status(201).json({ success: true, data: ride });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });
