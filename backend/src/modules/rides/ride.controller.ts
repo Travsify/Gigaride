@@ -176,6 +176,22 @@ rideRouter.get(
   }
 );
 
+// Driver ride & earnings history (for day/week/month/year analytics & date search)
+rideRouter.get(
+  '/history/driver',
+  requireAuth,
+  requireRole(['DRIVER']),
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const history = await rideService.getDriverHistory(req.user!.userId);
+      res.status(200).json({ success: true, data: history });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
+
 // Passenger pays trip fare from Giga Wallet (Dedicated Virtual Account)
 rideRouter.post(
   '/:id/pay-wallet',

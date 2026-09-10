@@ -182,12 +182,13 @@ class LocationService {
   }
 
   /// Stream of position updates for live tracking.
+  /// Distance filter set to 10m to prevent UI thrashing and Android OS ANR lockup.
   /// Mock/spoofed GPS positions are silently filtered out for security.
   static Stream<Position> getPositionStream() {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 3, // Every 3 meters
+        distanceFilter: 10, // Every 10 meters to prevent main-thread message starvation
       ),
     ).where((position) {
       if (position.isMocked) {

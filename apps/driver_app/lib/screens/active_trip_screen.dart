@@ -482,26 +482,36 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
 
   void _fetchDriverLocationAndRoute() async {
-    final pos = await LocationService.getCurrentLocation();
-    if (!mounted) return;
-    setState(() => _driverLocation = pos);
+    // 1. Use cached location immediately to avoid blocking main thread (prevents ANR)
+    final cached = LocationService.lastKnownUserLocation ?? LocationService.defaultLagosLocation;
+    if (mounted) {
+      setState(() => _driverLocation = cached);
+    }
 
     final pLat = (widget.trip['pickupLat'] as num?)?.toDouble() ?? 6.5244;
     final pLng = (widget.trip['pickupLng'] as num?)?.toDouble() ?? 3.3792;
     final dLat = (widget.trip['dropoffLat'] as num?)?.toDouble() ?? 6.4281;
     final dLng = (widget.trip['dropoffLng'] as num?)?.toDouble() ?? 3.4219;
 
-    final targetStart = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED') ? pos : LatLng(pLat, pLng);
+    final targetStart = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED') ? cached : LatLng(pLat, pLng);
     final targetEnd = (_currentStep == 'ACCEPTED' || _currentStep == 'ARRIVED') ? LatLng(pLat, pLng) : LatLng(dLat, dLng);
 
-    final route = await RoutingService.getDrivingRoute(targetStart, targetEnd);
-    if (route != null && mounted) {
-      setState(() {
-        _routePoints = route.polyline;
-        _distanceKm = route.distanceKm;
-        _durationMins = route.durationMinutes;
-      });
-    }
+    // Fetch routing asynchronously
+    RoutingService.getDrivingRoute(targetStart, targetEnd).then((route) {
+      if (route != null && mounted) {
+        setState(() {
+          _routePoints = route.polyline;
+          _distanceKm = route.distanceKm;
+          _durationMins = route.durationMinutes;
+        });
+      }
+    }).catchError((_) {});
+
+    // 2. Fetch fresh GPS fix in background without freezing UI
+    LocationService.getCurrentLocation().then((pos) {
+      if (!mounted) return;
+      setState(() => _driverLocation = pos);
+    }).catchError((_) {});
   }
 
   void _progressStep() {

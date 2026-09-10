@@ -8,9 +8,11 @@ import '../providers/driver_provider.dart';
 import 'active_trip_screen.dart';
 import 'kyc_screen.dart';
 import 'subscription_screen.dart';
+import 'driver_rides_screen.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/location_service.dart';
 import '../widgets/driver_interactive_map.dart';
+
 
 int _extractFare(dynamic req) {
   if (req is! Map) return 3000;
@@ -87,25 +89,33 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
   StreamSubscription<Position>? _driverLocationSub;
 
   void _initDriverLocation() async {
-    // 1. Instant check for cached last known position (0ms)
+    // 1. Instant check for cached last known position (0ms - zero ANR risk)
     final cached = await LocationService.getLastKnownLocation();
     if (cached != null && mounted) {
       setState(() => _driverLocation = cached);
-    }
-
-    // 2. Fetch fresh high accuracy location
-    final pos = await LocationService.getCurrentLocation();
-    if (mounted) {
-      setState(() => _driverLocation = pos);
-      context.read<DriverProvider>().updateLocation(pos.latitude, pos.longitude);
+      context.read<DriverProvider>().updateLocation(cached.latitude, cached.longitude);
       context.read<DriverProvider>().fetchBroadcastedFares();
     }
 
-    // 3. Keep driver location live as vehicle moves
+    // 2. Fetch fresh high accuracy location in background without blocking frame render
+    LocationService.getCurrentLocation().then((pos) {
+      if (mounted) {
+        setState(() => _driverLocation = pos);
+        context.read<DriverProvider>().updateLocation(pos.latitude, pos.longitude);
+        context.read<DriverProvider>().fetchBroadcastedFares();
+      }
+    }).catchError((_) {});
+
+    // 3. Keep driver location live as vehicle moves (rate-limited)
     _driverLocationSub?.cancel();
     _driverLocationSub = LocationService.getPositionStream().listen((Position newPos) {
       if (!mounted) return;
-      setState(() => _driverLocation = LatLng(newPos.latitude, newPos.longitude));
+      // Only trigger setState if movement exceeds ~15 meters to prevent render loop ANR
+      final dLat = (newPos.latitude - _driverLocation.latitude).abs();
+      final dLng = (newPos.longitude - _driverLocation.longitude).abs();
+      if (dLat > 0.00015 || dLng > 0.00015) {
+        setState(() => _driverLocation = LatLng(newPos.latitude, newPos.longitude));
+      }
       context.read<DriverProvider>().updateLocation(newPos.latitude, newPos.longitude);
     });
   }
@@ -568,10 +578,43 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                  ],
+                  // Quick Ride & Trip Analytics Banner
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverRidesScreen())),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.history_edu_rounded, color: AppConstants.primaryLight, size: 16),
+                              SizedBox(width: 8),
+                              Text('Trip History & Analytics', style: TextStyle(color: AppConstants.textLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('24h / Week / Month / Date', style: TextStyle(color: AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                              SizedBox(width: 4),
+                              Icon(Icons.chevron_right_rounded, color: AppConstants.accentColor, size: 16),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
+
 
             // Interactive Live Driver GPS Radar Map
             Padding(

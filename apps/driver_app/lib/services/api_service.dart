@@ -354,6 +354,21 @@ class ApiService {
     return null;
   }
 
+  /// Fetches complete ride and earnings history for the driver
+  Future<List<dynamic>> getDriverRideHistory() async {
+    final token = await getToken();
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/rides/history/driver'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      return data['data'] ?? [];
+    }
+    return [];
+  }
+
+
   // --- KYC & RegTech Identitypass Suite ---
   Future<Map<String, dynamic>> verifyNIN(String nin, String firstName, String lastName, {String? dob}) async {
     final token = await getToken();

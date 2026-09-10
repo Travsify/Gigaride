@@ -5,6 +5,8 @@ import '../providers/driver_provider.dart';
 import 'phone_auth_screen.dart';
 import 'kyc_screen.dart';
 import 'support_help_screen.dart';
+import 'driver_rides_screen.dart';
+
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -444,6 +446,35 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     ],
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Driver Ride & Trip Analytics Card (Daily/Weekly/Monthly/Yearly)
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0D3728), Color(0xFF072118)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppConstants.primaryLight.withOpacity(0.4)),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryLight.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.history_edu_rounded, color: AppConstants.primaryLight, size: 22),
+                ),
+                title: const Text('Ride & Trip Analytics', style: TextStyle(color: AppConstants.textLight, fontSize: 15, fontWeight: FontWeight.bold)),
+                subtitle: const Text('View trips & earnings by Day (24h), Week, Month, or Year', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                trailing: const Icon(Icons.chevron_right, color: AppConstants.primaryLight),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverRidesScreen())),
               ),
             ),
 
