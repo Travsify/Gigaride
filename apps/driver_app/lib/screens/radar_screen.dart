@@ -578,6 +578,8 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
+                  ],
+
                   // Quick Ride & Trip Analytics Banner
                   const SizedBox(height: 8),
                   InkWell(
@@ -614,6 +616,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                 ],
               ),
             ),
+
 
 
             // Interactive Live Driver GPS Radar Map
