@@ -671,6 +671,23 @@ class ApiService {
     throw Exception(data['message'] ?? 'Failed to update ride status');
   }
 
+  Future<List<Map<String, dynamic>>> getChatMessages(String rideId) async {
+    final token = await getToken();
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/rides/$rideId/messages'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200 && data['success'] == true) {
+      final list = data['data'] as List<dynamic>? ?? [];
+      return list.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    return [];
+  }
+
   Future<void> deleteAccount() async {
     final token = await getToken();
     await _safePost(

@@ -28,7 +28,7 @@ class InAppCallScreen extends StatefulWidget {
 
 class _InAppCallScreenState extends State<InAppCallScreen> {
   bool _isMuted = false;
-  bool _isSpeakerOn = false;
+  bool _isSpeakerOn = true;
   bool _isConnected = false;
   int _callSeconds = 0;
   Timer? _timer;
@@ -142,9 +142,6 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
       _isConnected = true;
     });
     _startTimer();
-    AgoraVoiceService.instance.joinChannel(
-      channelId: 'ride_${widget.rideId}',
-    );
   }
 
   void _endCall({String? reason}) {

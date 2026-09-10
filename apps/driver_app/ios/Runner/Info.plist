@@ -55,6 +55,8 @@
 	<string>Giga Driver needs camera access to capture your driver license, vehicle documents, and profile photo for verification.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Giga Driver needs photo library access to upload documents and certificates for hub inspection.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Giga Driver requires microphone access to enable secure, hands-free in-app voice calls between driver and passenger.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

@@ -865,6 +865,27 @@ export function setupBiddingGateway(io: SocketIOServer) {
 
         io.to(`user:${data.receiverId}`).emit('ride:chat_message', messagePayload);
         socket.emit('ride:chat_sent', messagePayload);
+        await db.saveChatMessage(messagePayload);
+      } catch (err: any) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // --- 💵 Cash / Bank Transfer Payment Settled Notification ---
+    socket.on('ride:cash_payment_received', async (data: { rideId: string; amountNgn?: number }) => {
+      try {
+        const ride = await db.getRideById(data.rideId);
+        if (!ride) return;
+
+        const targetUserId = user.role === 'DRIVER' ? ride.rider_id : ride.driver_id;
+        if (targetUserId) {
+          io.to(`user:${targetUserId}`).emit('ride:cash_payment_received', {
+            rideId: data.rideId,
+            paidBy: user.userId,
+            amountNgn: data.amountNgn || ride.agreed_fare_ngn || ride.suggested_fare_ngn,
+            timestamp: new Date().toISOString(),
+          });
+        }
       } catch (err: any) {
         socket.emit('error', { message: err.message });
       }

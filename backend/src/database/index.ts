@@ -469,6 +469,17 @@ export class DatabaseService {
     rider_subscriptions: [] as RiderSubscriptionRow[],
     beneficiaries: [] as BeneficiaryRow[],
     user_saved_cards: [] as UserSavedCardRow[],
+    chat_messages: [] as Array<{
+      id: string;
+      rideId: string;
+      senderId: string;
+      senderName: string;
+      senderRole: string;
+      text: string;
+      isVoiceMemo?: boolean;
+      durationSecs?: number | null;
+      timestamp: string;
+    }>,
     notifications: [] as NotificationRow[],
     email_verifications: [] as EmailVerificationRow[],
     processed_webhook_events: [] as string[],
@@ -1637,6 +1648,31 @@ export class DatabaseService {
       this.saveStore();
     }
     return ride;
+  }
+
+  public async saveChatMessage(message: {
+    id: string;
+    rideId: string;
+    senderId: string;
+    senderName: string;
+    senderRole: string;
+    text: string;
+    isVoiceMemo?: boolean;
+    durationSecs?: number | null;
+    timestamp: string;
+  }): Promise<void> {
+    if (!this.store.chat_messages) {
+      this.store.chat_messages = [];
+    }
+    this.store.chat_messages.push(message);
+    this.saveStore();
+  }
+
+  public async getChatMessages(rideId: string): Promise<any[]> {
+    if (!this.store.chat_messages) {
+      this.store.chat_messages = [];
+    }
+    return this.store.chat_messages.filter((m) => m.rideId === rideId);
   }
 
   public async updateRideWaitTime(

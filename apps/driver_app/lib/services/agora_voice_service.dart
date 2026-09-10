@@ -74,8 +74,8 @@ class AgoraVoiceService {
         profile: AudioProfileType.audioProfileSpeechStandard,
         scenario: AudioScenarioType.audioScenarioDefault,
       );
-      // Default to earpiece mode during call start
-      await _engine!.setEnableSpeakerphone(false);
+      // Default to loudspeaker mode for driver in-cabin calling
+      await _engine!.setEnableSpeakerphone(true);
 
       _isInitialized = true;
       debugPrint('[AgoraVoice] Initialized successfully with App ID: $targetAppId');

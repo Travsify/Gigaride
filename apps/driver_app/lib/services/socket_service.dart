@@ -109,6 +109,25 @@ class SocketService {
       }
     });
 
+    // Ride Lifecycle Listeners
+    socket!.on('ride:status_changed', (data) {
+      if (data != null && onRideStatusChanged != null) {
+        onRideStatusChanged!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ride:completed', (data) {
+      if (data != null && onRideCompleted != null) {
+        onRideCompleted!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ride:cash_payment_received', (data) {
+      if (data != null && onCashPaymentReceived != null) {
+        onCashPaymentReceived!(Map<String, dynamic>.from(data));
+      }
+    });
+
     // When a ride is taken by another driver or cancelled — remove from driver's list immediately
     socket!.on('ride:closed', (data) {
       if (data != null && onRideClosed != null) {
@@ -121,6 +140,9 @@ class SocketService {
   Function(Map<String, dynamic>)? onWaitEnded;
   Function(Map<String, dynamic>)? onRideClosed;
   Function(Map<String, dynamic>)? onRideCancelled;
+  Function(Map<String, dynamic>)? onRideStatusChanged;
+  Function(Map<String, dynamic>)? onRideCompleted;
+  Function(Map<String, dynamic>)? onCashPaymentReceived;
   Function(Map<String, dynamic>)? onChatMessage;
   Function(Map<String, dynamic>)? onIncomingCall;
   Function(Map<String, dynamic>)? onCallConnected;

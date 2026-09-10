@@ -50,6 +50,28 @@ class DriverProvider with ChangeNotifier {
   int todayCompletedTripsCount = 0;
   String? token;
 
+  // 💬 In-memory persistent chat history per ride
+  final Map<String, List<Map<String, dynamic>>> _rideChatHistory = {};
+
+  List<Map<String, dynamic>> getChatMessages(String rideId) {
+    return _rideChatHistory[rideId] ?? [];
+  }
+
+  void addChatMessage(String rideId, Map<String, dynamic> msg) {
+    _rideChatHistory.putIfAbsent(rideId, () => []);
+    final exists = _rideChatHistory[rideId]!.any((m) =>
+        m['id'] != null && msg['id'] != null && m['id'] == msg['id']);
+    if (!exists) {
+      _rideChatHistory[rideId]!.add(msg);
+      notifyListeners();
+    }
+  }
+
+  void setChatMessages(String rideId, List<Map<String, dynamic>> messages) {
+    _rideChatHistory[rideId] = List.from(messages);
+    notifyListeners();
+  }
+
   Future<bool> checkAuth() async {
     final t = await api.getToken();
     if (t == null) return false;
@@ -58,10 +80,16 @@ class DriverProvider with ChangeNotifier {
       final profile = await api.getMe();
       user = profile;
       driverProfile = profile['driverProfile'];
-      await refreshSubscription();
-      await loadVirtualAccount();
-      await loadNotifications();
       connectSocket(t);
+      // Secondary background refresh so splash screen never waits or times out
+      unawaited(Future.wait([
+        refreshSubscription(),
+        loadVirtualAccount(),
+        loadNotifications(),
+      ]).catchError((e) {
+        debugPrint('Background auth sync: $e');
+        return <void>[];
+      }));
       return true;
     } catch (_) {
       return false;
@@ -400,6 +428,50 @@ class DriverProvider with ChangeNotifier {
       notifyListeners();
     };
 
+    // 💬 Persistent In-App Chat Listener
+    socket.onChatMessage = (msgData) {
+      final rId = (msgData['rideId'] ?? activeTrip?['rideId'] ?? activeTrip?['id'] ?? '').toString();
+      if (rId.isNotEmpty) {
+        addChatMessage(rId, msgData);
+      }
+    };
+
+    // 🚗 Real-Time Ride Lifecycle & Status Listener
+    socket.onRideStatusChanged = (statusData) {
+      final changedRideId = (statusData['rideId'] ?? '').toString();
+      final newStatus = (statusData['status'] ?? '').toString();
+      final activeRideId = (activeTrip?['rideId'] ?? activeTrip?['id'] ?? '').toString();
+
+      if (activeRideId.isNotEmpty && activeRideId == changedRideId) {
+        if (newStatus == 'COMPLETED') {
+          final fare = activeTrip != null
+              ? (activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? activeTrip!['riderOfferNgn'] ?? 0)
+              : 0;
+          todayGrossEarningsNgn += (fare + accruedDriverWaitEarnings);
+          todayCompletedTripsCount++;
+          clearActiveTrip();
+          refreshSubscription();
+        } else if (newStatus.isNotEmpty) {
+          tripStep = newStatus;
+          notifyListeners();
+        }
+      }
+    };
+
+    socket.onRideCompleted = (completedData) {
+      final changedRideId = (completedData['rideId'] ?? '').toString();
+      final activeRideId = (activeTrip?['rideId'] ?? activeTrip?['id'] ?? '').toString();
+      if (activeRideId.isNotEmpty && (changedRideId.isEmpty || activeRideId == changedRideId)) {
+        final fare = activeTrip != null
+            ? (activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? activeTrip!['riderOfferNgn'] ?? 0)
+            : 0;
+        todayGrossEarningsNgn += (fare + accruedDriverWaitEarnings);
+        todayCompletedTripsCount++;
+        clearActiveTrip();
+        refreshSubscription();
+      }
+    };
+
     // When a ride is accepted by another driver or cancelled — remove it from this driver's radar list immediately
     socket.onRideClosed = (data) {
       final closedId = (data['rideId'] ?? '').toString();
@@ -425,7 +497,8 @@ class DriverProvider with ChangeNotifier {
     };
 
     // Broadcast initial live coordinates and start continuous GPS tracking
-    LocationService.getCurrentLocation().then((pos) {
+    LocationService.getLastKnownLocation().then((cachedPos) {
+      final pos = cachedPos ?? LocationService.defaultLagosLocation;
       socket.updateLocation(latitude: pos.latitude, longitude: pos.longitude, isOnline: isOnline);
     }).catchError((_) {
       socket.updateLocation(latitude: 6.5244, longitude: 3.3792, isOnline: isOnline);
@@ -438,7 +511,7 @@ class DriverProvider with ChangeNotifier {
 
   void _startGpsStreaming() {
     _stopGpsStreaming();
-    // 1. High-precision movement stream
+    // 1. High-precision movement stream (updates as vehicle moves)
     _gpsStreamSub = LocationService.getPositionStream().listen((Position pos) {
       if (isOnline) {
         socket.updateLocation(
@@ -452,18 +525,17 @@ class DriverProvider with ChangeNotifier {
       }
     });
 
-    // 2. Periodic heartbeat every 10 seconds to maintain radar freshness
-    _gpsBroadcastTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    // 2. Periodic heartbeat every 12 seconds to maintain radar freshness
+    // Uses cached coordinates to avoid blocking the main UI thread with GPS locks (prevents ANR)
+    _gpsBroadcastTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (isOnline) {
-        try {
-          final pos = await LocationService.getCurrentLocation();
-          socket.updateLocation(
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            isOnline: true,
-            activeRideId: activeTrip?['rideId'] ?? activeTrip?['id'],
-          );
-        } catch (_) {}
+        final pos = LocationService.lastKnownUserLocation ?? LocationService.defaultLagosLocation;
+        socket.updateLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          isOnline: true,
+          activeRideId: activeTrip?['rideId'] ?? activeTrip?['id'],
+        );
       }
     });
   }

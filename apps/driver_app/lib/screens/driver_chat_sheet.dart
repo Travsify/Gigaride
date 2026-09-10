@@ -23,7 +23,6 @@ class DriverChatSheet extends StatefulWidget {
 class _DriverChatSheetState extends State<DriverChatSheet> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final List<Map<String, dynamic>> _messages = [];
 
   final List<String> _quickChips = [
     "I'm at the pickup point / gate",
@@ -37,15 +36,25 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
     super.initState();
     final provider = context.read<DriverProvider>();
 
-    // Listen for incoming messages from passenger
+    // Sync persistent chat history from backend
+    provider.api.getChatMessages(widget.rideId).then((serverMessages) {
+      if (mounted && serverMessages.isNotEmpty) {
+        for (final m in serverMessages) {
+          provider.addChatMessage(widget.rideId, m);
+        }
+        _scrollToBottom();
+      }
+    }).catchError((_) {});
+
+    // Listen for real-time incoming messages
     provider.socket.onChatMessage = (data) {
       if (mounted) {
-        setState(() {
-          _messages.add(data);
-        });
+        provider.addChatMessage(widget.rideId, data);
         _scrollToBottom();
       }
     };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   void _scrollToBottom() {
@@ -74,15 +83,12 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
       text: trimmed,
     );
 
-    setState(() {
-      _messages.add({
-        'senderRole': 'DRIVER',
-        'text': trimmed,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-      _textCtrl.clear();
+    provider.addChatMessage(widget.rideId, {
+      'senderRole': 'DRIVER',
+      'text': trimmed,
+      'timestamp': DateTime.now().toIso8601String(),
     });
-
+    _textCtrl.clear();
     _scrollToBottom();
   }
 
@@ -95,6 +101,9 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<DriverProvider>();
+    final messages = provider.getChatMessages(widget.rideId);
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.72,
       decoration: const BoxDecoration(
@@ -138,7 +147,7 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
                           children: [
                             Icon(Icons.lock_rounded, size: 11, color: AppConstants.successColor),
                             SizedBox(width: 4),
-                            Text('Encrypted In-App Chat', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            Text('Encrypted In-App Chat', style: TextStyle(color: AppConstants.successColor, fontSize: 11)),
                           ],
                         ),
                       ],
@@ -175,7 +184,7 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
 
             // Messages list
             Expanded(
-              child: _messages.isEmpty
+              child: messages.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -189,9 +198,9 @@ class _DriverChatSheetState extends State<DriverChatSheet> {
                   : ListView.builder(
                       controller: _scrollCtrl,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
+                      itemCount: messages.length,
                       itemBuilder: (ctx, i) {
-                        final msg = _messages[i];
+                        final msg = messages[i];
                         final isMe = msg['senderRole'] == 'DRIVER';
                         return Align(
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

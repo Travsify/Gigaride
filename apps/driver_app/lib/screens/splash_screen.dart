@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
@@ -43,20 +44,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _bootstrapApp() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 200));
       final provider = context.read<DriverProvider>();
       final prefs = await SharedPreferences.getInstance().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 3),
         onTimeout: () => throw Exception('Prefs timeout'),
       );
 
       final hasSeenOnboarding = prefs.getBool('driver_seen_onboarding') ?? false;
 
-      // Timeout protection: Maximum 2.5 seconds wait
+      // Resilient Auth check: 8 seconds maximum wait with fast-path
       bool authed = false;
       try {
         authed = await provider.checkAuth().timeout(
-          const Duration(milliseconds: 2500),
+          const Duration(seconds: 8),
           onTimeout: () => false,
         );
       } catch (_) {
@@ -79,10 +80,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         // Authenticated: check KYC status
         final kycStatus = provider.driverProfile?['kyc_status'];
         final target = (kycStatus != 'APPROVED') ? const KycScreen() : const DriverShell();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
-        );
+
+        // Check if location permission is already active — if so, skip the gate and open DriverShell directly!
+        bool hasLocationAccess = false;
+        try {
+          final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (serviceEnabled) {
+            final permission = await Geolocator.checkPermission();
+            if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+              hasLocationAccess = true;
+            }
+          }
+        } catch (_) {}
+
+        if (!mounted) return;
+
+        if (hasLocationAccess) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => LocationPermissionGate(nextScreen: target)),
+          );
+        }
       }
     } catch (_) {
       if (!mounted) return;

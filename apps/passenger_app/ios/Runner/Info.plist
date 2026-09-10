@@ -53,6 +53,8 @@
 	<string>Giga Ride needs camera access if you choose to take a profile photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Giga Ride needs photo library access to set your profile avatar.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Giga Ride requires microphone access to enable secure in-app voice calls with your driver partner.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

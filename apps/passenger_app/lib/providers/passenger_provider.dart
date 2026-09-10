@@ -73,6 +73,29 @@ class PassengerProvider with ChangeNotifier {
     return 0;
   }
 
+  // 💬 In-memory persistent chat history per ride
+  final Map<String, List<Map<String, dynamic>>> _rideChatHistory = {};
+
+  List<Map<String, dynamic>> getChatMessages(String rideId) {
+    return _rideChatHistory[rideId] ?? [];
+  }
+
+  void addChatMessage(String rideId, Map<String, dynamic> msg) {
+    if (rideId.isEmpty) return;
+    _rideChatHistory.putIfAbsent(rideId, () => []);
+    final exists = _rideChatHistory[rideId]!.any((m) =>
+        m['id'] != null && msg['id'] != null && m['id'] == msg['id']);
+    if (!exists) {
+      _rideChatHistory[rideId]!.add(msg);
+      notifyListeners();
+    }
+  }
+
+  void setChatMessages(String rideId, List<Map<String, dynamic>> messages) {
+    _rideChatHistory[rideId] = List.from(messages);
+    notifyListeners();
+  }
+
   Future<bool> checkAuth() async {
     final t = await api.getToken();
     if (t == null) return false;
@@ -289,6 +312,14 @@ class PassengerProvider with ChangeNotifier {
         notifyListeners();
       },
     );
+
+    // 💬 Persistent In-App Chat Listener
+    socket.onChatMessage = (msgData) {
+      final rId = (msgData['rideId'] ?? currentRide?['id'] ?? selectedDriverBid?['rideId'] ?? '').toString();
+      if (rId.isNotEmpty) {
+        addChatMessage(rId, msgData);
+      }
+    };
 
     // ⏱️ Stopover Wait Time Listeners
     socket.onWaitStarted = (data) {

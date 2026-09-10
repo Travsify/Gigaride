@@ -294,6 +294,33 @@ rideRouter.get(
   }
 );
 
+// 💬 Get Persistent Chat Message History for Active/Past Ride
+rideRouter.get(
+  '/:id/messages',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const rideId = String(req.params.id);
+      const ride = await db.getRideById(rideId);
+      if (!ride) {
+        res.status(404).json({ success: false, message: 'Ride not found' });
+        return;
+      }
+
+      // Ensure requester is rider or driver or admin
+      if (ride.rider_id !== req.user!.userId && ride.driver_id !== req.user!.userId && req.user!.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Unauthorized.' });
+        return;
+      }
+
+      const messages = await db.getChatMessages(rideId);
+      res.status(200).json({ success: true, data: messages });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
 // 🚗 Get Available Broadcasted Fares for Drivers
 rideRouter.get(
   '/feed/available',

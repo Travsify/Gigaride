@@ -1043,8 +1043,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                                 onPressed: () {
-                                  FocusScope.of(context).unfocus();
-                                  setState(() => _cashPaymentConfirmed = true);
+                                   FocusScope.of(context).unfocus();
+                                   setState(() => _cashPaymentConfirmed = true);
+                                   if (rideId.toString().isNotEmpty) {
+                                     provider.socket.socket?.emit('ride:cash_payment_received', {'rideId': rideId});
+                                   }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('✅ Cash/Transfer payment confirmed! Thank you.'),

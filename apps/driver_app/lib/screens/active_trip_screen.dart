@@ -59,6 +59,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   int _passengerRating = 5;
   int _unreadChatMessages = 0;
   bool _isChatSheetOpen = false;
+  bool _isCompletionDialogShowing = false;
 
   String _formatDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
@@ -95,6 +96,37 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     provider.socket.onChatMessage = (msgData) {
       if (mounted) {
         _handleIncomingChatMessage(msgData);
+      }
+    };
+
+    // 🚗 Listen for passenger completing trip or paying
+    provider.socket.onRideStatusChanged = (statusData) {
+      if (mounted) {
+        final newStatus = (statusData['status'] ?? '').toString();
+        if (newStatus == 'COMPLETED') {
+          _showCompletionDialog();
+        } else if (newStatus.isNotEmpty) {
+          setState(() => _currentStep = newStatus);
+        }
+      }
+    };
+
+    provider.socket.onRideCompleted = (_) {
+      if (mounted) {
+        _showCompletionDialog();
+      }
+    };
+
+    // 💵 Listen for passenger confirming cash or bank transfer
+    provider.socket.onCashPaymentReceived = (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Passenger confirmed Cash / Bank Transfer payment!'),
+            backgroundColor: AppConstants.successColor,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     };
 
@@ -190,6 +222,10 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   void _handleIncomingChatMessage(Map<String, dynamic> msgData) {
+    final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
+    if (rideId.isNotEmpty) {
+      context.read<DriverProvider>().addChatMessage(rideId, msgData);
+    }
     if (!_isChatSheetOpen) {
       HapticFeedback.mediumImpact();
       setState(() {
@@ -497,6 +533,9 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   void _showCompletionDialog({int accruedWaitEarnings = 0, int billableWaitMinutes = 0}) {
+    if (_isCompletionDialogShowing) return;
+    _isCompletionDialogShowing = true;
+
     final baseFare = _extractFare(widget.trip);
     final fare = baseFare + accruedWaitEarnings;
     final rideId = (widget.trip['rideId'] ?? widget.trip['id'] ?? widget.trip['ride_id'] ?? '').toString();
@@ -628,13 +667,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                           ],
                         ),
                         if (changeAmount > 0) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.12),
+                              color: AppConstants.accentColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                              border: Border.all(color: AppConstants.accentColor.withOpacity(0.3)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -642,8 +681,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Change Due:', style: TextStyle(color: AppConstants.textMuted, fontSize: 10)),
-                                    Text('₦${_formatFare(changeAmount)}', style: const TextStyle(color: Colors.amberAccent, fontSize: 15, fontWeight: FontWeight.w900)),
+                                    const Text('Change Due Rider:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                                    Text('₦${_formatFare(changeAmount)}', style: const TextStyle(color: AppConstants.accentColor, fontSize: 14, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                                 if (!changeRolledOver)
@@ -721,8 +760,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pop(context);
+                    _isCompletionDialogShowing = false;
+                    final provider = context.read<DriverProvider>();
+                    provider.clearActiveTrip();
+                    Navigator.of(ctx).pop();
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
                   },
                   child: const Text('Return to Radar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
@@ -731,7 +775,9 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           );
         },
       ),
-    );
+    ).then((_) {
+      _isCompletionDialogShowing = false;
+    });
   }
 
   void _triggerSos() {

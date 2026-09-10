@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
@@ -23,7 +23,6 @@ class RideChatSheet extends StatefulWidget {
 class _RideChatSheetState extends State<RideChatSheet> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final List<Map<String, dynamic>> _messages = [];
 
   final List<String> _quickChips = [
     "I'm waiting at the estate security gate",
@@ -37,15 +36,25 @@ class _RideChatSheetState extends State<RideChatSheet> {
     super.initState();
     final provider = context.read<PassengerProvider>();
 
+    // Load persistent chat history from backend
+    provider.api.getChatMessages(widget.rideId).then((serverMessages) {
+      if (mounted && serverMessages.isNotEmpty) {
+        for (final m in serverMessages) {
+          provider.addChatMessage(widget.rideId, m);
+        }
+        _scrollToBottom();
+      }
+    }).catchError((_) {});
+
     // Listen for incoming messages from driver
     provider.socket.onChatMessage = (data) {
       if (mounted) {
-        setState(() {
-          _messages.add(data);
-        });
+        provider.addChatMessage(widget.rideId, data);
         _scrollToBottom();
       }
     };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   void _scrollToBottom() {
@@ -74,15 +83,12 @@ class _RideChatSheetState extends State<RideChatSheet> {
       text: trimmed,
     );
 
-    setState(() {
-      _messages.add({
-        'senderRole': 'PASSENGER',
-        'text': trimmed,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-      _textCtrl.clear();
+    provider.addChatMessage(widget.rideId, {
+      'senderRole': 'PASSENGER',
+      'text': trimmed,
+      'timestamp': DateTime.now().toIso8601String(),
     });
-
+    _textCtrl.clear();
     _scrollToBottom();
   }
 
@@ -95,6 +101,9 @@ class _RideChatSheetState extends State<RideChatSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<PassengerProvider>();
+    final messages = provider.getChatMessages(widget.rideId);
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.72,
       decoration: const BoxDecoration(
@@ -156,7 +165,7 @@ class _RideChatSheetState extends State<RideChatSheet> {
 
             // Messages List
             Expanded(
-              child: _messages.isEmpty
+              child: messages.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -172,9 +181,9 @@ class _RideChatSheetState extends State<RideChatSheet> {
                   : ListView.builder(
                       controller: _scrollCtrl,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
+                      itemCount: messages.length,
                       itemBuilder: (context, index) {
-                        final msg = _messages[index];
+                        final msg = messages[index];
                         final isMe = msg['senderRole'] == 'PASSENGER';
 
                         return Align(

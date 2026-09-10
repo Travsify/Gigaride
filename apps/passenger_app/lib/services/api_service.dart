@@ -802,6 +802,27 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getChatMessages(String rideId) async {
+    try {
+      final token = await getToken();
+      final response = await _safeGet(
+        Uri.parse('$baseUrl/api/rides/$rideId/messages'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final list = data['data'] as List<dynamic>? ?? [];
+        return list.map((item) => Map<String, dynamic>.from(item)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> deleteAccount() async {
     final token = await getToken();
     await _safePost(
