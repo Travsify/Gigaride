@@ -84,12 +84,29 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     }
   }
 
-  String _formatPhoneNumber(String raw) {
-    String clean = raw.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-    if (clean.startsWith('+234')) return clean;
-    if (clean.startsWith('234')) return '+$clean';
-    if (clean.startsWith('0')) return '+234${clean.substring(1)}';
-    return '+234$clean';
+  String _formatPhoneNumber(String raw, {String defaultCountryCode = '+234'}) {
+    // 1. Strip all spaces, dashes, parentheses, non-numeric characters except leading '+'
+    String cleaned = raw.replaceAll(RegExp(r'[^\d+]'), '');
+
+    // 2. Handle Nigerian local format (080..., 070..., 090...) and missing plus prefixes
+    if (cleaned.startsWith('0')) {
+      cleaned = defaultCountryCode + cleaned.substring(1);
+    } else if (!cleaned.startsWith('+')) {
+      if (cleaned.startsWith('234')) {
+        cleaned = '+$cleaned';
+      } else {
+        cleaned = defaultCountryCode + cleaned;
+      }
+    }
+    return cleaned;
+  }
+
+  bool _isValidE164(String phone) {
+    final e164Regex = RegExp(r'^\+[1-9]\d{7,14}$');
+    if (!e164Regex.hasMatch(phone)) return false;
+    // Nigerian mobile numbers must have exactly 10 digits after +234
+    if (phone.startsWith('+234') && phone.length != 14) return false;
+    return true;
   }
 
   // ==========================================
@@ -102,6 +119,10 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
     final formatted = _formatPhoneNumber(phone);
+    if (!_isValidE164(formatted)) {
+      _showError('Invalid mobile number. Please enter a valid 11-digit mobile number (e.g. 08012345678).');
+      return;
+    }
     final provider = context.read<PassengerProvider>();
 
     try {
@@ -429,6 +450,10 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
     final formatted = _formatPhoneNumber(phone);
+    if (!_isValidE164(formatted)) {
+      _showError('Invalid mobile number. Please enter a valid 11-digit mobile number (e.g. 08012345678).');
+      return;
+    }
     final provider = context.read<PassengerProvider>();
 
     try {

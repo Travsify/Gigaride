@@ -2579,8 +2579,13 @@ export class DatabaseService {
   // --- Phone OTP Verifications (Twilio) ---
   public async savePhoneOtp(phoneNumber: string, otpCode: string, expiryMinutes = 10): Promise<PhoneVerificationRow> {
     const expiresAt = new Date(Date.now() + expiryMinutes * 60000).toISOString();
-    let record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber);
+    const clean = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    const last10 = clean.slice(-10);
+    let record = this.store.phone_verifications.find(
+      (p) => p.phone_number === phoneNumber || (p.phone_number || '').replace(/[\s\-\(\)]/g, '').endsWith(last10)
+    );
     if (record) {
+      record.phone_number = phoneNumber;
       record.otp_code = otpCode;
       record.expires_at = expiresAt;
       record.is_verified = false;
@@ -2612,7 +2617,11 @@ export class DatabaseService {
   }
 
   public async verifyPhoneOtp(phoneNumber: string, otpCode: string): Promise<boolean> {
-    const record = this.store.phone_verifications.find((p) => p.phone_number === phoneNumber);
+    const clean = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    const last10 = clean.slice(-10);
+    const record = this.store.phone_verifications.find(
+      (p) => p.phone_number === phoneNumber || (p.phone_number || '').replace(/[\s\-\(\)]/g, '').endsWith(last10)
+    );
     if (!record) return false;
     if (new Date(record.expires_at).getTime() < Date.now()) return false;
     if (record.otp_code !== otpCode) {
@@ -2621,7 +2630,7 @@ export class DatabaseService {
       return false;
     }
     record.is_verified = true;
-    const user = this.store.users.find((u) => u.phone_number === phoneNumber);
+    const user = await this.findUserByPhone(phoneNumber);
     if (user) user.is_phone_verified = true;
     this.saveStore();
     return true;

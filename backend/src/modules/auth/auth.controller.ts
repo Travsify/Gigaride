@@ -4,6 +4,7 @@ import { authService } from './auth.service';
 import { AuthenticatedRequest, requireAuth } from './auth.middleware';
 import { db } from '../../database';
 import { twilioService } from '../notifications/twilio.service';
+import { formatToE164 } from '../../common/phone';
 
 export const authRouter = Router();
 
@@ -112,7 +113,11 @@ authRouter.post('/reset-password', async (req, res: Response): Promise<void> => 
       res.status(400).json({ success: false, message: 'phoneNumber, otpCode, and newPassword are required.' });
       return;
     }
-    const result = await authService.resetPassword(phoneNumber, otpCode, newPassword);
+    let formattedPhone = phoneNumber;
+    try {
+      formattedPhone = formatToE164(phoneNumber);
+    } catch (_) {}
+    const result = await authService.resetPassword(formattedPhone, otpCode, newPassword);
     res.status(200).json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
@@ -123,7 +128,13 @@ authRouter.post('/reset-password', async (req, res: Response): Promise<void> => 
 authRouter.post('/check-availability', async (req, res: Response): Promise<void> => {
   try {
     const { phoneNumber, email } = req.body;
-    const result = await authService.checkAvailability(phoneNumber, email);
+    let cleanPhone = phoneNumber;
+    if (phoneNumber) {
+      try {
+        cleanPhone = formatToE164(phoneNumber);
+      } catch (_) {}
+    }
+    const result = await authService.checkAvailability(cleanPhone, email);
     res.status(result.available ? 200 : 409).json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -138,8 +149,16 @@ authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
       return;
     }
 
+    let formattedPhone: string;
+    try {
+      formattedPhone = formatToE164(phoneNumber);
+    } catch (valErr: any) {
+      res.status(400).json({ success: false, message: valErr.message });
+      return;
+    }
+
     if (isSignUp) {
-      const existing = await db.findUserByPhone(phoneNumber);
+      const existing = await db.findUserByPhone(formattedPhone);
       if (existing) {
         res.status(409).json({
           success: false,
@@ -149,7 +168,7 @@ authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
         return;
       }
     } else if (isLogin) {
-      const existing = await db.findUserByPhone(phoneNumber);
+      const existing = await db.findUserByPhone(formattedPhone);
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -160,7 +179,7 @@ authRouter.post('/send-otp', async (req, res: Response): Promise<void> => {
       }
     }
 
-    const result = await twilioService.sendOtp(phoneNumber);
+    const result = await twilioService.sendOtp(formattedPhone);
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -174,8 +193,12 @@ authRouter.post('/verify-otp', async (req, res: Response): Promise<void> => {
       res.status(400).json({ success: false, message: 'phoneNumber and otpCode are required.' });
       return;
     }
+    let formattedPhone = phoneNumber;
+    try {
+      formattedPhone = formatToE164(phoneNumber);
+    } catch (_) {}
     // Authenticates user directly if they already exist, or validates phone for registration
-    const result = await authService.loginWithPhoneOtp(phoneNumber, otpCode);
+    const result = await authService.loginWithPhoneOtp(formattedPhone, otpCode);
     res.status(200).json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
@@ -244,7 +267,11 @@ authRouter.post('/login-otp', async (req, res: Response): Promise<void> => {
       res.status(400).json({ success: false, message: 'phoneNumber and otpCode are required.' });
       return;
     }
-    const result = await authService.loginWithPhoneOtp(phoneNumber, otpCode);
+    let formattedPhone = phoneNumber;
+    try {
+      formattedPhone = formatToE164(phoneNumber);
+    } catch (_) {}
+    const result = await authService.loginWithPhoneOtp(formattedPhone, otpCode);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
