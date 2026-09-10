@@ -44,8 +44,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, a, __) => const PhoneAuthScreen(),
-        transitionsBuilder: (_, a, __, child) =>
+        pageBuilder: (_, a, _) => const PhoneAuthScreen(),
+        transitionsBuilder: (_, a, _, child) =>
             FadeTransition(opacity: a, child: child),
         transitionDuration: const Duration(milliseconds: 400),
       ),
@@ -56,78 +56,125 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget build(BuildContext context) {
     final isLast = _currentPage == _images.length - 1;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1220),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          // Full-screen image carousel
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _images.length,
-            onPageChanged: (i) => setState(() => _currentPage = i),
-            itemBuilder: (_, i) => Image.asset(
-              _images[i],
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
+      backgroundColor: const Color(0xFF060B14),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.3),
+            radius: 1.3,
+            colors: [
+              Color(0xFF0B1E28), // Subtle driver emerald glow
+              Color(0xFF060B14),
+              Color(0xFF03060A),
+            ],
           ),
-          // Bottom gradient scrim
-          Positioned(
-            left: 0, right: 0, bottom: 0, height: 230,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    const Color(0xFF0A1220).withOpacity(0.98),
-                    const Color(0xFF0A1220).withOpacity(0.85),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Skip button top-right
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: SafeArea(
-              child: Padding(
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Top Bar: Giga Driver Partner Badge & Skip
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppConstants.accentColor.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.directions_car_rounded, color: AppConstants.accentColor, size: 14),
+                          SizedBox(width: 6),
+                          Text(
+                            'GIGA PARTNER',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     TextButton(
                       onPressed: _completeOnboarding,
                       style: TextButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.12),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
+                        backgroundColor: Colors.white.withOpacity(0.08),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
                       ),
-                      child: const Text('Skip',
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          // Bottom CTA
-          Positioned(
-            left: 0, right: 0, bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+
+              // Framed Illustration Showcase (100% Contained, Perfectly Proportioned, No Spill / Zoom)
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _images.length,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  itemBuilder: (_, i) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      child: Center(
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.02),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.08),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.45),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(28),
+                            child: Image.asset(
+                              _images[i],
+                              fit: BoxFit.contain, // Fits completely without cropping or zoom
+                              alignment: Alignment.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Bottom Control Panel: Dots, CTA Button, Sign In
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Smooth Animated Indicator Dots
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(_images.length, (i) {
@@ -143,14 +190,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                 ? AppConstants.accentColor
                                 : Colors.white24,
                             borderRadius: BorderRadius.circular(4),
+                            boxShadow: active
+                                ? [
+                                    BoxShadow(
+                                      color: AppConstants.accentColor.withOpacity(0.5),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
                           ),
                         );
                       }),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
+
+                    // Primary Action Button
                     SizedBox(
                       width: double.infinity,
-                      height: 54,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: () {
                           if (!isLast) {
@@ -165,44 +222,51 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.accentColor,
                           foregroundColor: Colors.white,
-                          elevation: 8,
-                          shadowColor:
-                              AppConstants.accentColor.withOpacity(0.5),
+                          elevation: 6,
+                          shadowColor: AppConstants.accentColor.withOpacity(0.45),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         child: Text(
                           isLast ? 'Start Driving \u2192' : 'Continue \u2192',
                           style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.4),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.4,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
+
+                    // Sign In Footer
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Already a partner? ',
-                            style: TextStyle(
-                                color: Colors.white54, fontSize: 13)),
+                        const Text(
+                          'Already a partner? ',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
                         GestureDetector(
                           onTap: _completeOnboarding,
-                          child: Text('Sign In',
-                              style: TextStyle(
-                                  color: AppConstants.accentColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13)),
+                          child: const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: AppConstants.accentColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
