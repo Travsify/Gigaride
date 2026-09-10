@@ -83,10 +83,27 @@ class PassengerProvider with ChangeNotifier {
   void addChatMessage(String rideId, Map<String, dynamic> msg) {
     if (rideId.isEmpty) return;
     _rideChatHistory.putIfAbsent(rideId, () => []);
-    final exists = _rideChatHistory[rideId]!.any((m) =>
-        m['id'] != null && msg['id'] != null && m['id'] == msg['id']);
+    final list = _rideChatHistory[rideId]!;
+
+    final exists = list.any((m) {
+      // 1. Exact ID match (both server-assigned or matching)
+      if (m['id'] != null && msg['id'] != null && m['id'] == msg['id']) return true;
+
+      // 2. Content + Sender role deduplication (catches local vs server echo)
+      final sameSender = m['senderRole'] == msg['senderRole'];
+      final sameText = (m['text'] ?? '').toString().trim() == (msg['text'] ?? '').toString().trim();
+      if (sameSender && sameText && sameText.isNotEmpty) {
+        try {
+          final t1 = DateTime.tryParse(m['timestamp'] ?? '')?.millisecondsSinceEpoch ?? 0;
+          final t2 = DateTime.tryParse(msg['timestamp'] ?? '')?.millisecondsSinceEpoch ?? 0;
+          if ((t1 - t2).abs() < 5000) return true; // Within 5s window = identical message
+        } catch (_) {}
+      }
+      return false;
+    });
+
     if (!exists) {
-      _rideChatHistory[rideId]!.add(msg);
+      list.add(msg);
       notifyListeners();
     }
   }

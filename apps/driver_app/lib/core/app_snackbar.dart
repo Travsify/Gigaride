@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'constants.dart';
 
-/// Global SnackBar � always floating, white text, never blocks the screen.
+/// Global SnackBar — always floating, white text, never blocks the screen.
 /// Use this everywhere instead of raw ScaffoldMessenger.showSnackBar calls.
 class AppSnackBar {
   static void show(
