@@ -24,6 +24,8 @@ jobs:
     name: Build iOS Applications
     runs-on: macos-latest
     timeout-minutes: 60
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -87,3 +89,23 @@ jobs:
           name: GigaDriver-iOS
           path: apps/driver_app/build/ios/iphoneos/GigaDriver-unsigned.ipa
           retention-days: 14
+
+      - name: Publish Latest iOS IPA Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest-ios
+          name: "Latest iOS Test Builds (GigaRide & GigaDriver)"
+          body: |
+            Automated iOS release builds for direct device testing.
+            
+            ### Installation Methods:
+            - **Sideloadly / AltStore / Scarlet / TrollStore**: Sideload `.ipa` directly to your iPhone or iPad.
+            - **Direct Artifacts**: Also accessible via GitHub Actions run artifacts.
+          prerelease: true
+          files: |
+            apps/passenger_app/build/ios/iphoneos/GigaRide-Passenger-unsigned.ipa
+            apps/driver_app/build/ios/iphoneos/GigaDriver-unsigned.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

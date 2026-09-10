@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
 import '../providers/driver_provider.dart';
 import 'package:latlong2/latlong.dart';
@@ -9,6 +8,7 @@ import '../services/location_service.dart';
 import '../services/routing_service.dart';
 import '../services/navigation_helper.dart';
 import '../widgets/driver_interactive_map.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'driver_chat_sheet.dart';
 import 'in_app_call_screen.dart';
 
@@ -87,6 +87,15 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         _handleIncomingChatMessage(msgData);
       }
     };
+
+    // 💡 Keep driver navigation screen awake throughout trip
+    WakelockPlus.enable();
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
   }
 
   void _showRideCancelledModal(Map<String, dynamic> cancelData) {
@@ -238,14 +247,6 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   void _showCallRiderSheet() {
-    final riderPhone = (widget.trip['riderPhone'] ??
-            widget.trip['rider_phone'] ??
-            widget.trip['passengerPhone'] ??
-            widget.trip['passenger_phone'] ??
-            widget.trip['phone'] ??
-            widget.trip['passenger']?['phone'] ??
-            '')
-        .toString();
     final riderName = (widget.trip['passengerName'] ?? widget.trip['riderName'] ?? widget.trip['rider_name'] ?? 'Passenger').toString();
     final rId = (widget.trip['passengerId'] ??
             widget.trip['userId'] ??
@@ -272,46 +273,46 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                     children: [
                       const Icon(Icons.phone_in_talk_rounded, color: AppConstants.accentColor, size: 24),
                       const SizedBox(width: 10),
-                      Text('Contact $riderName', style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Call $riderName', style: const TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Option 1: Direct Cellular GSM Dial (Guaranteed 100% audio transmission)
-              if (riderPhone.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.call, color: Colors.white),
-                    label: Text(
-                      'Direct Phone Call ($riderPhone)',
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      launchUrl(Uri.parse('tel:$riderPhone'), mode: LaunchMode.externalApplication);
-                    },
-                  ),
+              const SizedBox(height: 8),
+              // Privacy notice
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppConstants.primaryLight.withOpacity(0.3)),
                 ),
-              // Option 2: In-App VoIP Call
+                child: const Row(
+                  children: [
+                    Icon(Icons.shield_rounded, color: AppConstants.primaryLight, size: 14),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'NDPR Shield Active — Passenger number is 100% private',
+                        style: TextStyle(color: AppConstants.textMuted, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // In-App Secure Call
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppConstants.primaryLight),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.headset_mic_rounded, color: AppConstants.primaryLight),
-                  label: const Text('In-App VoIP Call', style: TextStyle(color: AppConstants.primaryLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.headset_mic_rounded, color: Colors.white),
+                  label: const Text('In-App Secure Call', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                   onPressed: () {
                     Navigator.pop(ctx);
                     Navigator.push(
@@ -324,6 +325,24 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                         ),
                       ),
                     );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Chat fallback
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white24),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppConstants.textMuted, size: 18),
+                  label: const Text('Send In-App Message Instead', style: TextStyle(color: AppConstants.textMuted, fontSize: 13)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openDriverChatSheet();
                   },
                 ),
               ),
@@ -704,7 +723,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           ],
         ),
         content: const Text(
-          'This streams your vehicle license plate, live GPS coordinates, and trip ID to Lagos State Emergency Dispatch Operations and Police.',
+          'This streams your vehicle license plate, live GPS coordinates, and trip ID to Nigeria Emergency Response (112) and State Police Command.',
           style: TextStyle(color: AppConstants.textMuted, fontSize: 13),
         ),
         actions: [
@@ -722,7 +741,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                 'notes': 'Driver emergency button tapped',
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('🚨 SOS Alert broadcast to Lagos Security Dispatch!'), backgroundColor: AppConstants.dangerColor),
+                const SnackBar(content: Text('🚨 SOS Alert broadcast to Nigeria Emergency Response (112)!'), backgroundColor: AppConstants.dangerColor),
               );
             },
             child: const Text('Confirm SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -737,13 +756,29 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final fare = _extractFare(widget.trip);
     final pickup = widget.trip['pickupAddress'] ?? 'Pickup Location';
     final dropoff = widget.trip['dropoffAddress'] ?? 'Destination Location';
-    final gateCode = widget.trip['gateCode'] ?? widget.trip['estateGateCode'];
+    final rawNotes = (widget.trip['notes'] ?? widget.trip['tripInstructions'] ?? widget.trip['trip_instructions'] ?? widget.trip['instructions'] ?? '').toString();
+
+    // Comprehensive Gate Pass Extraction (explicit field or embedded tag)
+    final rawGateCode = widget.trip['gateCode'] ?? widget.trip['estateGateCode'] ?? widget.trip['gate_code'] ?? widget.trip['passCode'] ?? widget.trip['estate_gate_code'];
+    String? gateCode = rawGateCode?.toString();
+    if ((gateCode == null || gateCode.isEmpty) && rawNotes.isNotEmpty) {
+      final m = RegExp(r'\[Estate Gate Pass:\s*([^\]]+)\]', caseSensitive: false).firstMatch(rawNotes);
+      if (m != null) gateCode = m.group(1)?.trim();
+    }
+
+    // Comprehensive Intermediate Stop Extraction (explicit field or embedded tag)
+    final rawStop = widget.trip['stop'] ?? widget.trip['stops'] ?? widget.trip['intermediateStop'] ?? widget.trip['intermediate_stop'] ?? widget.trip['waypoint'];
+    String? intermediateStop = rawStop?.toString();
+    if ((intermediateStop == null || intermediateStop.isEmpty) && rawNotes.isNotEmpty) {
+      final m = RegExp(r'\[Intermediate Stop:\s*([^\]]+)\]', caseSensitive: false).firstMatch(rawNotes);
+      if (m != null) intermediateStop = m.group(1)?.trim();
+    }
+
     final riderType = widget.trip['riderType'] ?? widget.trip['rider_type'] ?? 'SELF';
     final isFriend = riderType == 'FRIEND';
     final riderName = (widget.trip['riderName'] ?? widget.trip['rider_name'] ?? widget.trip['passengerName'] ?? widget.trip['passenger_name'] ?? 'Passenger').toString();
-    final riderPhone = widget.trip['riderPhone'] ?? widget.trip['rider_phone'] ?? widget.trip['passengerPhone'] ?? widget.trip['passenger_phone'];
     final bookerName = widget.trip['bookerName'] ?? widget.trip['booker_name'];
-    final notes = widget.trip['notes'] ?? widget.trip['tripInstructions'];
+    final notes = rawNotes;
 
     String actionTitle = 'I Have Arrived at Pickup';
     Color actionColor = AppConstants.primaryColor;
@@ -943,6 +978,32 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             child: SizedBox(height: 18, child: VerticalDivider(color: Colors.white24, thickness: 1.5)),
                           ),
                         ),
+                        if (intermediateStop != null && intermediateStop.isNotEmpty) ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.add_location_alt_rounded, color: Colors.orangeAccent, size: 16),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Intermediate Stop', style: TextStyle(color: Colors.orangeAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 2),
+                                    Text(intermediateStop, style: const TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6, top: 4, bottom: 4),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(height: 18, child: VerticalDivider(color: Colors.white24, thickness: 1.5)),
+                            ),
+                          ),
+                        ],
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1058,8 +1119,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     isFriend && bookerName != null
-                                        ? 'Booked by $bookerName${riderPhone != null ? ' • $riderPhone' : ''}'
-                                        : (riderPhone != null ? 'Phone: $riderPhone' : 'Giga Verified Passenger'),
+                                        ? 'Booked by $bookerName'
+                                        : 'Giga Verified Passenger',
                                     style: const TextStyle(color: AppConstants.textMuted, fontSize: 12),
                                   ),
                                 ],
@@ -1067,7 +1128,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                             ),
                           ],
                         ),
-                        if (notes != null && notes.toString().trim().isNotEmpty) ...[
+                        if (notes.trim().isNotEmpty) ...[
                           const SizedBox(height: 12),
                           // Comfort Requirement Badges
                           Wrap(

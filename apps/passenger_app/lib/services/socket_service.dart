@@ -50,6 +50,18 @@ class SocketService {
       }
     });
 
+    socket!.on('ride:completed', (data) {
+      if (data != null) {
+        onRideFinished(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket!.on('ride:trip_completed', (data) {
+      if (data != null) {
+        onRideFinished(Map<String, dynamic>.from(data));
+      }
+    });
+
     // 🚗 Live Driver GPS & Heading Stream
     socket!.on('ride:driver_location', (data) {
       if (data != null && onDriverLocationUpdate != null) {

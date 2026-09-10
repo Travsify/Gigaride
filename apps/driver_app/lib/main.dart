@@ -14,6 +14,18 @@ void main() async {
     OneSignal.Debug.setLogLevel(OSLogLevel.none);
     OneSignal.initialize(AppConstants.oneSignalAppId);
     OneSignal.Notifications.requestPermission(true);
+
+    // Handle notification tap → navigate to RadarScreen
+    OneSignal.Notifications.addClickListener((event) {
+      // App is already initialized, navigation happens through the app's state
+      debugPrint('[Push] Notification tapped: ${event.notification.title}');
+    });
+
+    // Handle foreground notifications
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      event.preventDefault();
+      event.notification.display();
+    });
   } catch (e) {
     debugPrint('[Push Notification] OneSignal init deferred: $e');
   }

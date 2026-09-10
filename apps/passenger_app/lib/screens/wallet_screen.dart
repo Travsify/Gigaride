@@ -243,7 +243,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         height: 48,
                         child: ElevatedButton.icon(
                           icon: const Icon(Icons.lock_outline, size: 16, color: Colors.white),
-                          label: const Text('Pay with Card (Paystack Checkout)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                          label: const Text('Pay with Card (Giga Secure Checkout)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                           style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                           onPressed: () async {
                             final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
@@ -254,15 +254,15 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                       ),
                     ] else ...[
-                      // BANK TRANSFER TAB (DYNAMIC PAYSTACK BANK ACCOUNT)
+                      // BANK TRANSFER TAB (DYNAMIC GIGA VIRTUAL ACCOUNT)
                       if (dynamicTransfer == null) ...[
                         const Text(
-                          'Paystack Dynamic Bank Transfer',
+                          'Giga Instant Bank Transfer',
                           style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'A temporary, one-time Paystack bank account is generated for this transfer. Funds are automatically credited to your Naira wallet once received.',
+                          'A temporary, one-time Giga virtual bank account is generated for this transfer. Funds are automatically credited to your Naira wallet once received.',
                           style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
                         ),
                         const SizedBox(height: 16),
@@ -342,7 +342,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Paystack Dynamic Account', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const Text('Giga Virtual Account', style: TextStyle(color: AppConstants.accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
@@ -358,7 +358,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                               const SizedBox(height: 12),
                               const Text('Bank Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                              Text(dynamicTransfer!['bankName'] ?? 'Wema Bank / Paystack', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(dynamicTransfer!['bankName'] ?? 'Wema Bank / Giga', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.bold, fontSize: 14)),
                               const SizedBox(height: 8),
                               const Text('Dynamic Account Number', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                               Row(
@@ -376,7 +376,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                               const SizedBox(height: 6),
                               const Text('Account Name', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
-                              Text(dynamicTransfer!['accountName'] ?? 'Paystack / Giga Ride', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(dynamicTransfer!['accountName'] ?? 'Giga Living Wallet', style: const TextStyle(color: AppConstants.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
                               const SizedBox(height: 8),
                               const Text('Amount to Pay Exactly', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                               Text(
@@ -533,7 +533,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           SizedBox(height: 10),
                           Text('No saved cards found.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           SizedBox(height: 4),
-                          Text('Cards used during Paystack funding are automatically saved here securely.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
+                          Text('Cards used during Giga Secure funding are automatically saved here securely.', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textMuted, fontSize: 12)),
                         ],
                       ),
                     )
@@ -600,7 +600,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     height: 48,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add_card_rounded, color: Colors.white, size: 18),
-                      label: const Text('Add New Card (Verify via Paystack)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      label: const Text('Add New Card (Giga Secure Verify)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       onPressed: () {
                         Navigator.pop(ctx);

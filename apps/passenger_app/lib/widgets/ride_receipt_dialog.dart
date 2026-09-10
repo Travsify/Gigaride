@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../core/constants.dart';
+import '../services/receipt_pdf_service.dart';
 
 class RideReceiptDialog extends StatelessWidget {
   final Map<String, dynamic> rideData;
@@ -377,14 +377,14 @@ class RideReceiptDialog extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
                       label: const Text(
-                        'Download / Share Receipt',
+                        'Download PDF Receipt',
                         style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       onPressed: () {
                         HapticFeedback.mediumImpact();
-                        _shareReceipt(
+                        ReceiptPdfService.generateAndShare(
                           shortId: shortId,
                           date: date,
                           pickup: pickup,
@@ -419,55 +419,5 @@ class RideReceiptDialog extends StatelessWidget {
       ),
     );
   }
-
-  void _shareReceipt({
-    required String shortId,
-    required String date,
-    required String pickup,
-    required String dropoff,
-    required String driverName,
-    required String vehicle,
-    required String plate,
-    required String fareFormatted,
-    required String paymentMethod,
-  }) {
-    final receiptText = '''
-========================================
-         GIGA OFFICIAL RIDE RECEIPT
-  Giga is a Product of Pickpadi Global Ltd
-========================================
-Receipt Ref: #$shortId
-Date & Time: $date
-Status: SETTLED & VERIFIED ✓
-
-TRIP DETAILS
-• Pickup: $pickup
-• Destination: $dropoff
-
-DRIVER & VEHICLE
-• Driver: $driverName
-• Vehicle: $vehicle ($plate)
-• Driver Net Payout: 100% (Zero Giga Cut)
-
-FINANCIAL BREAKDOWN
-• Agreed Fare: $fareFormatted
-• Lagos MOT & Road Tax: ₦50 (Included)
-• Platform Commission: ₦0 (0% Cut)
-----------------------------------------
-TOTAL PAID: $fareFormatted
-Payment Method: $paymentMethod
-========================================
-Thank you for riding with Giga!
-Giga is a Product of Pickpadi Global Ltd
-For Inquiries & Dispute Resolution:
-Email: support@getgigaride.com
-Web: https://getgigaride.com
-========================================
-''';
-
-    Share.share(
-      receiptText,
-      subject: 'Giga Ride Receipt #$shortId - Pickpadi Global Ltd',
-    );
-  }
 }
+

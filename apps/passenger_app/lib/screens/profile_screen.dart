@@ -125,28 +125,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 18),
               _buildPolicySection(
-                '1. Asymmetric Phone Number Masking',
-                'Your personal mobile number is strictly hidden from drivers. All in-app calls and chats utilize VoIP proxy relays and cryptographic masking. Drivers never receive your real phone number.',
+                '1. Asymmetric Phone Number Masking & Real-Time VoIP',
+                'Your personal mobile number is never disclosed or transmitted to drivers. All pre-trip communications, calls, and chat messages utilize end-to-end encrypted virtual proxy relays and cryptographic identifiers. Drivers never receive or store your cellular phone number.',
               ),
               _buildPolicySection(
-                '2. Information We Collect & Legal Basis',
-                'We collect your verified mobile number (via SMS OTP), email address for digital receipts, and high-precision GPS telemetry strictly during ride requests and active trips to facilitate routing and emergency dispatch.',
+                '2. Lawful Basis for Processing (NDPA 2023 § 25)',
+                'Pickpadi Global Ltd processes personal data under the Nigeria Data Protection Act 2023 on the following lawful bases: (a) Performance of a contract (facilitating ride dispatch and payment settlement); (b) Compliance with legal obligations under Nigerian transport, tax, and anti-money laundering regulations; (c) Legitimate safety interests (fraud detection, passenger verification, and SOS telemetry); and (d) User consent.',
               ),
               _buildPolicySection(
-                '3. Bank-Grade Financial Security',
-                'Dedicated NUBAN virtual bank accounts are powered exclusively by Korapay for direct bank transfers, while card funding and dynamic payment checkouts are powered directly by Paystack (PCI-DSS Level 1 certified). Giga Ride never stores or handles raw payment card PANs or security codes.',
+                '3. Location Telemetry & Background Tracking Disclosure',
+                'Precise GPS coordinates are collected while the app is active in the foreground and temporarily in the background during active trips. Background location telemetry is strictly utilized to compute route progress, verify arrival at pickup/dropoff points, calculate exact mileage, and power live encrypted Emergency SOS streaming.',
               ),
               _buildPolicySection(
-                '4. Location Telemetry & SOS Broadcasting',
-                'Live GPS telemetry is recorded during trips for passenger safety. In case of an emergency, tapping the SOS button immediately broadcasts your encrypted tracking link to your registered emergency contacts and security operations.',
+                '4. Bank-Grade Financial Security & PCI-DSS Standards',
+                'Dedicated NUBAN virtual bank accounts are provisioned via CBN-licensed commercial banking partners for direct bank transfers. Debit card tokenization and dynamic payment checkouts are powered by PCI-DSS Level 1 certified gateways. Giga never captures, processes, or stores raw payment card PANs, expiration dates, or CVV codes on platform servers.',
               ),
               _buildPolicySection(
-                '5. User Rights & Complete Data Erasure',
-                'Under Section 34 of the NDPA 2023, you retain the legal right to inspect your data, rectify inaccuracies, or permanently request the erasure of your personal data and travel history.',
+                '5. Statutory Data Retention Schedule',
+                'Financial transaction records, invoices, and payment receipts are retained for six (6) years in compliance with Central Bank of Nigeria (CBN) regulations and Nigerian tax statutes. GPS location logs and route telemetry are retained for twelve (12) months for safety auditing, route optimization, and dispute resolution, after which they are permanently anonymized or purged.',
               ),
               _buildPolicySection(
-                '6. Data Protection Officer (DPO)',
-                'For data privacy inquiries, contact our legal DPO at dpo@gigaride.ng or privacy@gigaride.ng. Head Office: Plot 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.',
+                '6. Law Enforcement Cooperation & Emergency Disclosures',
+                'In strict accordance with Nigerian law, Pickpadi Global Ltd reserves the right to disclose relevant trip records, user identity, or GPS telemetry to lawful security agencies (Nigeria Police Force, FRSC, EFCC) pursuant to a valid court order, warrant, or in situations of imminent physical peril via SOS dispatch (112).',
+              ),
+              _buildPolicySection(
+                '7. Cross-Border Data Processing & Encryption',
+                'Data is encrypted in transit via TLS 1.3 and at rest via AES-256. Cloud hosting infrastructure complies with international data security standards and NDPA 2023 Section 41–43 cross-border adequacy regulations.',
+              ),
+              _buildPolicySection(
+                '8. Data Subject Rights & Account Deletion (§ 34 NDPA)',
+                'Under Section 34 of the NDPA 2023, riders retain the legal right to inspect their personal profile, rectify inaccurate records, request data portability, or permanently request complete erasure of their account, payment tokens, and trip history via the in-app Delete Account utility.',
+              ),
+              _buildPolicySection(
+                '9. Data Protection Officer (DPO) Contact',
+                'To exercise your statutory data privacy rights or submit inquiries, contact our Data Protection Officer at dpo@gigaride.ng or privacy@gigaride.ng. Corporate Office: Plot 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.',
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -184,22 +196,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Terms of Service & Rider Agreement', style: TextStyle(color: AppConstants.textLight, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Terms of Service & Rider Agreement', style: TextStyle(color: AppConstants.textLight, fontSize: 17, fontWeight: FontWeight.bold)),
                   IconButton(icon: const Icon(Icons.close, color: AppConstants.textMuted), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const SizedBox(height: 14),
               _buildPolicySection(
-                '1. Fair Dynamic Bidding',
-                'Fares on Giga Ride are haggled transparently between passenger and driver. Drivers retain 100% of the agreed trip fare with zero platform deductions.',
+                '1. Corporate Entity & Technology Intermediary',
+                'GigaRide is an intelligent digital dispatch platform owned and operated by Pickpadi Global Ltd. GigaRide is exclusively a software intermediary that connects independent licensed transport providers ("Driver Partners") with riders. Pickpadi Global Ltd is not a common carrier, public transportation operator, or employer of drivers. Contracts for carriage are entered into directly between the Rider and the independent Driver Partner.',
               ),
               _buildPolicySection(
-                '2. Passenger Safety & Conduct',
-                'Passengers agree to treat driver partners with dignity and adhere to traffic and luggage regulations. Zero tolerance policy for harassment or property damage.',
+                '2. Mutual Dynamic Fare Haggling & 0% Platform Cut',
+                'Trip fares are negotiated and agreed upon directly between Rider and Driver Partner in real time via in-app bidding. Drivers retain 100% of the agreed fare with zero platform percentage deductions. Riders agree to pay the agreed fare upon reaching the final destination either via cash, direct bank transfer, or Giga Living Wallet.',
               ),
               _buildPolicySection(
-                '3. Living Wallet & Instant Refunds',
-                'Funds in your Giga Living Wallet can be used to pay for trips or withdrawn back to your commercial bank account at any time.',
+                '3. Trip Status, Cancellation & Running Trips',
+                'Riders may cancel a ride request prior to driver arrival without penalty. Once a trip is initiated and "IN TRANSIT" with the passenger onboard, the ride cannot be unilaterally cancelled by the passenger on-app. If an unexpected emergency occurs, the passenger must instruct the driver to conclude the ride at a safe, designated stopping point.',
+              ),
+              _buildPolicySection(
+                '4. Fare Payment, Theft of Services & Criminal Default',
+                'Willful refusal or intentional evasion of paying the agreed trip fare upon arrival at destination constitutes theft of services and fraud under the Nigerian Criminal Code and Penal Code. Pickpadi Global Ltd and Driver Partners reserve the right to report defaulters to the Nigeria Police Force, blacklist device terminals, report defaults to credit rating bureaus, and initiate automated recovery via linked cards or Living Wallet balances.',
+              ),
+              _buildPolicySection(
+                '5. Vehicle Soiling, Cleanliness & Detailing Fee',
+                'Riders are required to maintain vehicle cleanliness. If a passenger soils, spills liquids or food, vomits, or damages vehicle upholstery, interior fittings, or windows, a mandatory cleaning and detailing fee of between ₦10,000 and ₦30,000 (or the verified professional detailing invoice) shall be assessed and immediately debited from the rider\'s Living Wallet or linked debit card payable to the Driver Partner.',
+              ),
+              _buildPolicySection(
+                '6. Third-Party Bookings ("Booking for a Friend") & Minors',
+                'When creating a ride booking for a friend, associate, or family member ("Guest Rider"), the registered account holder warrants full legal authority to bind the Guest Rider. The account holder remains strictly, jointly, and severally liable for any misconduct, property damage, soiling fee, or fare default caused by the Guest Rider. Unaccompanied minors under 18 years of age are not permitted to travel without adult accompaniment or written guardian authorization.',
+              ),
+              _buildPolicySection(
+                '7. Zero Tolerance for Harassment, Weapons & Assault',
+                'Pickpadi Global Ltd enforces a strict zero-tolerance policy regarding physical violence, verbal abuse, sexual harassment, discriminatory slurs, or brandishing of weapons towards Driver Partners. Violations will result in immediate permanent terminal blacklisting, forfeiture of unencumbered wallet balances pending police investigation, and referral to law enforcement authorities.',
+              ),
+              _buildPolicySection(
+                '8. Prohibited Cargo, Contraband & Rider Indemnity',
+                'Riders are strictly prohibited from transporting illicit narcotics, unlicensed firearms, explosives, hazardous chemicals, stolen merchandise, or biological hazards. Riders unconditionally indemnify Pickpadi Global Ltd and the Driver Partner against any criminal prosecution, vehicle impoundments, customs penalties, or civil liabilities arising from contraband discovered in rider baggage.',
+              ),
+              _buildPolicySection(
+                '9. Lost & Found Property Disclaimer',
+                'Pickpadi Global Ltd accepts zero liability or responsibility for personal items, electronic devices, bags, or cash forgotten in vehicles. Returning lost property is an independent arrangement between rider and driver. The Driver Partner is entitled to a reasonable courier/inconvenience fee of between ₦3,000 and ₦5,000 to deliver recovered items to the rider.',
+              ),
+              _buildPolicySection(
+                '10. Emergency SOS & Telemetry Disclaimer',
+                'The in-app Emergency SOS tool is a supplementary telemetry conduit provided to stream live coordinates to designated contacts and emergency responder dispatch (112). Pickpadi Global Ltd does not operate armed security squads and makes no warranty regarding the response times or operational capacity of public emergency services.',
+              ),
+              _buildPolicySection(
+                '11. Intellectual Property & Anti-Defamation',
+                'All trademarks, logos, brand assets, proprietary algorithms, and software interfaces of Giga and Pickpadi Global Ltd are protected under Nigerian and international copyright and trademark laws. Users are strictly prohibited from reverse engineering, scraping, or engaging in malicious, coordinated public defamation campaigns against the platform.',
+              ),
+              _buildPolicySection(
+                '12. Limitation of Liability & Damage Cap',
+                'To the maximum extent permitted under Nigerian law, Pickpadi Global Ltd, its directors, officers, and affiliates shall not be liable for any indirect, incidental, special, exemplary, punitive, or consequential damages, including personal injury, property loss, or trip delays resulting from third-party driver partners. Total platform liability for any verified dispute shall not exceed the specific fare paid for that individual trip.',
+              ),
+              _buildPolicySection(
+                '13. Governing Law, Class Action Waiver & Binding Arbitration',
+                'This Agreement is governed by the laws of the Federal Republic of Nigeria. All disputes shall be resolved on an individual basis; class, collective, or representative actions are expressly waived. Any dispute arising from or related to platform usage that cannot be settled amicably within thirty (30) days shall be submitted to final and binding arbitration in Lagos State under the Nigerian Arbitration and Mediation Act 2023.',
               ),
               const SizedBox(height: 20),
             ],

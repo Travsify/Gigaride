@@ -262,29 +262,7 @@ class _InAppCallScreenState extends State<InAppCallScreen> {
                 ),
               ),
 
-              if (widget.riderPhone != null && widget.riderPhone!.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 18),
-                      label: Text(
-                        'Direct Cellular Call (${widget.riderPhone})',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        launchUrl(Uri.parse('tel:${widget.riderPhone}'), mode: LaunchMode.externalApplication);
-                      },
-                    ),
-                  ),
-                ),
-              ],
+              const SizedBox(height: 12),
 
               // Call Controls Area
               Padding(

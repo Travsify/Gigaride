@@ -223,7 +223,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(6)),
-                          child: const Text('Korapay DVA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          child: const Text('Instant DVA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -285,7 +285,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                    child: const Text('Paystack PCI-DSS', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                    child: const Text('PCI-DSS Secure', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -389,7 +389,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
                     final amountNgn = ((tx['amount_kobo'] ?? 0) / 100).round();
                     final brand = (tx['card_brand'] ?? 'CARD').toString().toUpperCase();
                     final last4 = tx['card_last4'] ?? '';
-                    final bank = tx['card_bank'] ?? 'Paystack';
+                    final bank = tx['card_bank'] ?? 'Debit Card';
 
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

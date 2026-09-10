@@ -158,13 +158,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
 
-            // Option 3: Pay with New Card (Paystack Checkout)
+            // Option 3: Pay with New Card (Giga Secure Checkout)
             SizedBox(
               width: double.infinity,
               height: 44,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.add_card_rounded, color: Colors.white, size: 16),
-                label: const Text('Pay with New Card (Paystack Checkout)', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text('Pay with New Card (Giga Secure Checkout)', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
                 onPressed: () async {
                   Navigator.pop(ctx);

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../services/api_service.dart';
@@ -314,12 +315,16 @@ class DriverProvider with ChangeNotifier {
       onNewRideRequest: (req) {
         incomingRequests.removeWhere((r) => r['rideId'] == req['rideId']);
         incomingRequests.insert(0, req);
+        HapticFeedback.heavyImpact();
+        SystemSound.play(SystemSoundType.alert);
         notifyListeners();
       },
       onRideAssigned: (assignment) {
         activeTrip = assignment;
         tripStep = 'ACCEPTED';
         incomingRequests.clear();
+        HapticFeedback.heavyImpact();
+        SystemSound.play(SystemSoundType.alert);
         notifyListeners();
       },
       onSubscriptionUpdated: (update) {
@@ -445,13 +450,16 @@ class DriverProvider with ChangeNotifier {
 
   void updateTripStatus(String status) {
     if (activeTrip == null) return;
+    final rId = (activeTrip!['rideId'] ?? activeTrip!['id'] ?? activeTrip!['ride_id'] ?? '').toString();
     socket.updateTripStatus(
-      rideId: activeTrip!['rideId'],
+      rideId: rId,
       status: status,
     );
     tripStep = status;
     if (status == 'COMPLETED') {
-      final fare = activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? 0;
+      socket.socket?.emit('ride:completed', {'rideId': rId});
+      socket.socket?.emit('ride:finish', {'rideId': rId});
+      final fare = activeTrip!['agreedFareNgn'] ?? activeTrip!['counterFareNgn'] ?? activeTrip!['riderOfferNgn'] ?? 0;
       todayGrossEarningsNgn += fare;
       todayCompletedTripsCount++;
       activeTrip = null;

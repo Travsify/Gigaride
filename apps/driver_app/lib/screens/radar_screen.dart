@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
@@ -67,6 +68,8 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _initDriverLocation();
+    // Keep screen awake while driver is on radar
+    WakelockPlus.enable();
   }
 
 
@@ -99,6 +102,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
   void dispose() {
     _driverLocationSub?.cancel();
     _pulseController.dispose();
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -246,7 +250,68 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
       );
       return;
     }
+
+    final remaining = provider.remainingRides;
+    final hasActiveSub = provider.hasActiveSubscription;
+    if (!provider.isOnline && remaining <= 0 && !hasActiveSub) {
+      _showOffRadarExhaustedModal();
+      return;
+    }
+
     provider.toggleOnline();
+  }
+
+  void _showOffRadarExhaustedModal() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppConstants.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppConstants.dangerColor, width: 1.5),
+        ),
+        title: const Column(
+          children: [
+            Icon(Icons.radar_outlined, color: AppConstants.dangerColor, size: 48),
+            SizedBox(height: 12),
+            Text(
+              "You're Off the Radar",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppConstants.textLight, fontSize: 19, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Your trip allowance and 2 grace trips are completed. You are currently invisible on the passenger radar. Activate any subscription plan of your choice to go live immediately and keep 100% of your earnings.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppConstants.textMuted, fontSize: 13, height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+              label: const Text('Tap to Pay & Go Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionScreen()));
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Remind Me Later', style: TextStyle(color: AppConstants.textMuted)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -338,29 +403,34 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                         ),
                       ),
 
-                      // Subscription Rides Pill
+                      // Subscription Rides Pill (Responsive, never spills out)
                       GestureDetector(
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionScreen()));
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(
-                            color: remaining > 2 ? AppConstants.primaryColor.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                            color: remaining > 2
+                                ? AppConstants.primaryColor.withOpacity(0.2)
+                                : (remaining > 0 ? Colors.amber.withOpacity(0.2) : AppConstants.dangerColor.withOpacity(0.2)),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: remaining > 2 ? AppConstants.primaryLight : Colors.amberAccent,
+                              color: remaining > 2
+                                  ? AppConstants.primaryLight
+                                  : (remaining > 0 ? Colors.amberAccent : AppConstants.dangerColor),
                             ),
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.bolt_rounded, size: 16, color: remaining > 2 ? AppConstants.primaryLight : Colors.amberAccent),
+                              Icon(Icons.bolt_rounded, size: 15, color: remaining > 2 ? AppConstants.primaryLight : (remaining > 0 ? Colors.amberAccent : AppConstants.dangerColor)),
                               const SizedBox(width: 4),
                               Text(
-                                '$remaining Rides Left',
+                                remaining > 0 ? '$remaining Left' : 'Renew Plan',
                                 style: TextStyle(
-                                  color: remaining > 2 ? AppConstants.textLight : Colors.amberAccent,
-                                  fontSize: 12,
+                                  color: remaining > 2 ? AppConstants.textLight : (remaining > 0 ? Colors.amberAccent : AppConstants.dangerColor),
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -373,9 +443,9 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
 
                   const SizedBox(height: 10),
 
-                  // Benchmark Fuel Ticker
+                  // Benchmark Fuel Ticker (National / Nigeria-wide, auto-contained)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppConstants.cardBg,
                       borderRadius: BorderRadius.circular(12),
@@ -385,16 +455,83 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.local_gas_station_rounded, color: Colors.cyanAccent, size: 15),
+                            Icon(Icons.local_gas_station_rounded, color: Colors.cyanAccent, size: 14),
                             SizedBox(width: 6),
-                            Text('Lagos Petrol Benchmark:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
+                            Text('Petrol Benchmark:', style: TextStyle(color: AppConstants.textMuted, fontSize: 11)),
                           ],
                         ),
-                        Text('₦1,050/L • 0% Commission Shield', style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '₦1,050/L • 0% Commission Shield',
+                            style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
                       ],
                     ),
                   ),
+
+                  // Grace Period Warning Banner (2 Extra Trips Allowed)
+                  if (remaining <= 2 && remaining > 0 && isOnline) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionScreen())),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amberAccent, width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '⚠️ Grace Period: $remaining extra trip${remaining == 1 ? '' : 's'} left before going invisible on radar. Tap to renew.',
+                                style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, color: Colors.amberAccent, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Off Radar Notice when 0 trips remain
+                  if (remaining <= 0 && isOnline) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionScreen())),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppConstants.dangerColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppConstants.dangerColor, width: 1.2),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.radar_outlined, color: AppConstants.dangerColor, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '📡 You are OFF the Radar: Trip allowance exhausted. Tap to choose a plan and go back live.',
+                                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: Colors.white, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -511,6 +648,7 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                     final distance = req['driverPickupDistanceKm'] ?? 1.8;
                     final isFriend = req['riderType'] == 'FRIEND' || req['rider_type'] == 'FRIEND';
                     final riderName = req['riderName'] ?? req['rider_name'];
+                    final riderRating = (req['riderRating'] ?? req['rider_rating'] ?? req['passengerRating'] ?? req['rating'] ?? 4.9).toString();
                     final notes = req['notes'] ?? req['tripInstructions'];
 
                     return Container(
@@ -543,6 +681,25 @@ class _RadarScreenState extends State<RadarScreen> with SingleTickerProviderStat
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text('${distance.toStringAsFixed(1)} km to pickup', style: const TextStyle(color: AppConstants.primaryLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.star_rounded, color: Colors.amberAccent, size: 13),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          riderRating,
+                                          style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   if (isFriend && riderName != null) ...[
                                     const SizedBox(width: 8),

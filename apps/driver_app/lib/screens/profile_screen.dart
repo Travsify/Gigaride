@@ -57,28 +57,36 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               const SizedBox(height: 18),
               _buildPolicySection(
-                '1. Asymmetric Phone Number Masking',
-                'Your personal mobile number is never disclosed to passengers. All in-app voice calls and chat messages utilize end-to-end encrypted virtual proxy relays, ensuring full anonymity before, during, and after each trip.',
+                '1. Asymmetric Phone Number Masking & VoIP Communications',
+                'Your personal mobile number is never disclosed or transmitted to passengers. All incoming and outgoing voice calls and messages utilize end-to-end encrypted virtual proxy relays, ensuring complete confidentiality before, during, and after each trip.',
               ),
               _buildPolicySection(
-                '2. Information We Collect & Legal Basis',
-                'We collect government identity credentials (NIN and FRSC Driver\'s License verified in real time via Official Identity Portals), high-precision GPS telemetry for trip navigation and SOS dispatch, and vehicle technical specifications to ensure passenger safety and federal compliance.',
+                '2. Information Collected & Official Verification',
+                'We collect government identity credentials (NIN and FRSC Driver\'s License verified in real time via NIMC and FRSC official databases), vehicle registration papers, high-precision GPS telemetry, and terminal hardware identifiers to ensure passenger safety, vehicle traceability, and federal compliance.',
               ),
               _buildPolicySection(
-                '3. Bank-Grade Financial Security',
-                'Dedicated NUBAN virtual bank accounts are powered exclusively by Korapay for direct bank transfers, while card funding and dynamic payment checkouts are powered directly by Paystack (PCI-DSS Level 1 certified). Giga Ride never stores full card PANs or CVVs on platform servers.',
+                '3. Background Location Tracking Disclosure (App Store Compliance)',
+                'The Giga Driver terminal collects precise real-time location data even when the app is running in the background or when the screen is locked. This telemetry is strictly required to: (a) broadcast your vehicle position on passenger radar maps, (b) calculate accurate distance and arrival estimates, (c) route navigation, and (d) stream live coordinates during emergency SOS alerts.',
               ),
               _buildPolicySection(
-                '4. Real-Time Telemetry & Safety Auditing',
-                'Location telemetry is recorded only while the terminal is Online or during active trips. Telemetry logs are retained for safety dispute resolution, insurance claims, and emergency dispatch, in strict compliance with statutory transport guidelines.',
+                '4. Bank-Grade Financial Security & Payouts',
+                'Dedicated NUBAN virtual accounts and direct bank settlement payouts are provisioned via CBN-licensed payment banking partners. Giga never captures or stores payment card CVVs or bank login credentials on platform servers.',
               ),
               _buildPolicySection(
-                '5. Driver Rights & Data Erasure',
-                'In accordance with Section 34 of the NDPA 2023, you have the right to request access to your data, rectify inaccuracies, or permanently request account deactivation and personal data erasure.',
+                '5. Statutory Data Retention Schedule',
+                'Driver identity credentials, KYC verification records, and transaction settlement histories are retained for six (6) years in strict compliance with Central Bank of Nigeria (CBN) AML/CFT guidelines and Nigerian tax regulations. Real-time GPS telemetry is retained for twelve (12) months for safety dispute resolution, insurance claims, and statutory auditing.',
               ),
               _buildPolicySection(
-                '6. Data Protection Officer (DPO)',
-                'For inquiries or to exercise your privacy rights, contact our Data Protection Officer at dpo@gigaride.ng or privacy@gigaride.ng. Head Office: Plot 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.',
+                '6. Law Enforcement Cooperation & Legal Disclosure',
+                'In accordance with Nigerian law, Pickpadi Global Ltd reserves the right to disclose driver vehicle telemetry, trip records, and identity files to statutory law enforcement agencies (Nigeria Police Force, FRSC, VIO, EFCC) upon receipt of a valid court order, warrant, or in connection with criminal or road collision investigations.',
+              ),
+              _buildPolicySection(
+                '7. Driver Rights & Account Erasure (§ 34 NDPA)',
+                'Under Section 34 of the NDPA 2023, you retain the legal right to inspect your profile data, rectify inaccuracies, or permanently request account deactivation and personal data erasure via the in-app Delete Account utility.',
+              ),
+              _buildPolicySection(
+                '8. Data Protection Officer (DPO) Contact',
+                'For inquiries or to exercise your statutory data privacy rights, contact our Data Protection Officer at dpo@gigaride.ng or privacy@gigaride.ng. Corporate Office: Plot 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.',
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -122,16 +130,48 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               const SizedBox(height: 14),
               _buildPolicySection(
-                '1. 100% Zero Platform Commission',
-                'Giga Ride charges 0% commission on all completed trips. Drivers retain 100% of the agreed fare paid by passengers. Platform access is governed exclusively through upfront ride packs or unlimited subscriptions.',
+                '1. Independent Contractor Relationship & Non-Exclusivity',
+                'Driver Partners are independent commercial transport operators and not employees, agents, or joint-venturers of Pickpadi Global Ltd under the Nigerian Labour Act. Giga is exclusively a technology dispatch marketplace. Drivers maintain absolute discretion over their working hours, route selection, and decision to accept or decline requests. Drivers are expressly free to operate on other commercial platforms (e.g. Bolt, Uber, InDrive) or provide private transport services without restriction.',
               ),
               _buildPolicySection(
-                '2. Code of Conduct & Vehicle Standards',
-                'Drivers agree to maintain safe, roadworthy commercial vehicles with valid FRSC licenses, working air conditioning, and polite passenger conduct. Non-compliance may result in temporary cockpit suspension.',
+                '2. 100% Zero Commission & Non-Refundable Plans',
+                'Giga charges 0% commission on all completed trips. Driver Partners retain 100% of all agreed fares paid by passengers. Terminal radar visibility is governed by subscription plans or ride packs. Once trip allowance is exhausted, two (2) grace trips are permitted before radar visibility is suspended. All subscription payments and ride pack purchases are strictly non-refundable once activated or partially utilized.',
               ),
               _buildPolicySection(
-                '3. Fair Live Bidding',
-                'Fares are determined by mutual agreement between passenger and driver. Drivers have the freedom to accept proposed fares or submit custom counter-bids based on traffic and operating costs.',
+                '3. Real-Time Haggling & Fare Gouging Prohibition',
+                'Trip fares are agreed upon directly between Driver and Rider via in-app bidding. Driver Partners are strictly prohibited from demanding excess cash, unilateral surcharges, or extorting passengers above the agreed price upon arrival. Price gouging constitutes a contractual breach and violation of Nigerian FCCPC regulations, resulting in immediate suspension.',
+              ),
+              _buildPolicySection(
+                '4. Strict Prohibition of Offline Solicitation ("Street Poaching")',
+                'Driver Partners are strictly prohibited from accepting a Giga ride request and subsequently instructing or inducing the passenger to cancel the in-app trip to pay cash offline. Offlining bypasses safety telemetry, invalidates insurance coverage, and results in instant, permanent account deactivation and blacklisting.',
+              ),
+              _buildPolicySection(
+                '5. Vehicle Roadworthiness, Licensing & NAICOM Insurance',
+                'Driver Partners warrant that their vehicle meets all statutory roadworthiness standards, possesses a valid FRSC driver\'s license, valid Roadworthiness Certificate, functional air conditioning, and active Third-Party or Comprehensive Motor Vehicle Insurance as prescribed by NAICOM. Pickpadi Global Ltd provides no motor vehicle insurance.',
+              ),
+              _buildPolicySection(
+                '6. Passenger Confidentiality & Anti-Harassment',
+                'Driver Partners must maintain strict passenger confidentiality. Passenger phone numbers are masked. Drivers are strictly prohibited from storing, extracting, stalking, or contacting passengers outside the platform for personal purposes. Pickpadi Global Ltd enforces zero tolerance for verbal abuse, sexual advances, or physical altercations.',
+              ),
+              _buildPolicySection(
+                '7. Cash Settlement & Living Wallet Change Rollover',
+                'Drivers may collect fares via cash, direct bank transfer, or Living Wallet settlement. When a passenger tenders excess cash, the Driver Partner agrees to credit the exact change to the passenger\'s Living Wallet using the in-app Change Settlement utility to eliminate cash change disputes.',
+              ),
+              _buildPolicySection(
+                '8. Criminal Background & Medical Fitness Warranty',
+                'Driver Partners warrant that they have no criminal convictions, pending felony charges, or history of violent crimes or driving under the influence (DUI). Drivers agree to periodic background checks and medical fitness verifications upon request.',
+              ),
+              _buildPolicySection(
+                '9. Tax & Statutory Levies Indemnification',
+                'Driver Partners operate as independent business owners and are solely responsible for declaring and remitting all applicable federal, state, and municipal taxes (including Personal Income Tax - PIT, state road permits, and local government vehicle stickers). Pickpadi Global Ltd is not a tax withholding agent and drivers indemnify the company against any personal tax liabilities.',
+              ),
+              _buildPolicySection(
+                '10. Limitation of Liability & Indemnification',
+                'Driver Partners agree to defend, indemnify, and hold harmless Pickpadi Global Ltd, its directors, employees, and agents from any claims, fines, vehicle impoundments (e.g. VIO, LASTMA), traffic citations, road accidents, or third-party liabilities arising from the driver\'s operation of their vehicle.',
+              ),
+              _buildPolicySection(
+                '11. Governing Law, Class Action Waiver & Binding Arbitration',
+                'This Agreement is governed by the laws of the Federal Republic of Nigeria. All disputes shall be resolved on an individual basis; class, collective, or representative proceedings are expressly waived. Any dispute that cannot be settled amicably within thirty (30) days shall be submitted to final and binding arbitration in Lagos State under the Nigerian Arbitration and Mediation Act 2023.',
               ),
               const SizedBox(height: 20),
             ],
@@ -351,21 +391,43 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Commercial Vehicle Profile', style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold)),
+                      const Expanded(
+                        child: Text(
+                          'Vehicle Profile',
+                          style: TextStyle(color: AppConstants.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycScreen())),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: kyc == 'APPROVED' ? AppConstants.successColor.withOpacity(0.15) : AppConstants.accentColor.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor),
                           ),
-                          child: Text(
-                            kyc == 'APPROVED' ? '✓ Verified & Approved' : 'KYC $kyc',
-                            style: TextStyle(color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor, fontSize: 11, fontWeight: FontWeight.bold),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                kyc == 'APPROVED' ? Icons.verified_rounded : Icons.pending_rounded,
+                                color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor,
+                                size: 13,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                kyc == 'APPROVED' ? 'Verified & Approved' : 'KYC $kyc',
+                                style: TextStyle(
+                                  color: kyc == 'APPROVED' ? AppConstants.successColor : AppConstants.accentColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
