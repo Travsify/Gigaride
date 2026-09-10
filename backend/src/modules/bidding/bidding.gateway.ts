@@ -31,6 +31,20 @@ export function broadcastFleetAlert(target: 'ALL' | 'DRIVERS' | 'PASSENGERS', al
   }
 }
 
+export function notifyRideStatusChanged(rideId: string, status: string, riderId?: string, driverId?: string) {
+  if (!globalIo) return;
+  const payload = { rideId, status };
+  if (riderId) globalIo.to(`user:${riderId}`).emit('ride:status_changed', payload);
+  if (driverId) globalIo.to(`user:${driverId}`).emit('ride:status_changed', payload);
+  if (status === 'COMPLETED' || status === 'CANCELLED') {
+    globalIo.emit('ride:closed', { rideId });
+    if (status === 'CANCELLED') {
+      if (riderId) globalIo.to(`user:${riderId}`).emit('ride:cancelled', { rideId, reason: 'Ride cancelled' });
+      if (driverId) globalIo.to(`user:${driverId}`).emit('ride:cancelled', { rideId, reason: 'Ride cancelled' });
+    }
+  }
+}
+
 export async function dispatchRideToDrivers(rideId: string): Promise<boolean> {
   if (!globalIo) {
     console.warn(`[Ride Dispatch] Cannot dispatch ride ${rideId} - globalIo not initialized.`);

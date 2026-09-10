@@ -49,7 +49,7 @@ export class AgoraService {
       uid,
       role,
       expireSeconds,
-      privilegeExpiredTs
+      expireSeconds
     );
 
     return {

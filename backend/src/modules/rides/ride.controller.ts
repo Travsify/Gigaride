@@ -5,7 +5,7 @@ import { AuthenticatedRequest, requireAuth, requireRole } from '../auth/auth.mid
 import { db } from '../../database';
 import { fincraService } from '../payments/fincra.service';
 import { agoraService } from '../calls/agora.service';
-import { dispatchRideToDrivers } from '../bidding/bidding.gateway';
+import { dispatchRideToDrivers, notifyRideStatusChanged } from '../bidding/bidding.gateway';
 
 export const rideRouter = Router();
 
@@ -206,6 +206,10 @@ rideRouter.post(
       await db.debitVirtualAccountBalance(passengerVba.account_number, fareNgn);
       await db.creditVirtualAccountBalance(driverVba.account_number, fareNgn);
 
+      // Lock ride status to COMPLETED and notify both parties in real-time
+      await db.updateRideStatus(rideId, 'COMPLETED');
+      notifyRideStatusChanged(rideId, 'COMPLETED', ride.rider_id, ride.driver_id || undefined);
+
       res.status(200).json({
         success: true,
         message: `Successfully paid ₦${fareNgn.toLocaleString()} from Giga Wallet to driver.`,
@@ -326,6 +330,7 @@ rideRouter.patch(
       }
 
       await db.updateRideStatus(rideId, status);
+      notifyRideStatusChanged(rideId, status, ride.rider_id, ride.driver_id || undefined);
       res.status(200).json({ success: true, data: { rideId, status } });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
