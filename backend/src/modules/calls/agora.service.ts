@@ -48,8 +48,10 @@ export class AgoraService {
       channelName,
       uid,
       role,
-      privilegeExpiredTs
+      expireSeconds,
+      expireSeconds
     );
+
 
 
     return {

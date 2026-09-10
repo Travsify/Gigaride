@@ -91,8 +91,10 @@ class PassengerProvider with ChangeNotifier {
 
       // 2. Content + Sender role deduplication (catches local vs server echo)
       final sameSender = m['senderRole'] == msg['senderRole'];
-      final sameText = (m['text'] ?? '').toString().trim() == (msg['text'] ?? '').toString().trim();
-      if (sameSender && sameText && sameText.isNotEmpty) {
+      final text1 = (m['text'] ?? '').toString().trim();
+      final text2 = (msg['text'] ?? '').toString().trim();
+      final sameText = text1 == text2 && text1.isNotEmpty;
+      if (sameSender && sameText) {
         try {
           final t1 = DateTime.tryParse(m['timestamp'] ?? '')?.millisecondsSinceEpoch ?? 0;
           final t2 = DateTime.tryParse(msg['timestamp'] ?? '')?.millisecondsSinceEpoch ?? 0;
