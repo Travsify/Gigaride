@@ -4,8 +4,8 @@ import shutil
 downloads = os.path.expanduser('~\\Downloads')
 
 # Source APKs
-passenger_src = r'c:\Users\USER\Desktop\giga\apps\passenger_app\build\app\outputs\flutter-apk\app-debug.apk'
-driver_src = r'c:\Users\USER\Desktop\giga\apps\driver_app\build\app\outputs\flutter-apk\app-debug.apk'
+passenger_src = r'c:\Users\USER\Desktop\giga\apps\passenger_app\build\app\outputs\flutter-apk\app-release.apk'
+driver_src = r'c:\Users\USER\Desktop\giga\apps\driver_app\build\app\outputs\flutter-apk\app-release.apk'
 
 # Dedicated folders in Downloads
 passenger_folder = os.path.join(downloads, 'GigaRide_Passenger')
@@ -23,6 +23,9 @@ targets = [
     (passenger_src, os.path.join(downloads, 'GigaPassenger-release.apk')),
     (driver_src, os.path.join(downloads, 'GigaRide-Driver.apk')),
     (driver_src, os.path.join(downloads, 'GigaDriver-release.apk')),
+    # Project release_apks directory
+    (passenger_src, r'c:\Users\USER\Desktop\giga\release_apks\gigaride-passenger.apk'),
+    (driver_src, r'c:\Users\USER\Desktop\giga\release_apks\gigaride-driver.apk'),
 ]
 
 print('=== Deploying Updated APKs to Downloads ===')
