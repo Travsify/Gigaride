@@ -7,7 +7,6 @@ import { autoTopupService } from '../subscriptions/autoTopup.service';
 import { calculateHaversineDistanceKm } from '../../common/geo';
 import { oneSignalService } from '../notifications/onesignal.service';
 import { twilioService } from '../notifications/twilio.service';
-import { agoraService } from '../calls/agora.service';
 import { ENV } from '../../config/env';
 
 interface AuthenticatedSocket extends Socket {
@@ -777,27 +776,21 @@ export function setupBiddingGateway(io: SocketIOServer) {
       }
     });
 
-    // --- In-App Secure Calling (VoIP / WebRTC Encrypted Audio) ---
-    // Passenger's personal phone number is NEVER exposed. Audio routes peer-to-peer via WebRTC.
+    // --- In-App Secure Calling (Native WebRTC Peer-to-Peer Encrypted Audio) ---
+    // Passenger's and Driver's phone numbers are NEVER exposed. Audio routes peer-to-peer via WebRTC.
     socket.on('call:initiate', async (data: { rideId: string; receiverId: string }) => {
       try {
         const caller = await db.findUserById(user.userId);
         const callerName = user.role === 'DRIVER' ? (caller?.full_name || 'Driver') : (caller?.full_name || 'Passenger');
         const channelName = `ride_${data.rideId}`;
-        let agoraData = { appId: '', token: '' };
-        try {
-          agoraData = await agoraService.generateRtcToken(channelName, 0);
-        } catch (_) {}
 
-        console.log(`📞 [In-App Call] Initiated by ${user.role} (${user.userId}) to ${data.receiverId} for ride ${data.rideId}`);
+        console.log(`📞 [Native WebRTC Call] Initiated by ${user.role} (${user.userId}) to ${data.receiverId} for ride ${data.rideId}`);
 
         io.to(`user:${data.receiverId}`).emit('call:incoming', {
           rideId: data.rideId,
           callerId: user.userId,
           callerName,
           callerRole: user.role,
-          agoraAppId: agoraData.appId,
-          agoraToken: agoraData.token,
           channelName,
           timestamp: new Date().toISOString(),
         });
@@ -805,8 +798,6 @@ export function setupBiddingGateway(io: SocketIOServer) {
         // Also notify caller
         socket.emit('call:token_ready', {
           rideId: data.rideId,
-          agoraAppId: agoraData.appId,
-          agoraToken: agoraData.token,
           channelName,
         });
       } catch (err: any) {
@@ -817,17 +808,11 @@ export function setupBiddingGateway(io: SocketIOServer) {
     socket.on('call:answer', async (data: { rideId: string; callerId: string }) => {
       try {
         const channelName = `ride_${data.rideId}`;
-        let agoraData = { appId: '', token: '' };
-        try {
-          agoraData = await agoraService.generateRtcToken(channelName, 0);
-        } catch (_) {}
-        console.log(`📞 [In-App Call Answered] User ${user.userId} answered call from ${data.callerId}`);
+        console.log(`📞 [Native WebRTC Call Answered] User ${user.userId} answered call from ${data.callerId}`);
 
         const connectPayload = {
           rideId: data.rideId,
           answeredBy: user.userId,
-          agoraAppId: agoraData.appId,
-          agoraToken: agoraData.token,
           channelName,
         };
 
